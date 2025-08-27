@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>MOAA</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <nav class="navbar">
+    <div class="nav-left">
+      <div class="logo">MOAA</div>
+      <ul class="nav-links">
+        <li class="nav-item"><a href="{{ url_for('main.home') }}">Home</a></li>
+        <li class="nav-item">
+          <a href="#">Analysis <span class="arrow">&#9662;</span></a>
+          <div class="dropdown">
+            <a href="#">PPM analysis</a>
+            <a href="#">AOI Grades</a>
+            <a href="#">AOI Daily Reports</a>
+            <a href="#">FI Daily Reports</a>
+          </div>
+        </li>
+        <li class="nav-item">
+          <a href="#">Tools <span class="arrow">&#9662;</span></a>
+          <div class="dropdown">
+            <a href="#">Rework Stencil Lookup</a>
+            <a href="#">Verified Part Markings</a>
+          </div>
+        </li>
+        <li class="nav-item">
+          <a href="#">Production <span class="arrow">&#9662;</span></a>
+          <div class="dropdown">
+            <a href="#"><em>Jobs</em></a>
+            <a href="#"><em><strong>SPC Dashboard</strong></em></a>
+          </div>
+        </li>
+      </ul>
+    </div>
+    <div class="nav-right">
+      {% if username %}
+      <span class="user-text">user:{{ username }}</span>
+      {% endif %}
+      <a href="#">Docs</a>
+      <a href="{{ url_for('auth.logout') }}">Logout</a>
+      <a href="#">Settings</a>
+      <a href="#">Light</a>
+      <a href="#">Dark</a>
+    </div>
+  </nav>
+  <div class="content">
+    {% block content %}{% endblock %}
+  </div>
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
