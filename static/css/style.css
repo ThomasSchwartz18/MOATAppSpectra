@@ -18,8 +18,11 @@ body {
 }
 
 .logo {
-  font-weight: bold;
   margin-right: 20px;
+}
+
+.logo img {
+  width: 25px;
 }
 
 .nav-links {
@@ -80,13 +83,16 @@ body {
   align-items: center;
 }
 
-.nav-right span,
 .nav-right a {
   margin-left: 10px;
   font-size: 0.9em;
   text-decoration: underline;
   color: #000;
   transition: color 0.3s ease;
+}
+
+.user-text {
+  text-decoration: none;
 }
 
 .nav-right a:hover {

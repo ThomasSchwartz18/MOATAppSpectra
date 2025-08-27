@@ -8,7 +8,7 @@
 <body>
   <nav class="navbar">
     <div class="nav-left">
-      <div class="logo">MOAA</div>
+      <div class="logo"><img src="{{ url_for('static', filename='images/company-logo.png')}}" alt="Spectra Tech Manufacturing"></div>
       <ul class="nav-links">
         <li class="nav-item"><a href="{{ url_for('main.home') }}">Home</a></li>
         <li class="nav-item">
@@ -31,7 +31,7 @@
           <a href="#">Production <span class="arrow">&#9662;</span></a>
           <div class="dropdown">
             <a href="#"><em>Jobs</em></a>
-            <a href="#"><em><strong>SPC Dashboard</strong></em></a>
+            <a href="#"><em>SPC Dashboard</em></a>
           </div>
         </li>
       </ul>
@@ -45,8 +45,6 @@
       <a href="{{ url_for('main.admin_panel') }}">Settings</a>
       {% endif %}
       <a href="{{ url_for('auth.logout') }}">Logout</a>
-      <a href="#">Light</a>
-      <a href="#">Dark</a>
     </div>
   </nav>
   <div class="content">
