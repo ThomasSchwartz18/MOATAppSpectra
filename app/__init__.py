@@ -13,7 +13,7 @@ def create_app():
         template_folder="../templates",
         static_folder="../static",
     )
-    app.secret_key = "dev-secret-key"
+    app.secret_key = os.environ["SECRET_KEY"]
 
     supabase = create_client(
         os.environ["SUPABASE_URL"],
