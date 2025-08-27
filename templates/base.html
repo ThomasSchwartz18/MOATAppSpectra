@@ -41,8 +41,10 @@
       <span class="user-text">user:{{ username }}</span>
       {% endif %}
       <a href="#">Docs</a>
+      {% if username == 'ADMIN' %}
+      <a href="{{ url_for('main.admin_panel') }}">Settings</a>
+      {% endif %}
       <a href="{{ url_for('auth.logout') }}">Logout</a>
-      <a href="#">Settings</a>
       <a href="#">Light</a>
       <a href="#">Dark</a>
     </div>
