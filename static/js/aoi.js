@@ -4,6 +4,7 @@ let currentData = { labels: [], accepted: [], rejected: [] };
 let savedQueriesCache = [];
 let customerOptions = [];
 let operatorOptions = [];
+let activePreset = null;
 
 function uniqueSorted(arr) {
   return Array.from(new Set(arr.filter((x) => x != null && x !== ''))).sort();
@@ -97,6 +98,47 @@ function renderChart(targetId, labels, accepted, rejected) {
   if (targetId === 'aoiChart') aoiChartInstance = inst; else aoiChartExpandedInstance = inst;
 }
 
+function renderShiftChart(targetId, labels, shift1, shift2) {
+  const ctx = document.getElementById(targetId).getContext('2d');
+  const data = {
+    labels,
+    datasets: [
+      { label: '1st Accepted', data: shift1.accepted, backgroundColor: 'rgba(54,162,235,0.6)', stack: 'shift1' },
+      { label: '1st Rejected', data: shift1.rejected, backgroundColor: 'rgba(255,99,132,0.6)', stack: 'shift1' },
+      { label: '2nd Accepted', data: shift2.accepted, backgroundColor: 'rgba(75,192,192,0.6)', stack: 'shift2' },
+      { label: '2nd Rejected', data: shift2.rejected, backgroundColor: 'rgba(255,206,86,0.6)', stack: 'shift2' },
+    ],
+  };
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: {
+      x: { stacked: true },
+      y: { stacked: true, beginAtZero: true },
+    },
+    plugins: {
+      tooltip: {
+        callbacks: {
+          label(ctx) {
+            const label = ctx.dataset.label || '';
+            const value = ctx.parsed.y;
+            const total = ctx.chart.data.datasets
+              .filter((ds) => ds.stack === ctx.dataset.stack)
+              .reduce((sum, ds) => sum + ds.data[ctx.dataIndex], 0);
+            const pct = total ? ((value / total) * 100).toFixed(1) : 0;
+            return `${label}: ${value} (${pct}%)`;
+          },
+        },
+      },
+    },
+  };
+  if (targetId === 'aoiChart' && aoiChartInstance) aoiChartInstance.destroy();
+  if (targetId === 'aoiChartExpanded' && aoiChartExpandedInstance) aoiChartExpandedInstance.destroy();
+  // eslint-disable-next-line no-undef
+  const inst = new Chart(ctx, { type: 'bar', data, options });
+  if (targetId === 'aoiChart') aoiChartInstance = inst; else aoiChartExpandedInstance = inst;
+}
+
 function fillTable(labels, accepted, rejected) {
   const tbody = document.getElementById('data-tbody');
   tbody.innerHTML = '';
@@ -110,12 +152,39 @@ function fillTable(labels, accepted, rejected) {
   });
 }
 
+function fillShiftTable(labels, shift1, shift2) {
+  const tbody = document.getElementById('data-tbody');
+  tbody.innerHTML = '';
+  labels.forEach((lab, i) => {
+    const entries = [
+      { name: `${lab} 1st`, acc: shift1.accepted[i], rej: shift1.rejected[i] },
+      { name: `${lab} 2nd`, acc: shift2.accepted[i], rej: shift2.rejected[i] },
+    ];
+    entries.forEach((e) => {
+      const total = e.acc + e.rej;
+      const accPct = total ? ((e.acc / total) * 100).toFixed(1) : 0;
+      const rejPct = total ? ((e.rej / total) * 100).toFixed(1) : 0;
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${e.name}</td><td>${e.acc}</td><td>${e.rej}</td><td>${accPct}%</td><td>${rejPct}%</td>`;
+      tbody.appendChild(tr);
+    });
+  });
+}
+
 function expandModal(show) {
   const overlay = document.getElementById('chart-modal');
   overlay.style.display = show ? 'flex' : 'none';
   if (show) {
-    renderChart('aoiChartExpanded', currentData.labels, currentData.accepted, currentData.rejected);
-    fillTable(currentData.labels, currentData.accepted, currentData.rejected);
+    const header = document.getElementById('data-label-header');
+    if (currentData.shift1 && currentData.shift2) {
+      renderShiftChart('aoiChartExpanded', currentData.labels, currentData.shift1, currentData.shift2);
+      fillShiftTable(currentData.labels, currentData.shift1, currentData.shift2);
+      if (header) header.textContent = 'Date / Shift';
+    } else {
+      renderChart('aoiChartExpanded', currentData.labels, currentData.accepted, currentData.rejected);
+      fillTable(currentData.labels, currentData.accepted, currentData.rejected);
+      if (header) header.textContent = 'Operator';
+    }
   }
 }
 
@@ -158,12 +227,24 @@ function runChart() {
     customers: getDropdownValues('filter-customer').join(','),
     operators: getDropdownValues('filter-operator').join(','),
   };
+  if (activePreset && activePreset.params && activePreset.params.view) {
+    params.view = activePreset.params.view;
+  }
   const qs = new URLSearchParams(params).toString();
   fetch(`/analysis/aoi/data?${qs}`)
     .then((r) => r.json())
     .then((res) => {
-      currentData = { labels: res.labels || [], accepted: res.accepted || [], rejected: res.rejected || [] };
-      renderChart('aoiChart', currentData.labels, currentData.accepted, currentData.rejected);
+      if (res.shift1 && res.shift2) {
+        currentData = { labels: res.labels || [], shift1: res.shift1, shift2: res.shift2 };
+        renderShiftChart('aoiChart', currentData.labels, currentData.shift1, currentData.shift2);
+        const s1 = res.shift1.avg_reject_rate?.toFixed ? res.shift1.avg_reject_rate.toFixed(1) : res.shift1.avg_reject_rate;
+        const s2 = res.shift2.avg_reject_rate?.toFixed ? res.shift2.avg_reject_rate.toFixed(1) : res.shift2.avg_reject_rate;
+        document.getElementById('aoi-info').textContent = `1st Shift Avg Reject Rate: ${s1}% | 2nd Shift Avg Reject Rate: ${s2}%`;
+      } else {
+        currentData = { labels: res.labels || [], accepted: res.accepted || [], rejected: res.rejected || [] };
+        renderChart('aoiChart', currentData.labels, currentData.accepted, currentData.rejected);
+        document.getElementById('aoi-info').textContent = '';
+      }
       document.getElementById('result-chart-name').textContent = document.getElementById('chart-title').value || '';
       document.getElementById('chart-description-result').textContent = document.getElementById('chart-description').value || '';
     });
@@ -205,6 +286,11 @@ function defaultPresets() {
       description: 'Boards accepted vs rejected per operator',
       params: { start_date: '', end_date: '', job_numbers: [], rev_numbers: [], assemblies: [], customers: [], operators: [] },
     },
+    {
+      name: 'Shift Reject Rate',
+      description: 'Accepted vs rejected per shift by date',
+      params: { start_date: '', end_date: '', job_numbers: [], rev_numbers: [], assemblies: [], customers: [], operators: [], view: 'shift' },
+    },
   ];
 }
 
@@ -223,6 +309,7 @@ function renderSavedList() {
 document.getElementById('saved-search').addEventListener('input', renderSavedList);
 
 function loadParams(row) {
+  activePreset = row;
   const p = row.params || {};
   document.getElementById('chart-title').value = row.name || '';
   document.getElementById('chart-description').value = row.description || '';
@@ -254,7 +341,7 @@ function loadSavedQueries() {
 }
 
 function collectParams() {
-  return {
+  const p = {
     start_date: document.getElementById('start-date').value || '',
     end_date: document.getElementById('end-date').value || '',
     job_numbers: getTextValues('filter-job'),
@@ -263,6 +350,10 @@ function collectParams() {
     customers: getDropdownValues('filter-customer'),
     operators: getDropdownValues('filter-operator'),
   };
+  if (activePreset && activePreset.params && activePreset.params.view) {
+    p.view = activePreset.params.view;
+  }
+  return p;
 }
 
 function saveQuery() {

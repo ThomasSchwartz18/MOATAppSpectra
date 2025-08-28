@@ -325,6 +325,46 @@ def aoi_daily_data():
             continue
         filtered.append(row)
 
+    view = request.args.get('view')
+
+    if view == 'shift':
+        agg = defaultdict(lambda: {'1st': {'accepted': 0, 'rejected': 0}, '2nd': {'accepted': 0, 'rejected': 0}})
+        totals = {'1st': {'accepted': 0, 'rejected': 0}, '2nd': {'accepted': 0, 'rejected': 0}}
+        for row in filtered:
+            date = parse_date(row.get('Date') or row.get('date'))
+            shift_raw = str(row.get('Shift') or row.get('shift') or '').lower()
+            if shift_raw in ('1', '1st', 'first', 'shift 1', 'shift1', '1st shift'):
+                shift = '1st'
+            elif shift_raw in ('2', '2nd', 'second', 'shift 2', 'shift2', '2nd shift'):
+                shift = '2nd'
+            else:
+                continue
+            inspected = int(row.get('Quantity Inspected') or row.get('quantity_inspected') or 0)
+            rejected = int(row.get('Quantity Rejected') or row.get('quantity_rejected') or 0)
+            accepted = inspected - rejected
+            if accepted < 0:
+                accepted = 0
+            agg[date][shift]['accepted'] += accepted
+            agg[date][shift]['rejected'] += rejected
+            totals[shift]['accepted'] += accepted
+            totals[shift]['rejected'] += rejected
+
+        dates = sorted(agg.keys())
+        s1_acc = [agg[d]['1st']['accepted'] for d in dates]
+        s1_rej = [agg[d]['1st']['rejected'] for d in dates]
+        s2_acc = [agg[d]['2nd']['accepted'] for d in dates]
+        s2_rej = [agg[d]['2nd']['rejected'] for d in dates]
+
+        def avg_rate(tot):
+            total = tot['accepted'] + tot['rejected']
+            return (tot['rejected'] / total * 100) if total else 0
+
+        return jsonify({
+            'labels': [d.isoformat() for d in dates],
+            'shift1': {'accepted': s1_acc, 'rejected': s1_rej, 'avg_reject_rate': avg_rate(totals['1st'])},
+            'shift2': {'accepted': s2_acc, 'rejected': s2_rej, 'avg_reject_rate': avg_rate(totals['2nd'])},
+        })
+
     agg = defaultdict(lambda: {'accepted': 0, 'rejected': 0})
     for row in filtered:
         op = row.get('Operator') or 'Unknown'
