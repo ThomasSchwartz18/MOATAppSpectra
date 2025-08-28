@@ -159,3 +159,54 @@ def update_saved_query(name: str, data: dict):
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to update saved query: {exc}"
+
+
+def fetch_saved_aoi_queries():
+    """Retrieve saved chart queries for the AOI Daily Reports page.
+
+    Expects a Supabase table named ``aoi_saved_queries`` with at least the
+    following columns:
+      - id (uuid) [optional]
+      - name (text)
+      - description (text)
+      - start_date (date)
+      - end_date (date)
+      - params (json)
+      - created_at (timestamptz)
+    """
+    supabase = _get_client()
+    try:
+        response = (
+            supabase.table("aoi_saved_queries")
+            .select("id,name,description,start_date,end_date,params,created_at")
+            .order("created_at", desc=True)
+            .execute()
+        )
+        return response.data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to fetch AOI saved queries: {exc}"
+
+
+def insert_saved_aoi_query(data: dict):
+    """Insert a saved AOI chart query definition into Supabase."""
+    supabase = _get_client()
+    try:
+        response = supabase.table("aoi_saved_queries").insert(data).execute()
+        return response.data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to save AOI chart query: {exc}"
+
+
+def update_saved_aoi_query(name: str, data: dict):
+    """Update or upsert a saved AOI chart query by ``name``."""
+    supabase = _get_client()
+    try:
+        payload = {**data, "name": name}
+        response = (
+            supabase.table("aoi_saved_queries")
+            .upsert(payload, on_conflict="name")
+            .execute()
+        )
+        return response.data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to update AOI saved query: {exc}"
