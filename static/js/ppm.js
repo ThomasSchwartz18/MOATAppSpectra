@@ -217,6 +217,7 @@ function collectChartConfig() {
 function collectParamsForSave() {
   return {
     title: document.getElementById('chart-title').value || '',
+    description: document.getElementById('chart-description').value || '',
     start_date: document.getElementById('start-date').value || '',
     end_date: document.getElementById('end-date').value || '',
     transform_expression: document.getElementById('transform-expression').value || '',
@@ -232,6 +233,7 @@ function collectParamsForSave() {
 
 function loadParamsIntoBuilder(params) {
   document.getElementById('chart-title').value = params.title || '';
+  document.getElementById('chart-description').value = params.description || '';
   document.getElementById('start-date').value = params.start_date || '';
   document.getElementById('end-date').value = params.end_date || '';
   document.getElementById('transform-expression').value = params.transform_expression || '';
@@ -297,6 +299,7 @@ function getDateInputs() {
 
 function runChart() {
   const title = document.getElementById('chart-title').value.trim();
+  const description = document.getElementById('chart-description').value.trim();
   runPresetChart()
     .then((result) => {
       const cfg = collectChartConfig();
@@ -344,12 +347,13 @@ function runChart() {
 
       if (ppmChartInstance) ppmChartInstance.destroy();
       // eslint-disable-next-line no-undef
-      ppmChartInstance = new Chart(ctx, { type: chartType, data: { labels, datasets }, options, plugins: (result.kind==='line-control' ? [controlLinesPlugin] : []) });
-      currentData = { labels, values: datasets[0]?.data || [], datasets };
-      window.currentChartMeta = { labels, datasets, type: chartType, options };
-      updateInfo(labels, datasets[0]?.data || []);
-      if (title) document.getElementById('modal-title').textContent = title;
-    })
+        ppmChartInstance = new Chart(ctx, { type: chartType, data: { labels, datasets }, options, plugins: (result.kind==='line-control' ? [controlLinesPlugin] : []) });
+        currentData = { labels, values: datasets[0]?.data || [], datasets };
+        window.currentChartMeta = { labels, datasets, type: chartType, options };
+        updateInfo(labels, datasets[0]?.data || []);
+        if (title) document.getElementById('modal-title').textContent = title;
+        document.getElementById('chart-description-result').textContent = description;
+      })
     .catch(() => { document.getElementById('ppm-info').textContent = 'Failed to build chart.'; });
 }
 

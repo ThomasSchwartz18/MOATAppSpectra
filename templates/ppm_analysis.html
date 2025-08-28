@@ -21,6 +21,13 @@
         </div>
       </div>
 
+      <div class="field-row">
+        <div class="field">
+          <label for="chart-description">Chart Description</label>
+          <textarea id="chart-description" placeholder="Describe this chart"></textarea>
+        </div>
+      </div>
+
     <div class="section-title" style="margin-top:10px;">Data Range</div>
     <div class="field-row">
       <div class="field">
@@ -166,9 +173,10 @@
         <canvas id="ppmChart"></canvas>
       </div>
       <div id="ppm-info" class="preview-info" style="margin-top:4px;"></div>
+      <div id="chart-description-result" class="preview-info" style="margin-top:4px;"></div>
       <small>Control limits shown: mean (blue), UCL/LCL (red/green).</small>
     </div>
-</div>
+  </div>
 
 <!-- Modal for Expanded View + Data Table -->
 <div id="chart-modal" class="modal-overlay">
