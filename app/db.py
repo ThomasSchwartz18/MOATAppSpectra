@@ -99,6 +99,13 @@ def fetch_saved_queries():
       - name (text)
       - type (text)
       - description (text)
+      - start_date (date)
+      - end_date (date)
+      - value_source (text)
+      - x_column (text)
+      - y_agg (text)
+      - chart_type (text)
+      - line_color (text)
       - params (json)
       - created_at (timestamptz)
     """
@@ -106,7 +113,10 @@ def fetch_saved_queries():
     try:
         response = (
             supabase.table("ppm_saved_queries")
-            .select("id,name,type,description,params,created_at")
+            .select(
+                "id,name,type,description,start_date,end_date,value_source,x_column,y_agg,"
+                "chart_type,line_color,params,created_at"
+            )
             .order("created_at", desc=True)
             .execute()
         )
@@ -118,7 +128,9 @@ def fetch_saved_queries():
 def insert_saved_query(data: dict):
     """Insert a saved chart query definition into Supabase.
 
-    ``data`` should include ``name``, ``type``, ``params`` and optional ``description``.
+    ``data`` should include ``name``, ``type`` and ``params`` along with optional
+    fields like ``description``, ``start_date``, ``end_date``, ``value_source``,
+    ``x_column``, ``y_agg``, ``chart_type`` and ``line_color``.
     """
     supabase = _get_client()
     try:
@@ -131,8 +143,10 @@ def insert_saved_query(data: dict):
 def update_saved_query(name: str, data: dict):
     """Update or upsert a saved chart query definition by ``name``.
 
-    ``data`` may include ``type``, ``params`` and ``description`` which will be
-    merged with the provided ``name``.
+    ``data`` may include ``type``, ``params`` and any of the optional metadata
+    fields (``description``, ``start_date``, ``end_date``, ``value_source``,
+    ``x_column``, ``y_agg``, ``chart_type``, ``line_color``) which will be merged
+    with the provided ``name``.
     """
     supabase = _get_client()
     try:
