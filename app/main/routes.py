@@ -16,8 +16,11 @@ from app.db import (
     fetch_moat,
     fetch_recent_moat,
     fetch_saved_queries,
+    fetch_saved_aoi_queries,
     insert_saved_query,
     update_saved_query,
+    insert_saved_aoi_query,
+    update_saved_aoi_query,
     insert_aoi_report,
     insert_fi_report,
     insert_moat,
@@ -252,6 +255,115 @@ def ppm_saved_queries():
         status = 200
     else:
         data, error = insert_saved_query(payload)
+        status = 201
+    if error:
+        abort(500, description=error)
+    return jsonify(data), status
+
+
+@main_bp.route('/analysis/aoi', methods=['GET'])
+def aoi_daily_reports():
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    return render_template('aoi_daily_reports.html', username=session.get('username'))
+
+
+@main_bp.route('/analysis/aoi/data', methods=['GET'])
+def aoi_daily_data():
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    start = request.args.get('start_date')
+    end = request.args.get('end_date')
+    job_numbers = request.args.get('job_numbers', '')
+    rev_numbers = request.args.get('rev_numbers', '')
+    assemblies = request.args.get('assemblies', '')
+    customers = request.args.get('customers', '')
+    operators = request.args.get('operators', '')
+
+    data, error = fetch_aoi_reports()
+    if error:
+        abort(500, description=error)
+
+    from datetime import datetime
+    from collections import defaultdict
+
+    def parse_date(d):
+        if not d:
+            return None
+        try:
+            return datetime.fromisoformat(str(d)).date()
+        except Exception:
+            return None
+
+    def to_list(s):
+        return [x.strip() for x in s.split(',') if x.strip()]
+
+    start_dt = parse_date(start)
+    end_dt = parse_date(end)
+    job_numbers = set(to_list(job_numbers))
+    rev_numbers = set(to_list(rev_numbers))
+    assemblies = set(to_list(assemblies))
+    customers = set(to_list(customers))
+    operators = set(to_list(operators))
+
+    filtered = []
+    for row in data:
+        date = parse_date(row.get('Date') or row.get('date'))
+        if start_dt and (not date or date < start_dt):
+            continue
+        if end_dt and (not date or date > end_dt):
+            continue
+        if job_numbers and (row.get('Job Number') not in job_numbers):
+            continue
+        if rev_numbers and (row.get('Rev') not in rev_numbers):
+            continue
+        if assemblies and (row.get('Assembly') not in assemblies):
+            continue
+        if customers and (row.get('Customer') not in customers):
+            continue
+        if operators and (row.get('Operator') not in operators):
+            continue
+        filtered.append(row)
+
+    agg = defaultdict(lambda: {'accepted': 0, 'rejected': 0})
+    for row in filtered:
+        op = row.get('Operator') or 'Unknown'
+        inspected = int(row.get('Quantity Inspected') or row.get('quantity_inspected') or 0)
+        rejected = int(row.get('Quantity Rejected') or row.get('quantity_rejected') or 0)
+        accepted = inspected - rejected
+        if accepted < 0:
+            accepted = 0
+        agg[op]['accepted'] += accepted
+        agg[op]['rejected'] += rejected
+
+    items = sorted(agg.items(), key=lambda kv: kv[1]['accepted'] + kv[1]['rejected'], reverse=True)
+    labels = [k for k, _ in items]
+    accepted_vals = [v['accepted'] for _, v in items]
+    rejected_vals = [v['rejected'] for _, v in items]
+
+    return jsonify({'labels': labels, 'accepted': accepted_vals, 'rejected': rejected_vals})
+
+
+@main_bp.route('/analysis/aoi/saved', methods=['GET', 'POST', 'PUT'])
+def aoi_saved_queries():
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    if request.method == 'GET':
+        data, error = fetch_saved_aoi_queries()
+        if error:
+            abort(500, description=error)
+        return jsonify(data)
+
+    payload = request.get_json() or {}
+    keys = ["name", "description", "start_date", "end_date", "params"]
+    payload = {k: payload.get(k) for k in keys if k in payload}
+    overwrite = request.method == 'PUT' or request.args.get('overwrite')
+    if overwrite:
+        name = payload.get('name')
+        data, error = update_saved_aoi_query(name, payload)
+        status = 200
+    else:
+        data, error = insert_saved_aoi_query(payload)
         status = 201
     if error:
         abort(500, description=error)
