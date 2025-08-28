@@ -2,38 +2,62 @@ let aoiChartInstance = null;
 let aoiChartExpandedInstance = null;
 let currentData = { labels: [], accepted: [], rejected: [] };
 let savedQueriesCache = [];
+let customerOptions = [];
+let operatorOptions = [];
 
 function uniqueSorted(arr) {
   return Array.from(new Set(arr.filter((x) => x != null && x !== ''))).sort();
 }
 
-function populateSelect(id, values) {
-  const sel = document.getElementById(id);
-  sel.innerHTML = '';
-  values.forEach((v) => {
-    const opt = document.createElement('option');
-    opt.value = v;
-    opt.textContent = v;
-    sel.appendChild(opt);
-  });
+function populateDynamicSelect(wrapperId, className, options, values = []) {
+  const wrapper = document.getElementById(wrapperId);
+  wrapper.innerHTML = '';
+  function addSelect(value = '') {
+    const sel = document.createElement('select');
+    sel.className = className;
+    const blank = document.createElement('option');
+    blank.value = '';
+    blank.textContent = '';
+    sel.appendChild(blank);
+    options.forEach((v) => {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = v;
+      sel.appendChild(opt);
+    });
+    sel.value = value;
+    sel.addEventListener('change', () => {
+      const sels = wrapper.querySelectorAll('select.' + className);
+      const last = sels[sels.length - 1];
+      if (sel === last && sel.value !== '') addSelect('');
+    });
+    wrapper.appendChild(sel);
+  }
+  values.forEach((v) => addSelect(v));
+  addSelect('');
+}
+
+function getTextValues(id) {
+  const val = document.getElementById(id).value || '';
+  return val.split(',').map((v) => v.trim()).filter((v) => v);
+}
+
+function getDropdownValues(className) {
+  return Array.from(document.querySelectorAll('select.' + className))
+    .map((sel) => sel.value)
+    .filter((v) => v);
 }
 
 function initFiltersUI() {
-  fetch('/aoi_reports')
+  return fetch('/aoi_reports')
     .then((r) => r.json())
     .then((rows) => {
       if (!Array.isArray(rows)) return;
-      populateSelect('filter-job', uniqueSorted(rows.map((r) => r['Job Number'])));
-      populateSelect('filter-rev', uniqueSorted(rows.map((r) => r['Rev'])));
-      populateSelect('filter-assembly', uniqueSorted(rows.map((r) => r['Assembly'])));
-      populateSelect('filter-customer', uniqueSorted(rows.map((r) => r['Customer'])));
-      populateSelect('filter-operator', uniqueSorted(rows.map((r) => r['Operator'])));
+      customerOptions = uniqueSorted(rows.map((r) => r['Customer']));
+      operatorOptions = uniqueSorted(rows.map((r) => r['Operator']));
+      populateDynamicSelect('customer-wrapper', 'filter-customer', customerOptions);
+      populateDynamicSelect('operator-wrapper', 'filter-operator', operatorOptions);
     });
-}
-
-function getSelectedValues(id) {
-  const sel = document.getElementById(id);
-  return Array.from(sel.selectedOptions).map((o) => o.value);
 }
 
 function renderChart(targetId, labels, accepted, rejected) {
@@ -52,6 +76,19 @@ function renderChart(targetId, labels, accepted, rejected) {
       x: { stacked: true },
       y: { stacked: true, beginAtZero: true },
     },
+    plugins: {
+      tooltip: {
+        callbacks: {
+          label(ctx) {
+            const label = ctx.dataset.label || '';
+            const value = ctx.parsed.y;
+            const total = ctx.chart.data.datasets.reduce((sum, ds) => sum + ds.data[ctx.dataIndex], 0);
+            const pct = total ? ((value / total) * 100).toFixed(1) : 0;
+            return `${label}: ${value} (${pct}%)`;
+          },
+        },
+      },
+    },
   };
   if (targetId === 'aoiChart' && aoiChartInstance) aoiChartInstance.destroy();
   if (targetId === 'aoiChartExpanded' && aoiChartExpandedInstance) aoiChartExpandedInstance.destroy();
@@ -64,8 +101,11 @@ function fillTable(labels, accepted, rejected) {
   const tbody = document.getElementById('data-tbody');
   tbody.innerHTML = '';
   labels.forEach((lab, i) => {
+    const total = accepted[i] + rejected[i];
+    const accPct = total ? ((accepted[i] / total) * 100).toFixed(1) : 0;
+    const rejPct = total ? ((rejected[i] / total) * 100).toFixed(1) : 0;
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${lab}</td><td>${accepted[i]}</td><td>${rejected[i]}</td>`;
+    tr.innerHTML = `<td>${lab}</td><td>${accepted[i]}</td><td>${rejected[i]}</td><td>${accPct}%</td><td>${rejPct}%</td>`;
     tbody.appendChild(tr);
   });
 }
@@ -92,8 +132,13 @@ document.getElementById('modal-download-chart').addEventListener('click', () => 
 
 document.getElementById('modal-download-csv').addEventListener('click', () => {
   const { labels, accepted, rejected } = currentData;
-  let csv = 'Operator,Accepted,Rejected\n';
-  labels.forEach((lab, i) => { csv += `${lab},${accepted[i]},${rejected[i]}\n`; });
+  let csv = 'Operator,Accepted,Rejected,Accepted %,Rejected %\n';
+  labels.forEach((lab, i) => {
+    const total = accepted[i] + rejected[i];
+    const accPct = total ? ((accepted[i] / total) * 100).toFixed(1) : 0;
+    const rejPct = total ? ((rejected[i] / total) * 100).toFixed(1) : 0;
+    csv += `${lab},${accepted[i]},${rejected[i]},${accPct},${rejPct}\n`;
+  });
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -107,11 +152,11 @@ function runChart() {
   const params = {
     start_date: document.getElementById('start-date').value,
     end_date: document.getElementById('end-date').value,
-    job_numbers: getSelectedValues('filter-job').join(','),
-    rev_numbers: getSelectedValues('filter-rev').join(','),
-    assemblies: getSelectedValues('filter-assembly').join(','),
-    customers: getSelectedValues('filter-customer').join(','),
-    operators: getSelectedValues('filter-operator').join(','),
+    job_numbers: getTextValues('filter-job').join(','),
+    rev_numbers: getTextValues('filter-rev').join(','),
+    assemblies: getTextValues('filter-assembly').join(','),
+    customers: getDropdownValues('filter-customer').join(','),
+    operators: getDropdownValues('filter-operator').join(','),
   };
   const qs = new URLSearchParams(params).toString();
   fetch(`/analysis/aoi/data?${qs}`)
@@ -177,22 +222,17 @@ function renderSavedList() {
 
 document.getElementById('saved-search').addEventListener('input', renderSavedList);
 
-function setSelectValues(id, values) {
-  const sel = document.getElementById(id);
-  Array.from(sel.options).forEach((opt) => { opt.selected = values.includes(opt.value); });
-}
-
 function loadParams(row) {
   const p = row.params || {};
   document.getElementById('chart-title').value = row.name || '';
   document.getElementById('chart-description').value = row.description || '';
   document.getElementById('start-date').value = p.start_date || '';
   document.getElementById('end-date').value = p.end_date || '';
-  setSelectValues('filter-job', p.job_numbers || []);
-  setSelectValues('filter-rev', p.rev_numbers || []);
-  setSelectValues('filter-assembly', p.assemblies || []);
-  setSelectValues('filter-customer', p.customers || []);
-  setSelectValues('filter-operator', p.operators || []);
+  document.getElementById('filter-job').value = (p.job_numbers || []).join(', ');
+  document.getElementById('filter-rev').value = (p.rev_numbers || []).join(', ');
+  document.getElementById('filter-assembly').value = (p.assemblies || []).join(', ');
+  populateDynamicSelect('customer-wrapper', 'filter-customer', customerOptions, p.customers || []);
+  populateDynamicSelect('operator-wrapper', 'filter-operator', operatorOptions, p.operators || []);
   document.getElementById('result-chart-name').textContent = row.name || '';
   document.getElementById('chart-description-result').textContent = row.description || '';
   runChart();
@@ -217,11 +257,11 @@ function collectParams() {
   return {
     start_date: document.getElementById('start-date').value || '',
     end_date: document.getElementById('end-date').value || '',
-    job_numbers: getSelectedValues('filter-job'),
-    rev_numbers: getSelectedValues('filter-rev'),
-    assemblies: getSelectedValues('filter-assembly'),
-    customers: getSelectedValues('filter-customer'),
-    operators: getSelectedValues('filter-operator'),
+    job_numbers: getTextValues('filter-job'),
+    rev_numbers: getTextValues('filter-rev'),
+    assemblies: getTextValues('filter-assembly'),
+    customers: getDropdownValues('filter-customer'),
+    operators: getDropdownValues('filter-operator'),
   };
 }
 
@@ -248,5 +288,4 @@ function saveQuery() {
 document.getElementById('save-chart').addEventListener('click', saveQuery);
 
 // Initialize on load
-initFiltersUI();
-loadSavedQueries();
+initFiltersUI().then(loadSavedQueries);
