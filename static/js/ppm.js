@@ -280,11 +280,12 @@ function loadSavedQueries() {
   fetch('/analysis/ppm/saved')
     .then((res) => res.json())
     .then((rows) => {
-      savedQueriesCache = Array.isArray(rows) ? rows : [];
+      const server = Array.isArray(rows) ? rows : [];
+      savedQueriesCache = presetsList().concat(server);
       filterSavedList();
     })
     .catch(() => {
-      savedQueriesCache = [];
+      savedQueriesCache = presetsList();
       filterSavedList();
     });
 }
@@ -905,12 +906,15 @@ function initColumnsUI() {
 function saveQuery() {
   const name = document.getElementById('save-name').value.trim();
   if (!name) { alert('Please provide a name for this chart.'); return; }
+  const existing = savedQueriesCache.find((q) => q.name === name);
+  if (existing && !confirm('Overwrite existing chart?')) return;
   const payload = {
     name,
     type: 'custom',
     params: collectParamsForSave(),
   };
-  fetch('/analysis/ppm/saved', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+  const method = existing ? 'PUT' : 'POST';
+  fetch('/analysis/ppm/saved', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     .then((res) => { if (!res.ok) throw new Error('save failed'); return res.json(); })
     .then(() => { document.getElementById('save-name').value=''; loadSavedQueries(); })
     .catch(() => alert('Failed to save chart. Ensure Supabase table exists.'));
@@ -1009,6 +1013,7 @@ document.addEventListener('DOMContentLoaded', () => {
   setPreset(preset === 'fc_parts_per_total_parts' ? 'fc_parts_per_total_parts' : 'avg_fc_per_board');
 
   document.getElementById('run-chart').addEventListener('click', runChart);
+  document.getElementById('save-chart').addEventListener('click', saveQuery);
   document.getElementById('saved-search').addEventListener('input', filterSavedList);
   document.getElementById('expand-chart').addEventListener('click', () => expandModal(true));
   document.getElementById('modal-close').addEventListener('click', () => expandModal(false));
@@ -1019,18 +1024,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Initialize filters and saved preset list
   initFiltersUI();
-  savedQueriesCache = presetsList();
-  // Optionally append any server-saved entries by name only
-  fetch('/analysis/ppm/saved')
-    .then((res) => res.json())
-    .then((rows) => {
-      if (Array.isArray(rows)) {
-        const mapped = rows.map((r) => ({ id: r.id || r.name, name: r.name || r.type || 'Saved Chart' }));
-        savedQueriesCache = presetsList().concat(mapped);
-      }
-      filterSavedList();
-    })
-    .catch(() => { filterSavedList(); });
-
+  loadSavedQueries();
   runChart();
 });
