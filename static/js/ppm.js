@@ -215,7 +215,7 @@ function collectChartConfig() {
 }
 
 function collectParamsForSave() {
-  return {
+  const params = {
     title: document.getElementById('chart-title').value || '',
     description: document.getElementById('chart-description').value || '',
     start_date: document.getElementById('start-date').value || '',
@@ -229,23 +229,39 @@ function collectParamsForSave() {
     series_column: document.getElementById('series-column').value || '',
     options: collectChartConfig(),
   };
+
+  return {
+    params,
+    start_date: params.start_date,
+    end_date: params.end_date,
+    value_source: params.value_source,
+    x_column: params.x_column,
+    y_agg: params.y_agg,
+    chart_type: params.options.type,
+    line_color: params.options.color,
+  };
 }
 
-function loadParamsIntoBuilder(params) {
+function loadParamsIntoBuilder(row) {
+  const params = row.params || {};
   document.getElementById('chart-title').value = params.title || '';
-  document.getElementById('chart-description').value = params.description || '';
-  document.getElementById('start-date').value = params.start_date || '';
-  document.getElementById('end-date').value = params.end_date || '';
+  document.getElementById('chart-description').value = row.description || params.description || '';
+  document.getElementById('start-date').value = row.start_date || params.start_date || '';
+  document.getElementById('end-date').value = row.end_date || params.end_date || '';
   document.getElementById('transform-expression').value = params.transform_expression || '';
-  document.getElementById('value-source').value = params.value_source || 'avg_false_calls_per_assembly';
-  if (params.x_column) document.getElementById('x-column').value = params.x_column;
+  document.getElementById('value-source').value = row.value_source || params.value_source || 'avg_false_calls_per_assembly';
+  const xCol = row.x_column || params.x_column;
+  if (xCol) document.getElementById('x-column').value = xCol;
   if (params.x_binning) document.getElementById('x-binning').value = params.x_binning;
   if (params.x_cat_sort) document.getElementById('x-cat-sort').value = params.x_cat_sort;
-  if (params.y_agg) document.getElementById('y-agg').value = params.y_agg;
+  const yAgg = row.y_agg || params.y_agg;
+  if (yAgg) document.getElementById('y-agg').value = yAgg;
   if (params.series_column !== undefined) document.getElementById('series-column').value = params.series_column;
+  const chartType = row.chart_type || params.options?.type;
+  const lineColor = row.line_color || params.options?.color;
+  if (chartType) document.getElementById('chart-type').value = chartType;
+  if (lineColor) document.getElementById('line-color').value = lineColor;
   if (params.options) {
-    document.getElementById('chart-type').value = params.options.type || 'line';
-    document.getElementById('line-color').value = params.options.color || '#000000';
     document.getElementById('point-style').value = params.options.pointStyle || 'circle';
     document.getElementById('point-radius').value = params.options.pointRadius ?? 3;
     document.getElementById('line-tension').value = params.options.tension ?? 0;
@@ -269,15 +285,15 @@ function filterSavedList() {
     li.textContent = r.name || r.type || 'Saved Chart';
     li.title = r.description || '';
     li.style.cursor = 'pointer';
-    li.addEventListener('click', () => {
-      if (r.params) {
-        loadParamsIntoBuilder({ ...r.params, description: r.description || r.params.description || '' });
-        document.getElementById('chart-description-result').textContent = r.description || '';
-      } else if (r.id) {
-        setPreset(r.id);
-      }
-      runChart();
-    });
+      li.addEventListener('click', () => {
+        if (r.params) {
+          loadParamsIntoBuilder(r);
+          document.getElementById('chart-description-result').textContent = r.description || '';
+        } else if (r.id) {
+          setPreset(r.id);
+        }
+        runChart();
+      });
     list.appendChild(li);
   });
 }
@@ -917,11 +933,19 @@ function saveQuery() {
   const existing = savedQueriesCache.find((q) => q.name === name);
   if (existing && !confirm('Overwrite existing chart?')) return;
   const description = document.getElementById('chart-description').value.trim();
+  const cfg = collectParamsForSave();
   const payload = {
     name,
     type: 'custom',
     description,
-    params: collectParamsForSave(),
+    params: cfg.params,
+    start_date: cfg.start_date,
+    end_date: cfg.end_date,
+    value_source: cfg.value_source,
+    x_column: cfg.x_column,
+    y_agg: cfg.y_agg,
+    chart_type: cfg.chart_type,
+    line_color: cfg.line_color,
   };
   const method = existing ? 'PUT' : 'POST';
   fetch('/analysis/ppm/saved', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })

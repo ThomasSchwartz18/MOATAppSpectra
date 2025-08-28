@@ -231,7 +231,20 @@ def ppm_saved_queries():
         return jsonify(data)
 
     payload = request.get_json() or {}
-    payload = {k: payload.get(k) for k in ["name", "type", "params", "description"] if k in payload}
+    keys = [
+        "name",
+        "type",
+        "params",
+        "description",
+        "start_date",
+        "end_date",
+        "value_source",
+        "x_column",
+        "y_agg",
+        "chart_type",
+        "line_color",
+    ]
+    payload = {k: payload.get(k) for k in keys if k in payload}
     overwrite = request.method == 'PUT' or request.args.get('overwrite')
     if overwrite:
         name = payload.get('name')
