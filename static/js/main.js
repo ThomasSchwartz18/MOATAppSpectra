@@ -100,4 +100,16 @@ document.addEventListener('DOMContentLoaded', () => {
   if (document.getElementById('moatChart')) {
     renderPreview('/moat_preview', 'moatChart', 'moat-info');
   }
+  // Auto-hide navbar on scroll down; reveal on scroll up
+  const nav = document.querySelector('.navbar');
+  if (nav) {
+    let lastY = window.scrollY;
+    window.addEventListener('scroll', () => {
+      const y = window.scrollY;
+      const goingDown = y > lastY;
+      if (goingDown && y > 10) nav.classList.add('navbar--hidden');
+      else nav.classList.remove('navbar--hidden');
+      lastY = y;
+    }, { passive: true });
+  }
 });

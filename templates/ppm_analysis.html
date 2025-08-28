@@ -3,23 +3,23 @@
 {% block content %}
 <h2>PPM Analysis</h2>
 
-<div class="analysis-grid">
-  <!-- Left: Builder -->
-  <div class="analysis-left section-card">
-    <div class="section-title">Chart Builder</div>
-    <div class="field-row">
-      <div class="field">
-        <label for="chart-title">Chart Title</label>
-        <input id="chart-title" placeholder="Chart title" />
+  <div class="analysis-grid">
+    <!-- Left: Builder -->
+    <div class="analysis-left section-card">
+      <div class="section-title">Chart Builder</div>
+      <div class="field-row">
+        <div class="field">
+          <label for="chart-title">Chart Title</label>
+          <input id="chart-title" placeholder="Chart title" />
+        </div>
+        <div class="field">
+          <label for="chart-type">Chart Type</label>
+          <select id="chart-type">
+            <option value="line">Line</option>
+            <option value="bar">Bar</option>
+          </select>
+        </div>
       </div>
-      <div class="field">
-        <label for="chart-type">Chart Type</label>
-        <select id="chart-type">
-          <option value="line">Line</option>
-          <option value="bar">Bar</option>
-        </select>
-      </div>
-    </div>
 
     <div class="section-title" style="margin-top:10px;">Data Range</div>
     <div class="field-row">
@@ -35,21 +35,61 @@
       </div>
     </div>
 
-    <div class="section-title" style="margin-top:10px;">Transformations</div>
-    <div class="field-row">
-      <div class="field" style="flex:1;">
-        <label for="transform-expression">New Column Expression</label>
-        <input id="transform-expression" placeholder="e.g. falsecall_parts / total_boards" />
-        <small>Fields: falsecall_parts, total_boards, total_parts</small>
+      <div class="section-title" style="margin-top:10px;">Filters</div>
+      <div class="field-row">
+        <div class="field" style="min-width:180px;">
+          <label for="filter-model-contains">Model Name contains</label>
+          <input id="filter-model-contains" placeholder="e.g. TH or SMT" />
+        </div>
+        <div class="field">
+          <label>Quick Tokens</label>
+          <div>
+            <label><input type="checkbox" id="filter-has-th" /> TH</label>
+            <label style="margin-left:8px;"><input type="checkbox" id="filter-has-smt" /> SMT</label>
+          </div>
+        </div>
       </div>
-      <div class="field">
-        <label for="value-source">Y Value</label>
-        <select id="value-source">
-          <option value="derived">Use derived column</option>
-          <option value="avg_false_calls_per_assembly" selected>Avg False Calls Per Assembly</option>
-        </select>
+
+      <div class="field-row">
+        <div class="field" id="wrap-assembly" style="min-width:180px;">
+          <label for="filter-assembly">Assembly</label>
+          <select id="filter-assembly"></select>
+        </div>
+        <div class="field" id="wrap-rev" style="min-width:160px;">
+          <label for="filter-rev">Revision</label>
+          <select id="filter-rev" disabled></select>
+        </div>
       </div>
-    </div>
+
+      <div class="field-row">
+        <div class="field" style="min-width:180px;">
+          <label>Line</label>
+          <div id="filter-lines"></div>
+          <button type="button" id="add-line">Add another line</button>
+        </div>
+        <div class="field" style="min-width:200px;">
+          <label for="filter-min-boards">Min Total Boards (per Model)</label>
+          <input type="number" id="filter-min-boards" value="7" min="0" />
+          <small>Exclude models with fewer boards</small>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field" style="min-width:200px;">
+          <label for="sort-column">Sort By</label>
+          <select id="sort-column">
+            <option value="">(None)</option>
+            <option value="__y__">Y Value</option>
+          </select>
+        </div>
+        <div class="field" style="min-width:140px;">
+          <label for="sort-dir">Direction</label>
+          <select id="sort-dir">
+            <option value="asc">Ascending</option>
+            <option value="desc" selected>Descending</option>
+          </select>
+        </div>
+      </div>
 
     <div class="section-title" style="margin-top:10px;">Appearance</div>
     <div class="field-row">
@@ -98,11 +138,6 @@
 
     <div class="field-row" style="margin-top:12px;">
       <button type="button" id="run-chart">Run</button>
-      <div class="field">
-        <label for="save-name">Save As</label>
-        <input type="text" id="save-name" placeholder="Query name (e.g., Weekly Avg)" />
-      </div>
-      <button type="button" id="save-query">Save This Chart</button>
     </div>
   </div>
 
@@ -116,23 +151,23 @@
       </div>
     </div>
     <ul id="saved-list" style="margin:0;padding-left:16px;"></ul>
-    <small>Click to load parameters into the builder.</small>
+    <small>Select a preset to load its metric.</small>
   </div>
 
   <!-- Bottom Right: Results -->
-  <div class="analysis-bottom-right section-card">
-    <div class="section-title">Results</div>
-    <div class="field-row" style="margin-bottom:6px;">
-      <button type="button" id="expand-chart">Expand</button>
-      <button type="button" id="download-pdf">Download PDF</button>
-      <button type="button" id="copy-image">Copy Image</button>
+    <div class="analysis-bottom-right section-card">
+      <div class="section-title">Results</div>
+      <div class="field-row" style="margin-bottom:6px;">
+        <button type="button" id="expand-chart">Expand</button>
+        <button type="button" id="download-pdf">Download PDF</button>
+        <button type="button" id="copy-image">Copy Image</button>
+      </div>
+      <div class="preview-card" style="height: 300px;">
+        <canvas id="ppmChart"></canvas>
+      </div>
+      <div id="ppm-info" class="preview-info" style="margin-top:4px;"></div>
+      <small>Control limits shown: mean (blue), UCL/LCL (red/green).</small>
     </div>
-    <div class="preview-card" style="height: 300px;">
-      <canvas id="ppmChart"></canvas>
-    </div>
-    <div id="ppm-info" class="preview-info" style="margin-top:4px;"></div>
-    <small>Ordered by date. Reference lines: Red=20, Yellow=10, Green=5</small>
-  </div>
 </div>
 
 <!-- Modal for Expanded View + Data Table -->
@@ -142,8 +177,8 @@
       <div id="modal-title">Chart Detail</div>
       <button id="modal-close" class="modal-close">Close</button>
     </div>
-    <div style="border:2px solid #000; padding:8px; margin-top:6px;">
-      <canvas id="ppmChartExpanded" style="max-height:50vh;"></canvas>
+    <div class="modal-chart-box">
+      <canvas id="ppmChartExpanded"></canvas>
     </div>
     <div style="margin-top:10px;" class="section-title">Data</div>
     <table class="data-table">

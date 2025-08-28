@@ -148,7 +148,9 @@ body {
 .preview-card {
   border: 2px solid #000;
   padding: 10px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  display: block;
 }
 
 .preview-info {
@@ -156,10 +158,13 @@ body {
   margin-bottom: 5px;
 }
 
-/* Home preview chart size */
+/* Preview canvases grow to container height; width may overflow for scrolling */
 .preview-card canvas {
-  height: 140px !important;
+  height: 100% !important;
+  max-height: 100% !important;
 }
+/* Home preview retains a fixed compact height */
+.preview-wrapper .preview-card canvas { height: 140px !important; }
 
 /* PPM Analysis layout */
 .analysis-grid {
@@ -167,7 +172,8 @@ body {
   grid-template-columns: 38% 62%;
   grid-template-rows: 1fr 1fr;
   gap: 10px;
-  min-height: calc(100vh - 120px);
+  height: calc(100vh - var(--nav-height) - 20px);
+  overflow: hidden;
 }
 
 .analysis-left {
@@ -185,6 +191,9 @@ body {
 .analysis-bottom-right {
   grid-column: 2 / 3;
   grid-row: 2 / 3;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   overflow: auto;
 }
 
@@ -218,11 +227,14 @@ body {
 .modal {
   background: #fff;
   border: 2px solid #000;
-  width: 90%;
-  max-width: 1000px;
-  max-height: 90vh;
+  width: 96%;
+  max-width: 1600px;
+  height: 92vh;
+  max-height: 92vh;
   overflow: auto;
   padding: 12px;
+  display: flex;
+  flex-direction: column;
 }
 
 .modal-header { display:flex; justify-content: space-between; align-items:center; }
@@ -230,3 +242,28 @@ body {
 
 .data-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
 .data-table th, .data-table td { border: 1px solid #000; padding: 4px; font-size: 12px; }
+/* Saved Charts: separators instead of bullets */
+#saved-list { list-style: none; padding-left: 0 !important; margin: 0; border: 1px solid #DDD; border-radius: 6px; overflow: hidden; }
+#saved-list li { list-style: none; padding: 8px 10px; border-bottom: 1px solid #EEE; }
+#saved-list li:last-child { border-bottom: none; }
+
+/* Expanded chart area fills modal */
+.modal-chart-box { flex: 1 1 auto; min-height: 60vh; border: 2px solid #000; padding: 8px; margin-top: 6px; overflow: hidden; }
+.modal-chart-box canvas { width: 100% !important; height: 100% !important; max-height: none !important; }
+
+/* Make the bottom-right preview fill vertical space */
+.analysis-bottom-right .preview-card { flex: 1 1 auto; min-height: 0; }
+
+/* Navbar should overlay content and auto-hide on scroll */
+:root { --nav-height: 56px; }
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  height: var(--nav-height);
+}
+.content { padding-top: var(--nav-height); }
+.navbar.navbar--hidden { transform: translateY(-100%); transition: transform 0.2s ease-in-out; }
+.navbar:not(.navbar--hidden) { transition: transform 0.2s ease-in-out; }
