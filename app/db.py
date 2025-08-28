@@ -1,4 +1,5 @@
 from flask import current_app
+from datetime import datetime, timedelta
 
 
 def _get_client():
@@ -38,6 +39,22 @@ def fetch_moat():
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to fetch MOAT data: {exc}"
+
+
+def fetch_recent_moat(days: int = 7):
+    """Retrieve MOAT data for the past ``days`` days."""
+    supabase = _get_client()
+    start_date = (datetime.utcnow() - timedelta(days=days)).date().isoformat()
+    try:
+        response = (
+            supabase.table("moat")
+            .select("*")
+            .gte("Report Date", start_date)
+            .execute()
+        )
+        return response.data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to fetch recent MOAT data: {exc}"
 
 
 def insert_aoi_report(data: dict):
