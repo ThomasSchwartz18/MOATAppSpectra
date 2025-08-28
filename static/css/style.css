@@ -1,6 +1,7 @@
 body {
   margin: 0;
   font-family: Arial, sans-serif;
+  padding: 10px;
 }
 
 .navbar {
@@ -185,7 +186,7 @@ body {
 .analysis-top-right {
   grid-column: 2 / 3;
   grid-row: 1 / 2;
-  overflow: auto;
+  overflow:scroll;
 }
 
 .analysis-bottom-right {
@@ -199,7 +200,7 @@ body {
 
 .section-card {
   border: 2px solid #000;
-  background: #F7F7F7;
+  background: #f5f5f5;
   padding: 10px;
 }
 
@@ -245,6 +246,7 @@ body {
 /* Saved Charts: separators instead of bullets */
 #saved-list { list-style: none; padding-left: 0 !important; margin: 0; border: 1px solid #DDD; border-radius: 6px; overflow: hidden; }
 #saved-list li { list-style: none; padding: 8px 10px; border-bottom: 1px solid #EEE; }
+#saved-list li:hover { list-style: none; padding: 8px 10px; border-bottom: 1px solid #cecece; background: #e3e3e3 }
 #saved-list li:last-child { border-bottom: none; }
 
 /* Expanded chart area fills modal */
