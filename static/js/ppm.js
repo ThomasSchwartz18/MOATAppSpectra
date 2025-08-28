@@ -927,22 +927,43 @@ async function copyChartImage() {
 }
 
 function downloadPDF() {
-  // Prefer expanded canvas if modal is open for best resolution
-  const overlay = document.getElementById('chart-modal');
-  const expandedVisible = overlay && getComputedStyle(overlay).display !== 'none';
-  const canvas = expandedVisible && document.getElementById('ppmChartExpanded') ? document.getElementById('ppmChartExpanded') : document.getElementById('ppmChart');
-  const imgData = canvas.toDataURL('image/png');
+  const meta = window.currentChartMeta;
+  if (!meta) return;
+
+  const off = document.createElement('canvas');
+  off.width = 1000;
+  off.height = 650;
+  const ctx = off.getContext('2d');
+  const plugins = (meta.options && meta.options.controlLimits) ? [controlLinesPlugin] : [];
+  // eslint-disable-next-line no-undef
+  const tmpChart = new Chart(ctx, {
+    type: meta.type,
+    data: { labels: meta.labels, datasets: meta.datasets },
+    options: { ...meta.options, responsive: false, maintainAspectRatio: false, animation: false },
+    plugins,
+  });
+
+  const imgData = off.toDataURL('image/png');
+
   // eslint-disable-next-line no-undef
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ orientation: 'l', unit: 'pt', format: 'letter' });
-  const pageWidth = pdf.internal.pageSize.getWidth();
-  const pageHeight = pdf.internal.pageSize.getHeight();
+  const pageW = pdf.internal.pageSize.getWidth();
+  const pageH = pdf.internal.pageSize.getHeight();
   const margin = 36;
-  const usableW = pageWidth - margin * 2;
-  const usableH = pageHeight - margin * 2;
-  pdf.addImage(imgData, 'PNG', margin, margin, usableW, usableH, undefined, 'FAST');
+  const usableW = pageW - margin * 2;
+  const usableH = pageH - margin * 2;
+  const scale = Math.min(usableW / off.width, usableH / off.height);
+  const renderW = off.width * scale;
+  const renderH = off.height * scale;
+  const x = (pageW - renderW) / 2;
+  const y = (pageH - renderH) / 2;
+  pdf.addImage(imgData, 'PNG', x, y, renderW, renderH, undefined, 'FAST');
   const title = document.getElementById('chart-title').value || 'chart';
   pdf.save(`${title}.pdf`);
+
+  tmpChart.destroy();
+  off.remove();
 }
 
 document.addEventListener('DOMContentLoaded', () => {
