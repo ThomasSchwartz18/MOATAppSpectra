@@ -1,0 +1,161 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>PPM Analysis</h2>
+
+<div class="analysis-grid">
+  <!-- Left: Builder -->
+  <div class="analysis-left section-card">
+    <div class="section-title">Chart Builder</div>
+    <div class="field-row">
+      <div class="field">
+        <label for="chart-title">Chart Title</label>
+        <input id="chart-title" placeholder="Chart title" />
+      </div>
+      <div class="field">
+        <label for="chart-type">Chart Type</label>
+        <select id="chart-type">
+          <option value="line">Line</option>
+          <option value="bar">Bar</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:10px;">Data Range</div>
+    <div class="field-row">
+      <div class="field">
+        <label for="start-date">Start Date</label>
+        <input type="date" id="start-date" />
+        <small>or token e.g. today-5d</small>
+      </div>
+      <div class="field">
+        <label for="end-date">End Date</label>
+        <input type="date" id="end-date" />
+        <small>or token e.g. today-1d</small>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:10px;">Transformations</div>
+    <div class="field-row">
+      <div class="field" style="flex:1;">
+        <label for="transform-expression">New Column Expression</label>
+        <input id="transform-expression" placeholder="e.g. falsecall_parts / total_boards" />
+        <small>Fields: falsecall_parts, total_boards, total_parts</small>
+      </div>
+      <div class="field">
+        <label for="value-source">Y Value</label>
+        <select id="value-source">
+          <option value="derived">Use derived column</option>
+          <option value="avg_false_calls_per_assembly" selected>Avg False Calls Per Assembly</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:10px;">Appearance</div>
+    <div class="field-row">
+      <div class="field">
+        <label for="line-color">Line/Bar Color</label>
+        <input type="color" id="line-color" value="#000000" />
+      </div>
+      <div class="field">
+        <label for="point-style">Point Style</label>
+        <select id="point-style">
+          <option value="circle">Circle</option>
+          <option value="rect">Square</option>
+          <option value="triangle">Triangle</option>
+          <option value="cross">Cross</option>
+          <option value="star">Star</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="point-radius">Point Radius</label>
+        <input type="number" id="point-radius" value="3" min="0" max="12" />
+      </div>
+      <div class="field">
+        <label for="line-tension">Line Tension</label>
+        <input type="number" id="line-tension" value="0" min="0" max="0.5" step="0.1" />
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:10px;">Axes</div>
+    <div class="field-row">
+      <div class="field">
+        <label for="x-title">X Axis Title</label>
+        <input id="x-title" placeholder="X Axis Title" />
+      </div>
+      <div class="field">
+        <label for="y-title">Y Axis Title</label>
+        <input id="y-title" placeholder="Y Axis Title" />
+      </div>
+      <div class="field">
+        <label for="show-tooltips">Tooltips</label>
+        <select id="show-tooltips">
+          <option value="yes" selected>Show</option>
+          <option value="no">Hide</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field-row" style="margin-top:12px;">
+      <button type="button" id="run-chart">Run</button>
+      <div class="field">
+        <label for="save-name">Save As</label>
+        <input type="text" id="save-name" placeholder="Query name (e.g., Weekly Avg)" />
+      </div>
+      <button type="button" id="save-query">Save This Chart</button>
+    </div>
+  </div>
+
+  <!-- Top Right: Saved Queries + Search -->
+  <div class="analysis-top-right section-card">
+    <div class="section-title">Saved Charts</div>
+    <div class="field-row" style="margin-bottom:8px;">
+      <div class="field" style="flex:1;">
+        <label for="saved-search">Search</label>
+        <input id="saved-search" placeholder="Filter saved charts" />
+      </div>
+    </div>
+    <ul id="saved-list" style="margin:0;padding-left:16px;"></ul>
+    <small>Click to load parameters into the builder.</small>
+  </div>
+
+  <!-- Bottom Right: Results -->
+  <div class="analysis-bottom-right section-card">
+    <div class="section-title">Results</div>
+    <div class="field-row" style="margin-bottom:6px;">
+      <button type="button" id="expand-chart">Expand</button>
+      <button type="button" id="download-pdf">Download PDF</button>
+      <button type="button" id="copy-image">Copy Image</button>
+    </div>
+    <div class="preview-card" style="height: 300px;">
+      <canvas id="ppmChart"></canvas>
+    </div>
+    <div id="ppm-info" class="preview-info" style="margin-top:4px;"></div>
+    <small>Ordered by date. Reference lines: Red=20, Yellow=10, Green=5</small>
+  </div>
+</div>
+
+<!-- Modal for Expanded View + Data Table -->
+<div id="chart-modal" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div id="modal-title">Chart Detail</div>
+      <button id="modal-close" class="modal-close">Close</button>
+    </div>
+    <div style="border:2px solid #000; padding:8px; margin-top:6px;">
+      <canvas id="ppmChartExpanded" style="max-height:50vh;"></canvas>
+    </div>
+    <div style="margin-top:10px;" class="section-title">Data</div>
+    <table class="data-table">
+      <thead><tr><th>Date</th><th>Value</th></tr></thead>
+      <tbody id="data-tbody"></tbody>
+    </table>
+  </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="{{ url_for('static', filename='js/ppm.js') }}"></script>
+{% endblock %}

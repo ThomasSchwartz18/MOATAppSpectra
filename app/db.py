@@ -90,3 +90,35 @@ def insert_moat(data: dict):
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to insert MOAT data: {exc}"
 
+
+def fetch_saved_queries():
+    """Retrieve saved chart queries for PPM analysis.
+
+    Expects a Supabase table named 'ppm_saved_queries' with columns like:
+      - id (uuid) [optional]
+      - name (text)
+      - type (text)
+      - params (json)
+      - created_at (timestamptz)
+    """
+    supabase = _get_client()
+    try:
+        response = (
+            supabase.table("ppm_saved_queries")
+            .select("id,name,type,params,created_at")
+            .order("created_at", desc=True)
+            .execute()
+        )
+        return response.data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to fetch saved queries: {exc}"
+
+
+def insert_saved_query(data: dict):
+    """Insert a saved chart query definition into Supabase."""
+    supabase = _get_client()
+    try:
+        response = supabase.table("ppm_saved_queries").insert(data).execute()
+        return response.data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to save chart query: {exc}"
