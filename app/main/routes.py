@@ -17,6 +17,7 @@ from app.db import (
     fetch_recent_moat,
     fetch_saved_queries,
     insert_saved_query,
+    update_saved_query,
     insert_aoi_report,
     insert_fi_report,
     insert_moat,
@@ -219,7 +220,7 @@ def ppm_data():
     return jsonify({"labels": labels, "values": values, "type": chart_type})
 
 
-@main_bp.route('/analysis/ppm/saved', methods=['GET', 'POST'])
+@main_bp.route('/analysis/ppm/saved', methods=['GET', 'POST', 'PUT'])
 def ppm_saved_queries():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
@@ -228,9 +229,16 @@ def ppm_saved_queries():
         if error:
             abort(500, description=error)
         return jsonify(data)
-    # POST
+
     payload = request.get_json() or {}
-    data, error = insert_saved_query(payload)
+    overwrite = request.method == 'PUT' or request.args.get('overwrite')
+    if overwrite:
+        name = payload.get('name')
+        data, error = update_saved_query(name, payload)
+        status = 200
+    else:
+        data, error = insert_saved_query(payload)
+        status = 201
     if error:
         abort(500, description=error)
-    return jsonify(data), 201
+    return jsonify(data), status

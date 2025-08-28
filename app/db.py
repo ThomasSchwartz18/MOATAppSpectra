@@ -122,3 +122,18 @@ def insert_saved_query(data: dict):
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to save chart query: {exc}"
+
+
+def update_saved_query(name: str, data: dict):
+    """Update or upsert a saved chart query definition by ``name``."""
+    supabase = _get_client()
+    try:
+        payload = {**data, "name": name}
+        response = (
+            supabase.table("ppm_saved_queries")
+            .upsert(payload, on_conflict="name")
+            .execute()
+        )
+        return response.data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to update saved query: {exc}"
