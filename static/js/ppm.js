@@ -267,9 +267,15 @@ function filterSavedList() {
   items.forEach((r) => {
     const li = document.createElement('li');
     li.textContent = r.name || r.type || 'Saved Chart';
+    li.title = r.description || '';
     li.style.cursor = 'pointer';
     li.addEventListener('click', () => {
-      if (r.id) setPreset(r.id);
+      if (r.params) {
+        loadParamsIntoBuilder({ ...r.params, description: r.description || r.params.description || '' });
+        document.getElementById('chart-description-result').textContent = r.description || '';
+      } else if (r.id) {
+        setPreset(r.id);
+      }
       runChart();
     });
     list.appendChild(li);
@@ -280,7 +286,9 @@ function loadSavedQueries() {
   fetch('/analysis/ppm/saved')
     .then((res) => res.json())
     .then((rows) => {
-      const server = Array.isArray(rows) ? rows : [];
+      const server = Array.isArray(rows)
+        ? rows.map((r) => ({ ...r, description: r.description || r.params?.description || '' }))
+        : [];
       savedQueriesCache = presetsList().concat(server);
       filterSavedList();
     })
@@ -908,15 +916,23 @@ function saveQuery() {
   if (!name) { alert('Please provide a name for this chart.'); return; }
   const existing = savedQueriesCache.find((q) => q.name === name);
   if (existing && !confirm('Overwrite existing chart?')) return;
+  const description = document.getElementById('chart-description').value.trim();
   const payload = {
     name,
     type: 'custom',
+    description,
     params: collectParamsForSave(),
   };
   const method = existing ? 'PUT' : 'POST';
   fetch('/analysis/ppm/saved', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     .then((res) => { if (!res.ok) throw new Error('save failed'); return res.json(); })
-    .then(() => { document.getElementById('save-name').value=''; loadSavedQueries(); })
+    .then((rows) => {
+      document.getElementById('save-name').value='';
+      if (Array.isArray(rows) && rows[0]) {
+        document.getElementById('chart-description').value = rows[0].description || description;
+      }
+      loadSavedQueries();
+    })
     .catch(() => alert('Failed to save chart. Ensure Supabase table exists.'));
 }
 

@@ -98,6 +98,7 @@ def fetch_saved_queries():
       - id (uuid) [optional]
       - name (text)
       - type (text)
+      - description (text)
       - params (json)
       - created_at (timestamptz)
     """
@@ -105,7 +106,7 @@ def fetch_saved_queries():
     try:
         response = (
             supabase.table("ppm_saved_queries")
-            .select("id,name,type,params,created_at")
+            .select("id,name,type,description,params,created_at")
             .order("created_at", desc=True)
             .execute()
         )
@@ -115,7 +116,10 @@ def fetch_saved_queries():
 
 
 def insert_saved_query(data: dict):
-    """Insert a saved chart query definition into Supabase."""
+    """Insert a saved chart query definition into Supabase.
+
+    ``data`` should include ``name``, ``type``, ``params`` and optional ``description``.
+    """
     supabase = _get_client()
     try:
         response = supabase.table("ppm_saved_queries").insert(data).execute()
@@ -125,7 +129,11 @@ def insert_saved_query(data: dict):
 
 
 def update_saved_query(name: str, data: dict):
-    """Update or upsert a saved chart query definition by ``name``."""
+    """Update or upsert a saved chart query definition by ``name``.
+
+    ``data`` may include ``type``, ``params`` and ``description`` which will be
+    merged with the provided ``name``.
+    """
     supabase = _get_client()
     try:
         payload = {**data, "name": name}
