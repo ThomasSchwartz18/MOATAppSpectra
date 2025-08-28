@@ -931,6 +931,37 @@ async function copyChartImage() {
   }
 }
 
+function downloadExpandedChart() {
+  const canvas = document.getElementById('ppmChartExpanded');
+  if (!canvas) return;
+  const link = document.createElement('a');
+  const title = document.getElementById('chart-title').value || 'chart';
+  link.download = `${title}.png`;
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+function downloadTableCSV() {
+  const rows = document.querySelectorAll('#data-tbody tr');
+  const lines = ['Date,Value'];
+  rows.forEach((tr) => {
+    const cols = tr.querySelectorAll('td');
+    const date = cols[0]?.textContent ?? '';
+    const val = cols[1]?.textContent ?? '';
+    const esc = (s) => `"${String(s).replace(/"/g, '""')}"`;
+    lines.push(`${esc(date)},${esc(val)}`);
+  });
+  const csv = lines.join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  const title = document.getElementById('chart-title').value || 'data';
+  link.href = url;
+  link.download = `${title}.csv`;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
 function downloadPDF() {
   const meta = window.currentChartMeta;
   if (!meta) return;
@@ -983,6 +1014,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('modal-close').addEventListener('click', () => expandModal(false));
   document.getElementById('download-pdf').addEventListener('click', downloadPDF);
   document.getElementById('copy-image').addEventListener('click', copyChartImage);
+  document.getElementById('modal-download-chart').addEventListener('click', downloadExpandedChart);
+  document.getElementById('modal-download-csv').addEventListener('click', downloadTableCSV);
 
   // Initialize filters and saved preset list
   initFiltersUI();
