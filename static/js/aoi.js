@@ -378,5 +378,40 @@ function saveQuery() {
 
 document.getElementById('save-chart').addEventListener('click', saveQuery);
 
+// Tab switching for Chart Builder / Upload
+document.querySelectorAll('.tab').forEach((tab) => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach((t) => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('.tab-content').forEach((c) => { c.style.display = 'none'; });
+    const target = document.getElementById(tab.dataset.target);
+    if (target) target.style.display = 'block';
+  });
+});
+
+// Handle CSV upload
+const uploadForm = document.getElementById('upload-form');
+if (uploadForm) {
+  uploadForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fileInput = document.getElementById('upload-csv');
+    if (!fileInput.files.length) { alert('Please select a file.'); return; }
+    const fd = new FormData();
+    fd.append('file', fileInput.files[0]);
+    try {
+      const res = await fetch('/aoi_reports/upload', { method: 'POST', body: fd });
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || 'Upload failed');
+      }
+      const data = await res.json();
+      alert(`Uploaded ${data.inserted} rows`);
+      fileInput.value = '';
+    } catch (err) {
+      alert(err.message || 'Upload failed');
+    }
+  });
+}
+
 // Initialize on load
 initFiltersUI().then(loadSavedQueries);

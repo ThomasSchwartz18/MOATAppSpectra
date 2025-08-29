@@ -9,6 +9,8 @@ from flask import (
     jsonify,
 )
 from functools import wraps
+import csv
+import io
 
 from app.db import (
     fetch_aoi_reports,
@@ -22,6 +24,7 @@ from app.db import (
     insert_saved_aoi_query,
     update_saved_aoi_query,
     insert_aoi_report,
+    insert_aoi_reports_bulk,
     insert_fi_report,
     insert_moat,
 )
@@ -69,6 +72,41 @@ def add_aoi_report():
     if error:
         abort(500, description=error)
     return jsonify(data), 201
+
+
+@main_bp.route('/aoi_reports/upload', methods=['POST'])
+@admin_required
+def upload_aoi_reports():
+    """Upload a CSV file of AOI reports."""
+    uploaded = request.files.get('file')
+    if not uploaded or uploaded.filename == '':
+        abort(400, description='No file provided')
+
+    stream = io.StringIO(uploaded.stream.read().decode('utf-8'))
+    reader = csv.DictReader(stream)
+    required_columns = [
+        'Date',
+        'Shift',
+        'Operator',
+        'Customer',
+        'Assembly',
+        'Rev',
+        'Job Number',
+        'Quantity Inspected',
+        'Quantity Rejected',
+        'Additional Information',
+    ]
+    if reader.fieldnames != required_columns:
+        abort(400, description='CSV must contain the required columns')
+
+    rows = [{col: row.get(col, '') for col in required_columns} for row in reader]
+    if not rows:
+        return jsonify({'inserted': 0}), 200
+
+    data, error = insert_aoi_reports_bulk(rows)
+    if error:
+        abort(500, description=error)
+    return jsonify({'inserted': len(rows)}), 201
 
 
 @main_bp.route('/fi_reports', methods=['GET'])
