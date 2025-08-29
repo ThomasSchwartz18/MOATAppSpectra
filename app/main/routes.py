@@ -12,7 +12,9 @@ from functools import wraps
 import csv
 import io
 import os
+from datetime import datetime
 from openpyxl import load_workbook
+import xlrd
 
 from app.db import (
     fetch_aoi_reports,
@@ -105,7 +107,17 @@ def upload_aoi_reports():
     if reader.fieldnames != required_columns:
         abort(400, description='CSV must contain the required columns')
 
-    rows = [{col: row.get(col, '') for col in required_columns} for row in reader]
+    rows = []
+    for row in reader:
+        current = {col: row.get(col, '') for col in required_columns}
+        date_str = current.get('Date')
+        if date_str:
+            try:
+                dt = datetime.strptime(date_str, '%m/%d/%Y')
+                current['Date'] = dt.date().isoformat()
+            except ValueError:
+                pass
+        rows.append(current)
     if not rows:
         return jsonify({'inserted': 0}), 200
 
@@ -176,7 +188,7 @@ def upload_fi_reports():
 @main_bp.route('/ppm_reports/upload', methods=['POST'])
 @admin_required
 def upload_ppm_reports():
-    """Upload an XLSX PPM report and store rows in the MOAT table."""
+    """Upload an XLS or XLSX PPM report and store rows in the MOAT table."""
     uploaded = request.files.get('file')
     if not uploaded or uploaded.filename == '':
         abort(400, description='No file provided')
@@ -190,29 +202,43 @@ def upload_ppm_reports():
 
     try:
         uploaded.stream.seek(0)
-        wb = load_workbook(uploaded.stream, data_only=True)
+        if uploaded.filename.lower().endswith('.xls'):
+            book = xlrd.open_workbook(file_contents=uploaded.stream.read())
+            sheet = book.sheet_by_index(0)
+
+            def cell(r, c):
+                try:
+                    return sheet.cell_value(r - 1, c - 1)
+                except IndexError:
+                    return None
+
+        else:
+            wb = load_workbook(uploaded.stream, data_only=True)
+            sheet = wb.active
+
+            def cell(r, c):
+                return sheet.cell(row=r, column=c).value
     except Exception as exc:
         abort(400, description=f'Failed to read Excel file: {exc}')
 
-    ws = wb.active
     rows = []
     row_idx = 7
     while True:
-        model = ws[f'B{row_idx}'].value
-        if model is None:
+        model = cell(row_idx, 2)
+        if model in (None, ''):
             row_idx += 1
             continue
         if str(model).strip().lower() == 'total':
             break
         rows.append({
             'Model Name': model,
-            'Total Boards': ws[f'C{row_idx}'].value or 0,
-            'Total Parts per Board': ws[f'D{row_idx}'].value or 0,
-            'Total Parts': ws[f'E{row_idx}'].value or 0,
-            'NG Parts': ws[f'F{row_idx}'].value or 0,
-            'NG PPM': ws[f'G{row_idx}'].value or 0,
-            'FalseCall Parts': ws[f'H{row_idx}'].value or 0,
-            'FalseCall PPM': ws[f'I{row_idx}'].value or 0,
+            'Total Boards': cell(row_idx, 3) or 0,
+            'Total Parts per Board': cell(row_idx, 4) or 0,
+            'Total Parts': cell(row_idx, 5) or 0,
+            'NG Parts': cell(row_idx, 6) or 0,
+            'NG PPM': cell(row_idx, 7) or 0,
+            'FalseCall Parts': cell(row_idx, 8) or 0,
+            'FalseCall PPM': cell(row_idx, 9) or 0,
             'Report Date': report_date,
             'Line': line,
         })
