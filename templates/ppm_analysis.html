@@ -4,8 +4,16 @@
 <h2>PPM Analysis</h2>
 
   <div class="analysis-grid">
-    <!-- Left: Builder -->
+    <!-- Left: Builder / Upload Tabs -->
     <div class="analysis-left section-card">
+      <div class="tab-bar">
+        <div class="tab active" data-target="builder-tab">Chart Builder</div>
+        {% if username == 'ADMIN' %}
+        <div class="tab" data-target="upload-tab">Upload</div>
+        {% endif %}
+      </div>
+
+      <div id="builder-tab" class="tab-content" style="display:block;">
       <div class="section-title">Chart Builder</div>
       <div class="field-row">
         <div class="field">
@@ -143,15 +151,29 @@
       </div>
     </div>
 
-    <div class="field-row" style="margin-top:12px;">
-      <div class="field" style="flex:1;">
-        <label for="save-name">Save As</label>
-        <input id="save-name" placeholder="Chart name" />
+      <div class="field-row" style="margin-top:12px;">
+        <div class="field" style="flex:1;">
+          <label for="save-name">Save As</label>
+          <input id="save-name" placeholder="Chart name" />
+        </div>
+        <button type="button" id="save-chart">Save</button>
+        <button type="button" id="run-chart">Run</button>
       </div>
-      <button type="button" id="save-chart">Save</button>
-      <button type="button" id="run-chart">Run</button>
+    </div> <!-- end builder-tab -->
+    {% if username == 'ADMIN' %}
+    <div id="upload-tab" class="tab-content" style="display:none;">
+      <form id="upload-form">
+        <div class="field-row">
+          <div class="field" style="flex:1;">
+            <label for="upload-xlsx">XLSX File</label>
+            <input type="file" id="upload-xlsx" accept=".xlsx" />
+          </div>
+        </div>
+        <button type="submit" id="upload-button">Upload</button>
+      </form>
     </div>
-  </div>
+    {% endif %}
+    </div>
 
   <!-- Top Right: Saved Queries + Search -->
   <div class="analysis-top-right section-card">

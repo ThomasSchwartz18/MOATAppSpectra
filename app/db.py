@@ -105,6 +105,16 @@ def insert_moat(data: dict):
         return None, f"Failed to insert MOAT data: {exc}"
 
 
+def insert_moat_bulk(rows: list[dict]):
+    """Insert multiple MOAT records at once."""
+    supabase = _get_client()
+    try:
+        response = supabase.table("moat").insert(rows).execute()
+        return response.data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to insert MOAT data: {exc}"
+
+
 def fetch_saved_queries():
     """Retrieve saved chart queries for PPM analysis.
 
