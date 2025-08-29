@@ -777,9 +777,9 @@ async function runPresetChart() {
         partsSum: Number(row[cols.totalParts] ?? 0),
       };
       const val = activePreset.calc ? activePreset.calc(agg) : 0;
-      const label = cols.date && row[cols.date]
-        ? String(row[cols.date]).slice(0, 10)
-        : String(row[cols.model] ?? 'Unknown');
+      const label = cols.model && row[cols.model] !== undefined
+        ? String(row[cols.model])
+        : (cols.date && row[cols.date] ? String(row[cols.date]).slice(0, 10) : 'Unknown');
       labels.push(label);
       values.push(val);
       metaLookup[idx] = {
