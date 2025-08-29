@@ -403,6 +403,72 @@ def aoi_daily_data():
             'shift2': {'accepted': s2_acc, 'rejected': s2_rej, 'avg_reject_rate': avg_rate(totals['2nd'])},
         })
 
+    if view == 'yield':
+        agg = defaultdict(lambda: {'accepted': 0, 'rejected': 0})
+        for row in filtered:
+            date = parse_date(row.get('Date') or row.get('date'))
+            inspected = int(row.get('Quantity Inspected') or row.get('quantity_inspected') or 0)
+            rejected = int(row.get('Quantity Rejected') or row.get('quantity_rejected') or 0)
+            accepted = inspected - rejected
+            if accepted < 0:
+                accepted = 0
+            agg[date]['accepted'] += accepted
+            agg[date]['rejected'] += rejected
+
+        dates = sorted(agg.keys())
+        yields = []
+        for d in dates:
+            a = agg[d]['accepted']
+            r = agg[d]['rejected']
+            tot = a + r
+            y = (a / tot * 100) if tot else 0
+            yields.append(y)
+        avg_yield = sum(yields) / len(yields) if yields else 0
+        min_yield = min(yields) if yields else 0
+        max_yield = max(yields) if yields else 0
+        return jsonify({
+            'labels': [d.isoformat() for d in dates],
+            'yields': yields,
+            'avg_yield': avg_yield,
+            'min_yield': min_yield,
+            'max_yield': max_yield,
+        })
+
+    if view == 'customer_rate':
+        agg = defaultdict(lambda: {'accepted': 0, 'rejected': 0})
+        for row in filtered:
+            cust = row.get('Customer') or 'Unknown'
+            inspected = int(row.get('Quantity Inspected') or row.get('quantity_inspected') or 0)
+            rejected = int(row.get('Quantity Rejected') or row.get('quantity_rejected') or 0)
+            accepted = inspected - rejected
+            if accepted < 0:
+                accepted = 0
+            agg[cust]['accepted'] += accepted
+            agg[cust]['rejected'] += rejected
+
+        items = []
+        for cust, vals in agg.items():
+            tot = vals['accepted'] + vals['rejected']
+            rate = (vals['rejected'] / tot * 100) if tot else 0
+            items.append((cust, rate))
+        items.sort(key=lambda x: x[1], reverse=True)
+        labels = [i[0] for i in items]
+        rates = [i[1] for i in items]
+        avg_rate = sum(rates) / len(rates) if rates else 0
+        max_rate = max(rates) if rates else 0
+        min_rate = min(rates) if rates else 0
+        max_customer = labels[rates.index(max_rate)] if rates else ''
+        min_customer = labels[rates.index(min_rate)] if rates else ''
+        return jsonify({
+            'labels': labels,
+            'rates': rates,
+            'avg_rate': avg_rate,
+            'max_rate': max_rate,
+            'max_customer': max_customer,
+            'min_rate': min_rate,
+            'min_customer': min_customer,
+        })
+
     agg = defaultdict(lambda: {'accepted': 0, 'rejected': 0})
     for row in filtered:
         op = row.get('Operator') or 'Unknown'

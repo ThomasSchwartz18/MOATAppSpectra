@@ -324,7 +324,9 @@ function getDateInputs() {
 
 function runChart() {
   const title = document.getElementById('chart-title').value.trim();
-  document.getElementById('result-chart-name').textContent = title || '(untitled)';
+  const { start, end } = getDateInputs();
+  const range = (start || end) ? ` (${start || ''} to ${end || ''})` : '';
+  document.getElementById('result-chart-name').textContent = (title || '(untitled)') + range;
   const description = document.getElementById('chart-description').value.trim();
   runPresetChart()
     .then((result) => {

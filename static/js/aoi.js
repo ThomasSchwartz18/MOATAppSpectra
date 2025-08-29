@@ -139,6 +139,47 @@ function renderShiftChart(targetId, labels, shift1, shift2) {
   if (targetId === 'aoiChart') aoiChartInstance = inst; else aoiChartExpandedInstance = inst;
 }
 
+function renderYieldChart(targetId, labels, yields) {
+  const ctx = document.getElementById(targetId).getContext('2d');
+  const minY = yields.length ? Math.min(...yields) : 0;
+  const data = {
+    labels,
+    datasets: [
+      { label: 'Yield %', data: yields, backgroundColor: 'rgba(75,192,192,0.6)', borderColor: 'rgba(75,192,192,0.8)', fill: false },
+    ],
+  };
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: { y: { beginAtZero: false, min: minY, max: 100, ticks: { callback: (v) => v + '%' } } },
+  };
+  if (targetId === 'aoiChart' && aoiChartInstance) aoiChartInstance.destroy();
+  if (targetId === 'aoiChartExpanded' && aoiChartExpandedInstance) aoiChartExpandedInstance.destroy();
+  // eslint-disable-next-line no-undef
+  const inst = new Chart(ctx, { type: 'line', data, options });
+  if (targetId === 'aoiChart') aoiChartInstance = inst; else aoiChartExpandedInstance = inst;
+}
+
+function renderRateChart(targetId, labels, rates) {
+  const ctx = document.getElementById(targetId).getContext('2d');
+  const data = {
+    labels,
+    datasets: [
+      { label: 'Reject %', data: rates, backgroundColor: 'rgba(255,99,132,0.6)' },
+    ],
+  };
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    scales: { y: { beginAtZero: true, max: 100, ticks: { callback: (v) => v + '%' } } },
+  };
+  if (targetId === 'aoiChart' && aoiChartInstance) aoiChartInstance.destroy();
+  if (targetId === 'aoiChartExpanded' && aoiChartExpandedInstance) aoiChartExpandedInstance.destroy();
+  // eslint-disable-next-line no-undef
+  const inst = new Chart(ctx, { type: 'bar', data, options });
+  if (targetId === 'aoiChart') aoiChartInstance = inst; else aoiChartExpandedInstance = inst;
+}
+
 function fillTable(labels, accepted, rejected) {
   const tbody = document.getElementById('data-tbody');
   tbody.innerHTML = '';
@@ -171,19 +212,47 @@ function fillShiftTable(labels, shift1, shift2) {
   });
 }
 
+function fillYieldTable(labels, yields) {
+  const tbody = document.getElementById('data-tbody');
+  tbody.innerHTML = '';
+  labels.forEach((lab, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${lab}</td><td>${yields[i].toFixed(1)}%</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function fillRateTable(labels, rates) {
+  const tbody = document.getElementById('data-tbody');
+  tbody.innerHTML = '';
+  labels.forEach((lab, i) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${lab}</td><td>${rates[i].toFixed(1)}%</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
 function expandModal(show) {
   const overlay = document.getElementById('chart-modal');
   overlay.style.display = show ? 'flex' : 'none';
   if (show) {
-    const header = document.getElementById('data-label-header');
+    const thead = document.querySelector('.data-table thead');
     if (currentData.shift1 && currentData.shift2) {
+      if (thead) thead.innerHTML = '<tr><th>Date / Shift</th><th>Accepted</th><th>Rejected</th><th>Accepted %</th><th>Rejected %</th></tr>';
       renderShiftChart('aoiChartExpanded', currentData.labels, currentData.shift1, currentData.shift2);
       fillShiftTable(currentData.labels, currentData.shift1, currentData.shift2);
-      if (header) header.textContent = 'Date / Shift';
+    } else if (currentData.yields) {
+      if (thead) thead.innerHTML = '<tr><th>Date</th><th>Yield %</th></tr>';
+      renderYieldChart('aoiChartExpanded', currentData.labels, currentData.yields);
+      fillYieldTable(currentData.labels, currentData.yields);
+    } else if (currentData.rates) {
+      if (thead) thead.innerHTML = '<tr><th>Customer</th><th>Rejection %</th></tr>';
+      renderRateChart('aoiChartExpanded', currentData.labels, currentData.rates);
+      fillRateTable(currentData.labels, currentData.rates);
     } else {
+      if (thead) thead.innerHTML = '<tr><th>Operator</th><th>Accepted</th><th>Rejected</th><th>Accepted %</th><th>Rejected %</th></tr>';
       renderChart('aoiChartExpanded', currentData.labels, currentData.accepted, currentData.rejected);
       fillTable(currentData.labels, currentData.accepted, currentData.rejected);
-      if (header) header.textContent = 'Operator';
     }
   }
 }
@@ -200,14 +269,38 @@ document.getElementById('modal-download-chart').addEventListener('click', () => 
 });
 
 document.getElementById('modal-download-csv').addEventListener('click', () => {
-  const { labels, accepted, rejected } = currentData;
-  let csv = 'Operator,Accepted,Rejected,Accepted %,Rejected %\n';
-  labels.forEach((lab, i) => {
-    const total = accepted[i] + rejected[i];
-    const accPct = total ? ((accepted[i] / total) * 100).toFixed(1) : 0;
-    const rejPct = total ? ((rejected[i] / total) * 100).toFixed(1) : 0;
-    csv += `${lab},${accepted[i]},${rejected[i]},${accPct},${rejPct}\n`;
-  });
+  let csv = '';
+  if (currentData.shift1 && currentData.shift2) {
+    csv = 'Date,Shift,Accepted,Rejected,Accepted %,Rejected %\n';
+    currentData.labels.forEach((lab, i) => {
+      ['1st', '2nd'].forEach((sh) => {
+        const acc = currentData[sh === '1st' ? 'shift1' : 'shift2'].accepted[i];
+        const rej = currentData[sh === '1st' ? 'shift1' : 'shift2'].rejected[i];
+        const total = acc + rej;
+        const accPct = total ? ((acc / total) * 100).toFixed(1) : 0;
+        const rejPct = total ? ((rej / total) * 100).toFixed(1) : 0;
+        csv += `${lab},${sh},${acc},${rej},${accPct},${rejPct}\n`;
+      });
+    });
+  } else if (currentData.yields) {
+    csv = 'Date,Yield %\n';
+    currentData.labels.forEach((lab, i) => {
+      csv += `${lab},${currentData.yields[i].toFixed(1)}\n`;
+    });
+  } else if (currentData.rates) {
+    csv = 'Customer,Rejection %\n';
+    currentData.labels.forEach((lab, i) => {
+      csv += `${lab},${currentData.rates[i].toFixed(1)}\n`;
+    });
+  } else {
+    csv = 'Operator,Accepted,Rejected,Accepted %,Rejected %\n';
+    currentData.labels.forEach((lab, i) => {
+      const total = currentData.accepted[i] + currentData.rejected[i];
+      const accPct = total ? ((currentData.accepted[i] / total) * 100).toFixed(1) : 0;
+      const rejPct = total ? ((currentData.rejected[i] / total) * 100).toFixed(1) : 0;
+      csv += `${lab},${currentData.accepted[i]},${currentData.rejected[i]},${accPct},${rejPct}\n`;
+    });
+  }
   const blob = new Blob([csv], { type: 'text/csv' });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -230,6 +323,11 @@ function runChart() {
   if (activePreset && activePreset.params && activePreset.params.view) {
     params.view = activePreset.params.view;
   }
+  const title = document.getElementById('chart-title').value || '';
+  const range = (params.start_date || params.end_date)
+    ? ` (${params.start_date || ''} to ${params.end_date || ''})`
+    : '';
+  document.getElementById('result-chart-name').textContent = title + range;
   const qs = new URLSearchParams(params).toString();
   fetch(`/analysis/aoi/data?${qs}`)
     .then((r) => r.json())
@@ -240,12 +338,25 @@ function runChart() {
         const s1 = res.shift1.avg_reject_rate?.toFixed ? res.shift1.avg_reject_rate.toFixed(1) : res.shift1.avg_reject_rate;
         const s2 = res.shift2.avg_reject_rate?.toFixed ? res.shift2.avg_reject_rate.toFixed(1) : res.shift2.avg_reject_rate;
         document.getElementById('aoi-info').textContent = `1st Shift Avg Reject Rate: ${s1}% | 2nd Shift Avg Reject Rate: ${s2}%`;
+      } else if (res.yields) {
+        currentData = { labels: res.labels || [], yields: res.yields || [] };
+        renderYieldChart('aoiChart', currentData.labels, currentData.yields);
+        const avg = res.avg_yield?.toFixed ? res.avg_yield.toFixed(1) : res.avg_yield;
+        const min = res.min_yield?.toFixed ? res.min_yield.toFixed(1) : res.min_yield;
+        const max = res.max_yield?.toFixed ? res.max_yield.toFixed(1) : res.max_yield;
+        document.getElementById('aoi-info').textContent = `Avg Yield: ${avg}% | Min: ${min}% | Max: ${max}%`;
+      } else if (res.rates) {
+        currentData = { labels: res.labels || [], rates: res.rates || [] };
+        renderRateChart('aoiChart', currentData.labels, currentData.rates);
+        const avg = res.avg_rate?.toFixed ? res.avg_rate.toFixed(1) : res.avg_rate;
+        const maxRate = res.max_rate?.toFixed ? res.max_rate.toFixed(1) : res.max_rate;
+        const minRate = res.min_rate?.toFixed ? res.min_rate.toFixed(1) : res.min_rate;
+        document.getElementById('aoi-info').textContent = `Max: ${res.max_customer} ${maxRate}% | Min: ${res.min_customer} ${minRate}% | Avg: ${avg}%`;
       } else {
         currentData = { labels: res.labels || [], accepted: res.accepted || [], rejected: res.rejected || [] };
         renderChart('aoiChart', currentData.labels, currentData.accepted, currentData.rejected);
         document.getElementById('aoi-info').textContent = '';
       }
-      document.getElementById('result-chart-name').textContent = document.getElementById('chart-title').value || '';
       document.getElementById('chart-description-result').textContent = document.getElementById('chart-description').value || '';
     });
 }
@@ -290,6 +401,16 @@ function defaultPresets() {
       name: 'Shift Reject Rate',
       description: 'Accepted vs rejected per shift by date',
       params: { start_date: '', end_date: '', job_numbers: [], rev_numbers: [], assemblies: [], customers: [], operators: [], view: 'shift' },
+    },
+        {
+      name: 'Daily Yield',
+      description: 'Yield percentage per day across both shifts',
+      params: { start_date: '', end_date: '', job_numbers: [], rev_numbers: [], assemblies: [], customers: [], operators: [], view: 'yield' },
+    },
+    {
+      name: 'Customer Rejection Rate',
+      description: 'Rejection rate per customer across all jobs',
+      params: { start_date: '', end_date: '', job_numbers: [], rev_numbers: [], assemblies: [], customers: [], operators: [], view: 'customer_rate' },
     },
   ];
 }
