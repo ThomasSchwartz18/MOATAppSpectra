@@ -224,3 +224,43 @@ def update_saved_aoi_query(name: str, data: dict):
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to update AOI saved query: {exc}"
+
+
+def fetch_saved_fi_queries():
+    """Retrieve saved chart queries for the FI Daily Reports page."""
+    supabase = _get_client()
+    try:
+        response = (
+            supabase.table("fi_saved_queries")
+            .select("id,name,description,start_date,end_date,params,created_at")
+            .order("created_at", desc=True)
+            .execute()
+        )
+        return response.data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to fetch FI saved queries: {exc}"
+
+
+def insert_saved_fi_query(data: dict):
+    """Insert a saved FI chart query definition into Supabase."""
+    supabase = _get_client()
+    try:
+        response = supabase.table("fi_saved_queries").insert(data).execute()
+        return response.data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to save FI chart query: {exc}"
+
+
+def update_saved_fi_query(name: str, data: dict):
+    """Update or upsert a saved FI chart query by ``name``."""
+    supabase = _get_client()
+    try:
+        payload = {**data, "name": name}
+        response = (
+            supabase.table("fi_saved_queries")
+            .upsert(payload, on_conflict="name")
+            .execute()
+        )
+        return response.data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to update FI saved query: {exc}"
