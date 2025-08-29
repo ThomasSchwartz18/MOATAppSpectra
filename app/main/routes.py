@@ -247,7 +247,7 @@ def upload_ppm_reports():
         rows.append({
             'Model Name': model,
             'Total Boards': cell(row_idx, 3) or 0,
-            'Total Parts per Board': cell(row_idx, 4) or 0,
+            'Total Parts/Board': cell(row_idx, 4) or 0,
             'Total Parts': cell(row_idx, 5) or 0,
             'NG Parts': cell(row_idx, 6) or 0,
             'NG PPM': cell(row_idx, 7) or 0,
