@@ -59,3 +59,16 @@ def compute_operator_grades(rows: Iterable[dict]) -> dict:
             "grade": grade,
         }
     return results
+
+
+def calculate_aoi_grades(rows: Iterable[dict]) -> dict:
+    """Wrapper around :func:`compute_operator_grades` for clarity.
+
+    Args:
+        rows: Iterable of dictionaries from the ``combined_reports`` table.
+
+    Returns:
+        The result of :func:`compute_operator_grades`.
+    """
+
+    return compute_operator_grades(rows)
