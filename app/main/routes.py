@@ -337,6 +337,74 @@ def moat_preview():
     })
 
 
+def _yield_preview(fetch_func):
+    """Return yield percentages for the last 7 recorded days."""
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+
+    data, error = fetch_func()
+    if error:
+        abort(500, description=error)
+
+    from datetime import datetime, timedelta
+    from collections import defaultdict
+
+    def parse_date(d):
+        if not d:
+            return None
+        try:
+            return datetime.fromisoformat(str(d)).date()
+        except Exception:
+            return None
+
+    today = datetime.utcnow().date()
+    start = today - timedelta(days=6)
+    agg = defaultdict(lambda: {'accepted': 0, 'rejected': 0})
+
+    for row in data:
+        d = parse_date(row.get('Date') or row.get('date'))
+        if not d or d < start or d > today:
+            continue
+        inspected = int(row.get('Quantity Inspected') or row.get('quantity_inspected') or 0)
+        rejected = int(row.get('Quantity Rejected') or row.get('quantity_rejected') or 0)
+        accepted = inspected - rejected
+        if accepted < 0:
+            accepted = 0
+        agg[d]['accepted'] += accepted
+        agg[d]['rejected'] += rejected
+
+    dates = sorted(agg.keys())
+    yields = []
+    for d in dates:
+        a = agg[d]['accepted']
+        r = agg[d]['rejected']
+        tot = a + r
+        y = (a / tot * 100) if tot else 0
+        yields.append(y)
+
+    avg_yield = sum(yields) / len(yields) if yields else 0
+    start_date = dates[0].isoformat() if dates else None
+    end_date = dates[-1].isoformat() if dates else None
+
+    return jsonify({
+        'labels': [d.isoformat() for d in dates],
+        'yields': yields,
+        'avg_yield': avg_yield,
+        'start_date': start_date,
+        'end_date': end_date,
+    })
+
+
+@main_bp.route('/aoi_preview', methods=['GET'])
+def aoi_preview():
+    return _yield_preview(fetch_aoi_reports)
+
+
+@main_bp.route('/fi_preview', methods=['GET'])
+def fi_preview():
+    return _yield_preview(fetch_fi_reports)
+
+
 @main_bp.route('/analysis/ppm', methods=['GET'])
 def ppm_analysis():
     if 'username' not in session:
