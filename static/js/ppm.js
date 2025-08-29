@@ -328,10 +328,48 @@ function runChart() {
   const range = (start || end) ? ` (${start || ''} to ${end || ''})` : '';
   document.getElementById('result-chart-name').textContent = (title || '(untitled)') + range;
   const description = document.getElementById('chart-description').value.trim();
-  runPresetChart()
+
+  const xCol = document.getElementById('x-column')?.value || '';
+  const sCol = document.getElementById('series-column')?.value || '';
+  const expr = document.getElementById('transform-expression')?.value.trim() || '';
+  const yAgg = document.getElementById('y-agg')?.value || 'avg';
+  const xBin = document.getElementById('x-binning')?.value || 'none';
+  const xSort = document.getElementById('x-cat-sort')?.value || 'alpha-asc';
+  const src = document.getElementById('value-source')?.value || 'avg_false_calls_per_assembly';
+
+  const hasCustom = Boolean(
+    xCol || sCol || expr || src !== 'avg_false_calls_per_assembly' ||
+    yAgg !== 'avg' || xBin !== 'none' || xSort !== 'alpha-asc'
+  );
+
+  const runner = hasCustom ? runChartFlexible() : runPresetChart();
+  runner
     .then((result) => {
       const cfg = collectChartConfig();
       const canvasEl = document.getElementById('ppmChart');
+
+      if (hasCustom) {
+        const labels = result.labels || [];
+        const datasets = result.datasets || [];
+        const chartType = cfg.type === 'area' ? 'line' : cfg.type;
+        const chartCfg = { ...cfg, type: chartType, xTickDisplay: false };
+        const container = canvasEl.parentElement;
+        const minPerLabel = 120;
+        const width = Math.max(container.clientWidth, labels.length * minPerLabel);
+        canvasEl.style.width = width + 'px';
+        if (datasets.length > 1) {
+          renderChartMulti('ppmChart', labels, datasets, chartCfg);
+        } else {
+          renderChart('ppmChart', labels, datasets[0]?.data || [], chartCfg);
+        }
+        currentData = { labels, values: datasets[0]?.data || [], datasets };
+        window.currentChartMeta = { labels, datasets, type: chartType, options: buildOptions(chartCfg) };
+        updateInfo(labels, datasets[0]?.data || []);
+        if (title) document.getElementById('modal-title').textContent = title;
+        document.getElementById('chart-description-result').textContent = description;
+        return;
+      }
+
       const ctx = canvasEl.getContext('2d');
       let chartType = 'line';
       let options = buildOptions({ ...cfg, xTickDisplay: false });
@@ -375,13 +413,13 @@ function runChart() {
 
       if (ppmChartInstance) ppmChartInstance.destroy();
       // eslint-disable-next-line no-undef
-        ppmChartInstance = new Chart(ctx, { type: chartType, data: { labels, datasets }, options, plugins: (result.kind==='line-control' ? [controlLinesPlugin] : []) });
-        currentData = { labels, values: datasets[0]?.data || [], datasets };
-        window.currentChartMeta = { labels, datasets, type: chartType, options };
-        updateInfo(labels, datasets[0]?.data || []);
-        if (title) document.getElementById('modal-title').textContent = title;
-        document.getElementById('chart-description-result').textContent = description;
-      })
+      ppmChartInstance = new Chart(ctx, { type: chartType, data: { labels, datasets }, options, plugins: (result.kind==='line-control' ? [controlLinesPlugin] : []) });
+      currentData = { labels, values: datasets[0]?.data || [], datasets };
+      window.currentChartMeta = { labels, datasets, type: chartType, options };
+      updateInfo(labels, datasets[0]?.data || []);
+      if (title) document.getElementById('modal-title').textContent = title;
+      document.getElementById('chart-description-result').textContent = description;
+    })
     .catch(() => { document.getElementById('ppm-info').textContent = 'Failed to build chart.'; });
 }
 
