@@ -557,9 +557,11 @@ def aoi_grades():
             continue
         if end_dt and (not dt or dt > end_dt):
             continue
-        if operator_set and (row.get('Operator') not in operator_set):
+        operator = row.get('aoi_Operator') or row.get('Operator')
+        if operator_set and (operator not in operator_set):
             continue
-        if job_set and (row.get('Job Number') not in job_set):
+        job_number = row.get('aoi_Job Number') or row.get('Job Number')
+        if job_set and (job_number not in job_set):
             continue
         filtered.append(row)
 
