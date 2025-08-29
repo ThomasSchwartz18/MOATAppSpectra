@@ -2,3 +2,4 @@ flask
 supabase
 dotenv
 openpyxl
+xlrd
