@@ -269,6 +269,7 @@ function loadParamsIntoBuilder(row) {
     document.getElementById('y-title').value = params.options.yTitle || '';
     document.getElementById('show-tooltips').value = params.options.showTooltips ? 'yes' : 'no';
   }
+  updateXTypeUI();
 }
 
 function filterSavedList() {
@@ -929,11 +930,27 @@ function populateSelect(sel, items, withNone=false) {
 
 function updateXTypeUI() {
   const xCol = document.getElementById('x-column').value;
-  const t = columnTypes[xCol] || 'categorical';
-  const hint = document.getElementById('x-type-hint');
-  hint.textContent = `Type: ${t}`;
-  document.getElementById('x-binning-wrap').style.display = (t === 'temporal') ? '' : 'none';
-  document.getElementById('x-cat-sort-wrap').style.display = (t === 'categorical') ? '' : 'none';
+  const apply = () => {
+    const t = columnTypes[xCol] || 'categorical';
+    const hint = document.getElementById('x-type-hint');
+    hint.textContent = `Type: ${t}`;
+    document.getElementById('x-binning-wrap').style.display = (t === 'temporal') ? '' : 'none';
+    document.getElementById('x-cat-sort-wrap').style.display = (t === 'categorical') ? '' : 'none';
+  };
+
+  if (!columnTypes[xCol]) {
+    fetch('/moat')
+      .then((res) => res.json())
+      .then((rows) => {
+        const { cols, types } = inferTypes(rows);
+        allColumns = cols;
+        columnTypes = types;
+        apply();
+      })
+      .catch(apply);
+  } else {
+    apply();
+  }
 }
 
 function initColumnsUI() {
