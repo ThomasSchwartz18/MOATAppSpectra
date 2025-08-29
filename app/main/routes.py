@@ -11,6 +11,8 @@ from flask import (
 from functools import wraps
 import csv
 import io
+import os
+from openpyxl import load_workbook
 
 from app.db import (
     fetch_aoi_reports,
@@ -30,6 +32,7 @@ from app.db import (
     insert_aoi_reports_bulk,
     insert_fi_report,
     insert_moat,
+    insert_moat_bulk,
 )
 
 main_bp = Blueprint('main', __name__)
@@ -168,6 +171,61 @@ def upload_fi_reports():
             abort(500, description=err)
         inserted += 1
     return jsonify({'inserted': inserted}), 201
+
+
+@main_bp.route('/ppm_reports/upload', methods=['POST'])
+@admin_required
+def upload_ppm_reports():
+    """Upload an XLSX PPM report and store rows in the MOAT table."""
+    uploaded = request.files.get('file')
+    if not uploaded or uploaded.filename == '':
+        abort(400, description='No file provided')
+
+    base = os.path.splitext(os.path.basename(uploaded.filename))[0]
+    parts = base.split()
+    if len(parts) < 3:
+        abort(400, description='Filename must be "PPMReportControl YYYY-MM-DD LX"')
+    report_date = parts[1]
+    line = parts[2]
+
+    try:
+        uploaded.stream.seek(0)
+        wb = load_workbook(uploaded.stream, data_only=True)
+    except Exception as exc:
+        abort(400, description=f'Failed to read Excel file: {exc}')
+
+    ws = wb.active
+    rows = []
+    row_idx = 7
+    while True:
+        model = ws[f'B{row_idx}'].value
+        if model is None:
+            row_idx += 1
+            continue
+        if str(model).strip().lower() == 'total':
+            break
+        rows.append({
+            'Model Name': model,
+            'Total Boards': ws[f'C{row_idx}'].value or 0,
+            'Total Parts per Board': ws[f'D{row_idx}'].value or 0,
+            'Total Parts': ws[f'E{row_idx}'].value or 0,
+            'NG Parts': ws[f'F{row_idx}'].value or 0,
+            'NG PPM': ws[f'G{row_idx}'].value or 0,
+            'FalseCall Parts': ws[f'H{row_idx}'].value or 0,
+            'FalseCall PPM': ws[f'I{row_idx}'].value or 0,
+            'Report Date': report_date,
+            'Line': line,
+        })
+        row_idx += 1
+
+    if not rows:
+        return jsonify({'inserted': 0}), 200
+
+    _, error = insert_moat_bulk(rows)
+    if error:
+        abort(500, description=error)
+
+    return jsonify({'inserted': len(rows)}), 201
 
 
 @main_bp.route('/moat', methods=['GET'])
