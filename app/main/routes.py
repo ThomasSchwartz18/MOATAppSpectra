@@ -12,7 +12,7 @@ from functools import wraps
 import csv
 import io
 import os
-from datetime import datetime
+from datetime import datetime, date
 from openpyxl import load_workbook
 import xlrd
 
@@ -212,12 +212,26 @@ def upload_ppm_reports():
                 except IndexError:
                     return None
 
+            raw_date = cell(2, 1)
         else:
             wb = load_workbook(uploaded.stream, data_only=True)
             sheet = wb.active
 
             def cell(r, c):
                 return sheet.cell(row=r, column=c).value
+
+            raw_date = cell(2, 1)
+
+        if raw_date:
+            if isinstance(raw_date, datetime):
+                report_date = raw_date.date().isoformat()
+            elif isinstance(raw_date, date):
+                report_date = raw_date.isoformat()
+            elif isinstance(raw_date, str):
+                try:
+                    report_date = datetime.strptime(raw_date.strip(), "%m/%d/%Y").date().isoformat()
+                except ValueError:
+                    pass
     except Exception as exc:
         abort(400, description=f'Failed to read Excel file: {exc}')
 
