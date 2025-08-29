@@ -132,8 +132,21 @@ function renderYieldPreview(endpoint, canvasId, infoId) {
             line: { borderWidth: 2 },
           },
           scales: {
-            x: { display: false, grid: { display: false }, ticks: { display: false } },
-            y: { beginAtZero: true, display: false, grid: { display: false }, ticks: { display: false } },
+            x: {
+              display: true,
+              title: { display: true, text: 'Date' },
+              grid: { display: false },
+              ticks: { display: true },
+              border: { display: true },
+            },
+            y: {
+              beginAtZero: true,
+              display: true,
+              title: { display: true, text: 'Yield' },
+              grid: { display: false },
+              ticks: { display: true },
+              border: { display: true },
+            },
           },
         },
       });
