@@ -4,68 +4,90 @@
 <h2>AOI Daily Reports</h2>
 
   <div class="analysis-grid">
-    <!-- Left: Builder -->
+    <!-- Left: Builder / Upload Tabs -->
     <div class="analysis-left section-card">
-      <div class="section-title">Chart Builder</div>
-      <div class="field-row">
-        <div class="field">
-          <label for="chart-title">Chart Title</label>
-          <input id="chart-title" placeholder="Chart title" />
+      <div class="tab-bar">
+        <div class="tab active" data-target="builder-tab">Chart Builder</div>
+        {% if username == 'ADMIN' %}
+        <div class="tab" data-target="upload-tab">Upload</div>
+        {% endif %}
+      </div>
+
+      <div id="builder-tab" class="tab-content" style="display:block;">
+        <div class="field-row">
+          <div class="field">
+            <label for="chart-title">Chart Title</label>
+            <input id="chart-title" placeholder="Chart title" />
+          </div>
+          <div class="field">
+            <label for="chart-description">Chart Description</label>
+            <textarea id="chart-description" placeholder="Describe this chart"></textarea>
+          </div>
         </div>
-        <div class="field">
-          <label for="chart-description">Chart Description</label>
-          <textarea id="chart-description" placeholder="Describe this chart"></textarea>
+
+        <div class="section-title" style="margin-top:10px;">Data Range</div>
+        <div class="field-row">
+          <div class="field">
+            <label for="start-date">Start Date</label>
+            <input type="date" id="start-date" />
+          </div>
+          <div class="field">
+            <label for="end-date">End Date</label>
+            <input type="date" id="end-date" />
+          </div>
+        </div>
+
+        <div class="section-title" style="margin-top:10px;">Filters</div>
+        <div class="field-row">
+          <div class="field">
+            <label for="filter-job">Job Number</label>
+            <input id="filter-job" placeholder="e.g. 12345,67890" />
+          </div>
+          <div class="field">
+            <label for="filter-rev">Revision</label>
+            <input id="filter-rev" placeholder="e.g. A,B" />
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="filter-assembly">Assembly Number</label>
+            <input id="filter-assembly" placeholder="e.g. ASM1,ASM2" />
+          </div>
+          <div class="field">
+            <label>Customer</label>
+            <div id="customer-wrapper"></div>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label>Operator</label>
+            <div id="operator-wrapper"></div>
+          </div>
+        </div>
+
+        <div class="field-row" style="margin-top:12px;">
+          <div class="field" style="flex:1;">
+            <label for="save-name">Save As</label>
+            <input id="save-name" placeholder="Chart name" />
+          </div>
+          <button type="button" id="save-chart">Save</button>
+          <button type="button" id="run-chart">Run</button>
         </div>
       </div>
 
-      <div class="section-title" style="margin-top:10px;">Data Range</div>
-      <div class="field-row">
-        <div class="field">
-          <label for="start-date">Start Date</label>
-          <input type="date" id="start-date" />
-        </div>
-        <div class="field">
-          <label for="end-date">End Date</label>
-          <input type="date" id="end-date" />
-        </div>
+      {% if username == 'ADMIN' %}
+      <div id="upload-tab" class="tab-content" style="display:none;">
+        <form id="upload-form">
+          <div class="field-row">
+            <div class="field" style="flex:1;">
+              <label for="upload-csv">CSV File</label>
+              <input type="file" id="upload-csv" accept=".csv" />
+            </div>
+          </div>
+          <button type="submit" id="upload-button">Upload</button>
+        </form>
       </div>
-
-      <div class="section-title" style="margin-top:10px;">Filters</div>
-      <div class="field-row">
-        <div class="field">
-          <label for="filter-job">Job Number</label>
-          <input id="filter-job" placeholder="e.g. 12345,67890" />
-        </div>
-        <div class="field">
-          <label for="filter-rev">Revision</label>
-          <input id="filter-rev" placeholder="e.g. A,B" />
-        </div>
-      </div>
-      <div class="field-row">
-        <div class="field">
-          <label for="filter-assembly">Assembly Number</label>
-          <input id="filter-assembly" placeholder="e.g. ASM1,ASM2" />
-        </div>
-        <div class="field">
-          <label>Customer</label>
-          <div id="customer-wrapper"></div>
-        </div>
-      </div>
-      <div class="field-row">
-        <div class="field">
-          <label>Operator</label>
-          <div id="operator-wrapper"></div>
-        </div>
-      </div>
-
-      <div class="field-row" style="margin-top:12px;">
-        <div class="field" style="flex:1;">
-          <label for="save-name">Save As</label>
-          <input id="save-name" placeholder="Chart name" />
-        </div>
-        <button type="button" id="save-chart">Save</button>
-        <button type="button" id="run-chart">Run</button>
-      </div>
+      {% endif %}
     </div>
 
     <!-- Top Right: Saved Queries + Search -->

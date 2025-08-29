@@ -71,6 +71,20 @@ def insert_aoi_report(data: dict):
         return None, f"Failed to insert AOI report: {exc}"
 
 
+def insert_aoi_reports_bulk(rows: list[dict]):
+    """Insert multiple AOI reports at once.
+
+    Args:
+        rows (list[dict]): List of AOI report dictionaries.
+    """
+    supabase = _get_client()
+    try:
+        response = supabase.table("aoi_reports").insert(rows).execute()
+        return response.data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to insert AOI reports: {exc}"
+
+
 def insert_fi_report(data: dict):
     """Insert a new FI report."""
     supabase = _get_client()
