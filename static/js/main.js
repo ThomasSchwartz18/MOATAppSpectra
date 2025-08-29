@@ -96,9 +96,69 @@ function renderPreview(endpoint, canvasId, infoId) {
     });
 }
 
+function renderYieldPreview(endpoint, canvasId, infoId) {
+  fetch(endpoint)
+    .then((res) => res.json())
+    .then((data) => {
+      const ctx = document.getElementById(canvasId).getContext('2d');
+
+      // eslint-disable-next-line no-undef
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.labels,
+          datasets: [
+            {
+              data: data.yields,
+              borderColor: '#000',
+              backgroundColor: '#000',
+              pointBackgroundColor: '#000',
+              pointBorderColor: '#000',
+              pointRadius: 3,
+              fill: false,
+              tension: 0,
+              borderWidth: 2,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: { enabled: false },
+          },
+          elements: {
+            line: { borderWidth: 2 },
+          },
+          scales: {
+            x: { display: false, grid: { display: false }, ticks: { display: false } },
+            y: { beginAtZero: true, display: false, grid: { display: false }, ticks: { display: false } },
+          },
+        },
+      });
+
+      const infoEl = document.getElementById(infoId);
+      if (infoEl) {
+        const avg = data.avg_yield ? data.avg_yield.toFixed(1) : '0';
+        infoEl.textContent = `${data.start_date} to ${data.end_date} | Avg Yield: ${avg}%`;
+      }
+    })
+    .catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to load preview', err);
+    });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   if (document.getElementById('moatChart')) {
     renderPreview('/moat_preview', 'moatChart', 'moat-info');
+  }
+  if (document.getElementById('aoiChart')) {
+    renderYieldPreview('/aoi_preview', 'aoiChart', 'aoi-info');
+  }
+  if (document.getElementById('fiChart')) {
+    renderYieldPreview('/fi_preview', 'fiChart', 'fi-info');
   }
   // Auto-hide navbar on scroll down; reveal on scroll up
   const nav = document.querySelector('.navbar');
