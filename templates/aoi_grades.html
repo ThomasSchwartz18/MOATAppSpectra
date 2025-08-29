@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>AOI Operator Grades</h2>
+<div class="section-card">
+  <div style="height:300px">
+    <canvas id="gradesChart"></canvas>
+  </div>
+  <table id="gradesTable" class="data-table" style="margin-top:16px;">
+    <thead>
+      <tr><th>Operator</th><th>Inspected</th><th>Weighted Missed</th><th>Grade %</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/aoi_grades.js') }}"></script>
+{% endblock %}

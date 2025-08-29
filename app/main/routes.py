@@ -567,6 +567,13 @@ def aoi_grades():
     return jsonify(grades)
 
 
+@main_bp.route('/analysis/aoi/grades/view', methods=['GET'])
+def aoi_grades_page():
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    return render_template('aoi_grades.html', username=session.get('username'))
+
+
 @main_bp.route('/analysis/aoi', methods=['GET'])
 def aoi_daily_reports():
     if 'username' not in session:
