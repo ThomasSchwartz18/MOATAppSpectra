@@ -154,10 +154,10 @@ document.addEventListener('DOMContentLoaded', () => {
   if (document.getElementById('moatChart')) {
     renderPreview('/moat_preview', 'moatChart', 'moat-info');
   }
-  if (document.getElementById('aoiChart')) {
+  if (document.getElementById('aoi-preview')) {
     renderYieldPreview('/aoi_preview', 'aoiChart', 'aoi-info');
   }
-  if (document.getElementById('fiChart')) {
+  if (document.getElementById('fi-preview')) {
     renderYieldPreview('/fi_preview', 'fiChart', 'fi-info');
   }
   // Auto-hide navbar on scroll down; reveal on scroll up
