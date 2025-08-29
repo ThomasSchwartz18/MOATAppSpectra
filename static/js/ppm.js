@@ -77,8 +77,34 @@ function computeDerived(row, expr) {
   }
 }
 
-function buildOptions({ showTooltips, xTitle, yTitle, controlLimits, xTickDisplay = true }) {
-  return {
+function withMetaTooltip(opts, metaLookup, showTooltips = true) {
+  if (!opts.plugins) opts.plugins = {};
+  if (!opts.plugins.tooltip) opts.plugins.tooltip = {};
+  opts.plugins.tooltip.enabled = showTooltips;
+  if (!metaLookup) return opts;
+  const baseCb = opts.plugins.tooltip.callbacks && opts.plugins.tooltip.callbacks.label;
+  if (!opts.plugins.tooltip.callbacks) opts.plugins.tooltip.callbacks = {};
+  const toArr = (v) => (v == null ? [] : Array.isArray(v) ? v : [v]);
+  opts.plugins.tooltip.callbacks.label = (context) => {
+    const dsLabel = context.dataset?.label || '';
+    const lbl = context.label ?? context.dataIndex;
+    const key = `${dsLabel}||${lbl}`;
+    const meta = metaLookup[key] || metaLookup[lbl];
+    const val = context.formattedValue;
+    const base = baseCb ? baseCb(context) : (dsLabel ? `${dsLabel}: ${val}` : `${val}`);
+    const parts = [];
+    const fromRaw = context.raw || {};
+    const metaSrc = meta || { date: toArr(fromRaw.date), line: toArr(fromRaw.line), model: toArr(fromRaw.model) };
+    if (metaSrc.date && metaSrc.date.length) parts.push(`Date: ${metaSrc.date.join(', ')}`);
+    if (metaSrc.line && metaSrc.line.length) parts.push(`Line: ${metaSrc.line.join(', ')}`);
+    if (metaSrc.model && metaSrc.model.length) parts.push(`Model: ${metaSrc.model.join(', ')}`);
+    return parts.length ? `${base} (${parts.join(' | ')})` : base;
+  };
+  return opts;
+}
+
+function buildOptions({ showTooltips, xTitle, yTitle, controlLimits, xTickDisplay = true, metaLookup }) {
+  const opts = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: { legend: { display: false }, tooltip: { enabled: showTooltips } },
@@ -88,6 +114,7 @@ function buildOptions({ showTooltips, xTitle, yTitle, controlLimits, xTickDispla
     },
     controlLimits: controlLimits || null,
   };
+  return withMetaTooltip(opts, metaLookup, showTooltips);
 }
 
 function renderChart(targetId, labels, values, cfg) {
@@ -147,10 +174,11 @@ function renderChartMulti(targetId, labels, datasets, cfg) {
   if (targetId === 'ppmChartExpanded' && ppmChartExpandedInstance) ppmChartExpandedInstance.destroy();
 
   // eslint-disable-next-line no-undef
+  const baseOpts = buildOptions(cfg);
   const instance = new Chart(ctx, {
     type: cfg.type === 'area' ? 'line' : cfg.type,
     data: { labels, datasets: chartDatasets },
-    options: { ...buildOptions(cfg), plugins: { legend: { display: true }, tooltip: { enabled: cfg.showTooltips } } },
+    options: { ...baseOpts, plugins: { ...baseOpts.plugins, legend: { display: true } } },
     plugins: [controlLinesPlugin],
   });
   if (targetId === 'ppmChart') ppmChartInstance = instance;
@@ -353,7 +381,7 @@ function runChart() {
         const labels = result.labels || [];
         const datasets = result.datasets || [];
         const chartType = cfg.type === 'area' ? 'line' : cfg.type;
-        const chartCfg = { ...cfg, type: chartType, xTickDisplay: false };
+        const chartCfg = { ...cfg, type: chartType, xTickDisplay: false, metaLookup: result.metaLookup };
         const container = canvasEl.parentElement;
         const minPerLabel = 120;
         const width = Math.max(container.clientWidth, labels.length * minPerLabel);
@@ -363,8 +391,8 @@ function runChart() {
         } else {
           renderChart('ppmChart', labels, datasets[0]?.data || [], chartCfg);
         }
-        currentData = { labels, values: datasets[0]?.data || [], datasets };
-        window.currentChartMeta = { labels, datasets, type: chartType, options: buildOptions(chartCfg) };
+        currentData = { labels, values: datasets[0]?.data || [], datasets, metaLookup: result.metaLookup };
+        window.currentChartMeta = { labels, datasets, type: chartType, options: buildOptions(chartCfg), metaLookup: result.metaLookup };
         updateInfo(labels, datasets[0]?.data || []);
         if (title) document.getElementById('modal-title').textContent = title;
         document.getElementById('chart-description-result').textContent = description;
@@ -373,50 +401,54 @@ function runChart() {
 
       const ctx = canvasEl.getContext('2d');
       let chartType = 'line';
-      let options = buildOptions({ ...cfg, xTickDisplay: false });
+      let options = buildOptions({ ...cfg, xTickDisplay: false, metaLookup: result.metaLookup });
       let datasets = [];
       let labels = [];
 
       if (result.kind === 'line-control') {
         labels = result.labels; datasets = [{ label: activePreset?.name || 'Series', data: result.values, borderColor: cfg.color, backgroundColor: cfg.color, pointRadius: cfg.pointRadius, pointStyle: cfg.pointStyle, fill: false, tension: cfg.tension, borderWidth: 2 }];
-        options = buildOptions({ ...cfg, controlLimits: result.limits, xTickDisplay: false });
+        options = buildOptions({ ...cfg, controlLimits: result.limits, xTickDisplay: false, metaLookup: result.metaLookup });
         chartType = 'line';
         const container = canvasEl.parentElement; const minPerLabel = 120; const width = Math.max(container.clientWidth, labels.length * minPerLabel); canvasEl.style.width = width + 'px';
       } else if (result.kind === 'pareto') {
         labels = result.labels; datasets = result.datasets; chartType = 'bar';
+        const basePareto = buildOptions({ ...cfg, xTickDisplay: false, metaLookup: result.metaLookup });
         options = {
-          ...buildOptions({ ...cfg, xTickDisplay: false }),
-          scales: { x: { ...buildOptions(cfg).scales.x }, y: { beginAtZero: true }, y2: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { callback: (v)=> v + '%' } } },
-          plugins: { legend: { display: true }, tooltip: { enabled: cfg.showTooltips } }
+          ...basePareto,
+          scales: { x: { ...basePareto.scales.x }, y: { beginAtZero: true }, y2: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false }, ticks: { callback: (v)=> v + '%' } } },
+          plugins: { ...basePareto.plugins, legend: { display: true } }
         };
         const container = canvasEl.parentElement; const minPerLabel = 120; const width = Math.max(container.clientWidth, labels.length * minPerLabel); canvasEl.style.width = width + 'px';
       } else if (result.kind === 'fc_avg_and_ppm') {
         labels = result.labels; datasets = result.datasets; chartType = 'bar';
+        const baseDual = buildOptions({ ...cfg, xTickDisplay: false, metaLookup: result.metaLookup });
         options = {
-          ...buildOptions({ ...cfg, xTickDisplay: false }),
-          scales: { x: { ...buildOptions(cfg).scales.x }, y: { beginAtZero: true }, y2: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false } } },
-          plugins: { legend: { display: true }, tooltip: { enabled: cfg.showTooltips } }
+          ...baseDual,
+          scales: { x: { ...baseDual.scales.x }, y: { beginAtZero: true }, y2: { beginAtZero: true, position: 'right', grid: { drawOnChartArea: false } } },
+          plugins: { ...baseDual.plugins, legend: { display: true } }
         };
         const container = canvasEl.parentElement; const minPerLabel = 120; const width = Math.max(container.clientWidth, labels.length * minPerLabel); canvasEl.style.width = width + 'px';
       } else if (result.kind === 'scatter') {
         chartType = 'scatter'; labels = []; datasets = [{ label: 'Models', data: result.points, pointRadius: cfg.pointRadius, backgroundColor: cfg.color, borderColor: cfg.color }];
-        options = { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true }, tooltip: { enabled: cfg.showTooltips } }, scales: { x: { type: 'linear', title: { display: true, text: 'NG PPM' } }, y: { type: 'linear', title: { display: true, text: 'FalseCall PPM' } } } };
+        options = withMetaTooltip({ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true } }, scales: { x: { type: 'linear', title: { display: true, text: 'NG PPM' } }, y: { type: 'linear', title: { display: true, text: 'FalseCall PPM' } } } }, result.metaLookup, cfg.showTooltips);
         canvasEl.style.width = '100%';
       } else if (result.kind === 'ts_ng_by_line' || result.kind === 'ts_fc_vs_ng') {
         labels = result.labels; datasets = result.datasets; chartType = 'line';
-        options = { ...buildOptions(cfg), plugins: { legend: { display: true }, tooltip: { enabled: cfg.showTooltips } } };
+        const baseTs = buildOptions({ ...cfg, metaLookup: result.metaLookup });
+        options = { ...baseTs, plugins: { ...baseTs.plugins, legend: { display: true } } };
         canvasEl.style.width = '100%';
       } else if (result.kind === 'ratio_fc_ng') {
         labels = result.labels; datasets = [{ label: 'FC/NG Ratio', data: result.values, backgroundColor: cfg.color, borderColor: cfg.color }]; chartType = 'bar';
-        options = { ...buildOptions({ ...cfg, xTickDisplay: false }), plugins: { legend: { display: false }, tooltip: { enabled: cfg.showTooltips } }, scales: { y: { beginAtZero: true } } };
+        const baseRatio = buildOptions({ ...cfg, xTickDisplay: false, metaLookup: result.metaLookup });
+        options = { ...baseRatio, plugins: { ...baseRatio.plugins, legend: { display: false } }, scales: { y: { beginAtZero: true } } };
         const container = canvasEl.parentElement; const minPerLabel = 120; const width = Math.max(container.clientWidth, labels.length * minPerLabel); canvasEl.style.width = width + 'px';
       }
 
       if (ppmChartInstance) ppmChartInstance.destroy();
       // eslint-disable-next-line no-undef
       ppmChartInstance = new Chart(ctx, { type: chartType, data: { labels, datasets }, options, plugins: (result.kind==='line-control' ? [controlLinesPlugin] : []) });
-      currentData = { labels, values: datasets[0]?.data || [], datasets };
-      window.currentChartMeta = { labels, datasets, type: chartType, options };
+      currentData = { labels, values: datasets[0]?.data || [], datasets, metaLookup: result.metaLookup };
+      window.currentChartMeta = { labels, datasets, type: chartType, options, metaLookup: result.metaLookup };
       updateInfo(labels, datasets[0]?.data || []);
       if (title) document.getElementById('modal-title').textContent = title;
       document.getElementById('chart-description-result').textContent = description;
@@ -436,7 +468,8 @@ async function runChartFlexible() {
   const xSort = document.getElementById('x-cat-sort').value || 'alpha-asc';
 
   const rows = await fetch('/moat').then((r) => r.json());
-  if (!rows || !rows.length) return { labels: [], datasets: [], firstValues: [] };
+  if (!rows || !rows.length) return { labels: [], datasets: [], firstValues: [], metaLookup: {} };
+  const cols = window.__ppm_cols__ || resolveColumns(rows);
 
   // Value per row
   const valueFn = (row) => {
@@ -479,7 +512,7 @@ async function runChartFlexible() {
   };
 
   // Grouping
-  const groups = new Map(); // xKey -> seriesKey -> {sum,count,min,max}
+  const groups = new Map(); // xKey -> seriesKey -> {sum,count,min,max,meta:{dates:Set,lines:Set,models:Set}}
   const sKeys = new Set();
   rows.forEach((row) => {
     // Date window is based on Report Date if present
@@ -492,7 +525,7 @@ async function runChartFlexible() {
     sKeys.add(seriesKey);
     if (!groups.has(xKey)) groups.set(xKey, new Map());
     const m = groups.get(xKey);
-    if (!m.has(seriesKey)) m.set(seriesKey, { sum:0, count:0, min: Infinity, max: -Infinity });
+    if (!m.has(seriesKey)) m.set(seriesKey, { sum:0, count:0, min: Infinity, max: -Infinity, meta:{dates:new Set(), lines:new Set(), models:new Set()} });
     const st = m.get(seriesKey);
     const v = Number(valueFn(row));
     if (!isFinite(v)) return;
@@ -500,6 +533,9 @@ async function runChartFlexible() {
     st.count += 1;
     st.min = Math.min(st.min, v);
     st.max = Math.max(st.max, v);
+    if (cols.date && row[cols.date]) st.meta.dates.add(String(row[cols.date]).slice(0,10));
+    if (cols.line && row[cols.line] !== undefined) st.meta.lines.add(String(row[cols.line]));
+    if (cols.model && row[cols.model] !== undefined) st.meta.models.add(String(row[cols.model]));
   });
 
   // Labels sorting
@@ -519,10 +555,18 @@ async function runChartFlexible() {
 
   const seriesOrdered = sCol ? Array.from(sKeys).sort() : ['__single__'];
   const datasets = [];
+  const metaLookup = {};
   seriesOrdered.forEach((sKey) => {
-    const data = labels.map((xk) => {
+    const data = labels.map((xk, idx) => {
       const st = groups.get(xk)?.get(sKey);
       if (!st) return 0;
+      const meta = {
+        date: Array.from(st.meta.dates),
+        line: Array.from(st.meta.lines),
+        model: Array.from(st.meta.models),
+      };
+      const dsLabel = sCol ? `${sKey}` : (document.getElementById('y-agg').selectedOptions[0]?.text || 'Value');
+      metaLookup[`${dsLabel}||${labels[idx]}`] = meta;
       switch (yAgg) {
         case 'sum': return st.sum;
         case 'avg': return st.count ? st.sum / st.count : 0;
@@ -534,7 +578,7 @@ async function runChartFlexible() {
     datasets.push({ label: sCol ? `${sKey}` : (document.getElementById('y-agg').selectedOptions[0]?.text || 'Value'), data });
   });
 
-  return { labels, datasets, firstValues: datasets[0]?.data || [] };
+  return { labels, datasets, firstValues: datasets[0]?.data || [], metaLookup };
 }
 
 // Presets and filter-focused charting
@@ -711,11 +755,14 @@ async function runPresetChart() {
   }
 
   // group by model
-  const groups = new Map(); // model -> { ngSum, fcSum, boardSum, partsSum }
+  const groups = new Map(); // model -> { ngSum, fcSum, boardSum, partsSum, meta:{dates:Set, lines:Set, models:Set} }
   filteredByBoards.forEach((row) => {
     const model = cols.model ? String(row[cols.model] ?? 'Unknown') : 'Unknown';
-    if (!groups.has(model)) groups.set(model, { ngSum:0, fcSum:0, boardSum:0, partsSum:0 });
+    if (!groups.has(model)) groups.set(model, { ngSum:0, fcSum:0, boardSum:0, partsSum:0, meta:{dates:new Set(), lines:new Set(), models:new Set()} });
     const g = groups.get(model);
+    if (cols.date && row[cols.date]) g.meta.dates.add(String(row[cols.date]).slice(0,10));
+    if (cols.line && row[cols.line] !== undefined) g.meta.lines.add(String(row[cols.line]));
+    if (cols.model && row[cols.model] !== undefined) g.meta.models.add(String(row[cols.model]));
     // NG parts: prefer explicit NG Parts; fallback to NG PPM * Total Parts / 1e6
     if (cols.ngParts) {
       g.ngSum += Number(row[cols.ngParts] ?? 0);
@@ -787,7 +834,16 @@ async function runPresetChart() {
     }
     const values = labels.map((m) => yByModel.get(m));
     const limits = computeControlLimits(values);
-    return { kind, labels, values, limits };
+    const metaLookup = {};
+    labels.forEach((m) => {
+      const meta = groups.get(m).meta;
+      metaLookup[m] = {
+        date: Array.from(meta.dates),
+        line: Array.from(meta.lines),
+        model: Array.from(meta.models),
+      };
+    });
+    return { kind, labels, values, limits, metaLookup };
   }
 
   if (kind === 'pareto') {
@@ -802,7 +858,16 @@ async function runPresetChart() {
       { type:'bar', label:'NG Parts', data: bar, backgroundColor:'#4F6BED' },
       { type:'line', label:'Cumulative %', data: cum, yAxisID:'y2', borderColor:'#F59E0B', backgroundColor:'#F59E0B', pointRadius:2, tension:0.1 }
     ];
-    return { kind, labels, datasets };
+    const metaLookup = {};
+    labels.forEach((m) => {
+      const meta = groups.get(m).meta;
+      metaLookup[m] = {
+        date: Array.from(meta.dates),
+        line: Array.from(meta.lines),
+        model: Array.from(meta.models),
+      };
+    });
+    return { kind, labels, datasets, metaLookup };
   }
 
   if (kind === 'fc_avg_and_ppm') {
@@ -816,7 +881,16 @@ async function runPresetChart() {
       { type:'bar', label:'Avg FC/Board', data: avg, backgroundColor:'#4F6BED' },
       { type:'line', label:'FC PPM', data: ppm, yAxisID:'y2', borderColor:'#F59E0B', backgroundColor:'#F59E0B', pointRadius:2, tension:0.1 }
     ];
-    return { kind, labels, datasets };
+    const metaLookup = {};
+    labels.forEach((m) => {
+      const meta = groups.get(m).meta;
+      metaLookup[m] = {
+        date: Array.from(meta.dates),
+        line: Array.from(meta.lines),
+        model: Array.from(meta.models),
+      };
+    });
+    return { kind, labels, datasets, metaLookup };
   }
 
   if (kind === 'scatter') {
@@ -825,9 +899,9 @@ async function runPresetChart() {
       const denom = g.partsSum || 0;
       const ngppm = denom ? (g.ngSum/denom)*1e6 : 0;
       const fcppm = denom ? (g.fcSum/denom)*1e6 : 0;
-      pts.push({ x: ngppm, y: fcppm, model: m });
+      pts.push({ x: ngppm, y: fcppm, model: m, date: Array.from(g.meta.dates), line: Array.from(g.meta.lines) });
     });
-    return { kind, points: pts };
+    return { kind, points: pts, metaLookup: {} };
   }
 
   if (kind === 'ts_ng_by_line') {
@@ -837,7 +911,7 @@ async function runPresetChart() {
       const line = cols.line ? String(row[cols.line]||'Unknown') : 'Unknown';
       if (!map.has(d)) map.set(d, new Map());
       const mline = map.get(d);
-      if (!mline.has(line)) mline.set(line, { ng:0, parts:0 });
+      if (!mline.has(line)) mline.set(line, { ng:0, parts:0, models:new Set() });
       const ag = mline.get(line);
       if (cols.ngParts) {
         ag.ng += Number(row[cols.ngParts]||0);
@@ -847,23 +921,25 @@ async function runPresetChart() {
         if (isFinite(parts) && isFinite(ppm)) ag.ng += (parts*ppm)/1e6;
       }
       ag.parts += Number(row[cols.totalParts]||0);
+      if (cols.model && row[cols.model] !== undefined) ag.models.add(String(row[cols.model]));
     });
     const dates = Array.from(map.keys()).sort();
     const lines = new Set(); dates.forEach(d=> map.get(d).forEach((_,line)=>lines.add(line)));
     const labels = dates;
+    const metaLookup = {};
     const datasets = Array.from(lines).sort().map((line, i)=>{
       const hue=(i*53)%360; const color=`hsl(${hue} 75% 45%)`;
-      const data = dates.map(d=>{ const r=map.get(d).get(line); const ppm = r && r.parts ? (r.ng/r.parts)*1e6 : null; return ppm; });
+      const data = dates.map(d=>{ const r=map.get(d).get(line); const ppm = r && r.parts ? (r.ng/r.parts)*1e6 : null; const m = r ? { date:[d], line:[line], model:Array.from(r.models) } : { date:[d], line:[line], model:[] }; metaLookup[`${line}||${d}`] = m; return ppm; });
       return { label: line, data, borderColor: color, backgroundColor: color, fill:false, tension:0.1, pointRadius:2 };
     });
-    return { kind, labels, datasets };
+    return { kind, labels, datasets, metaLookup };
   }
 
   if (kind === 'ts_fc_vs_ng') {
     const byDate = new Map();
     filteredByBoards.forEach((row)=>{
       const d = cols.date ? String(row[cols.date]).slice(0,10) : '';
-      const ag = byDate.get(d) || { ng:0, fc:0, parts:0 };
+      const ag = byDate.get(d) || { ng:0, fc:0, parts:0, models:new Set(), lines:new Set() };
       if (cols.ngParts) {
         ag.ng += Number(row[cols.ngParts]||0);
       } else if (cols.ngPPM && cols.totalParts) {
@@ -873,16 +949,19 @@ async function runPresetChart() {
       }
       ag.fc += Number(row[cols.fcParts]||0);
       ag.parts += Number(row[cols.totalParts]||0);
+      if (cols.model && row[cols.model] !== undefined) ag.models.add(String(row[cols.model]));
+      if (cols.line && row[cols.line] !== undefined) ag.lines.add(String(row[cols.line]));
       byDate.set(d, ag);
     });
     const labels = Array.from(byDate.keys()).sort();
-    const ng = labels.map(d=>{ const a=byDate.get(d); return a.parts? (a.ng/a.parts)*1e6 : 0; });
-    const fc = labels.map(d=>{ const a=byDate.get(d); return a.parts? (a.fc/a.parts)*1e6 : 0; });
+    const metaLookup = {};
+    const ng = labels.map(d=>{ const a=byDate.get(d); metaLookup[`NG PPM||${d}`]={ date:[d], line:Array.from(a.lines), model:Array.from(a.models) }; return a.parts? (a.ng/a.parts)*1e6 : 0; });
+    const fc = labels.map(d=>{ const a=byDate.get(d); metaLookup[`FalseCall PPM||${d}`]={ date:[d], line:Array.from(a.lines), model:Array.from(a.models) }; return a.parts? (a.fc/a.parts)*1e6 : 0; });
     const datasets = [
       { label:'NG PPM', data: ng, borderColor:'#EF4444', backgroundColor:'#EF4444', fill:false, tension:0.1, pointRadius:2 },
       { label:'FalseCall PPM', data: fc, borderColor:'#3B82F6', backgroundColor:'#3B82F6', fill:false, tension:0.1, pointRadius:2 }
     ];
-    return { kind, labels, datasets };
+    return { kind, labels, datasets, metaLookup };
   }
 
   if (kind === 'ratio_fc_ng') {
@@ -890,10 +969,19 @@ async function runPresetChart() {
     const ratioByModel = new Map(labels.map((m)=>{ const g=groups.get(m); const r = g.ngSum? (g.fcSum/g.ngSum) : null; return [m, (r==null?0:r)]; }));
     labels.sort((a,b)=> (ratioByModel.get(b) - ratioByModel.get(a)) );
     const values = labels.map(m=> ratioByModel.get(m));
-    return { kind, labels, values };
+    const metaLookup = {};
+    labels.forEach((m) => {
+      const meta = groups.get(m).meta;
+      metaLookup[m] = {
+        date: Array.from(meta.dates),
+        line: Array.from(meta.lines),
+        model: Array.from(meta.models),
+      };
+    });
+    return { kind, labels, values, metaLookup };
   }
 
-  return { kind:'line-control', labels:[], values:[], limits:{ mean:0,ucl:0,lcl:0 } };
+  return { kind:'line-control', labels:[], values:[], limits:{ mean:0,ucl:0,lcl:0 }, metaLookup:{} };
 }
 
 // Infer simple types and populate encoding dropdowns
