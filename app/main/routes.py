@@ -18,6 +18,7 @@ import xlrd
 
 from app.db import (
     fetch_aoi_reports,
+    fetch_combined_reports,
     fetch_fi_reports,
     fetch_moat,
     fetch_recent_moat,
@@ -36,6 +37,8 @@ from app.db import (
     insert_moat,
     insert_moat_bulk,
 )
+
+from app.grades import calculate_aoi_grades
 
 main_bp = Blueprint('main', __name__)
 
@@ -504,6 +507,64 @@ def ppm_saved_queries():
     if error:
         abort(500, description=error)
     return jsonify(data), status
+
+
+@main_bp.route('/analysis/aoi/grades', methods=['GET'])
+def aoi_grades():
+    """Return AOI grades computed from combined reports.
+
+    Optional query parameters:
+        - start_date
+        - end_date
+        - operators (comma-separated)
+        - job_numbers (comma-separated)
+    """
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+
+    start = request.args.get('start_date')
+    end = request.args.get('end_date')
+    operators = request.args.get('operators', '')
+    job_numbers = request.args.get('job_numbers', '')
+
+    data, error = fetch_combined_reports()
+    if error:
+        abort(500, description=error)
+
+    from datetime import datetime
+
+    def parse_date(val):
+        if not val:
+            return None
+        try:
+            return datetime.fromisoformat(str(val)).date()
+        except Exception:
+            return None
+
+    def to_set(values):
+        return {v.strip() for v in values.split(',') if v.strip()}
+
+    start_dt = parse_date(start)
+    end_dt = parse_date(end)
+    operator_set = to_set(operators)
+    job_set = to_set(job_numbers)
+
+    filtered = []
+    for row in data:
+        date_val = row.get('aoi_Date') or row.get('Date') or row.get('date')
+        dt = parse_date(date_val)
+        if start_dt and (not dt or dt < start_dt):
+            continue
+        if end_dt and (not dt or dt > end_dt):
+            continue
+        if operator_set and (row.get('Operator') not in operator_set):
+            continue
+        if job_set and (row.get('Job Number') not in job_set):
+            continue
+        filtered.append(row)
+
+    grades = calculate_aoi_grades(filtered)
+    return jsonify(grades)
 
 
 @main_bp.route('/analysis/aoi', methods=['GET'])
