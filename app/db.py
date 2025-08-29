@@ -31,6 +31,20 @@ def fetch_fi_reports():
         return None, f"Failed to fetch FI reports: {exc}"
 
 
+def fetch_combined_reports():
+    """Retrieve all combined reports from the database.
+
+    Returns:
+        tuple[list | None, str | None]: (data, error)
+    """
+    supabase = _get_client()
+    try:
+        response = supabase.table("combined_reports").select("*").execute()
+        return response.data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to fetch combined reports: {exc}"
+
+
 def fetch_moat():
     """Retrieve MOAT data from the database."""
     supabase = _get_client()
