@@ -1,5 +1,5 @@
-let aoiChartInstance = null;
-let aoiChartExpandedInstance = null;
+let fiChartInstance = null;
+let fiChartExpandedInstance = null;
 let currentData = { labels: [], accepted: [], rejected: [] };
 let savedQueriesCache = [];
 let customerOptions = [];
@@ -50,7 +50,7 @@ function getDropdownValues(className) {
 }
 
 function initFiltersUI() {
-  return fetch('/aoi_reports')
+  return fetch('/fi_reports')
     .then((r) => r.json())
     .then((rows) => {
       if (!Array.isArray(rows)) return;
@@ -91,11 +91,11 @@ function renderChart(targetId, labels, accepted, rejected) {
       },
     },
   };
-  if (targetId === 'aoiChart' && aoiChartInstance) aoiChartInstance.destroy();
-  if (targetId === 'aoiChartExpanded' && aoiChartExpandedInstance) aoiChartExpandedInstance.destroy();
+  if (targetId === 'fiChart' && fiChartInstance) fiChartInstance.destroy();
+  if (targetId === 'fiChartExpanded' && fiChartExpandedInstance) fiChartExpandedInstance.destroy();
   // eslint-disable-next-line no-undef
   const inst = new Chart(ctx, { type: 'bar', data, options });
-  if (targetId === 'aoiChart') aoiChartInstance = inst; else aoiChartExpandedInstance = inst;
+  if (targetId === 'fiChart') fiChartInstance = inst; else fiChartExpandedInstance = inst;
 }
 
 function renderShiftChart(targetId, labels, shift1, shift2) {
@@ -132,11 +132,11 @@ function renderShiftChart(targetId, labels, shift1, shift2) {
       },
     },
   };
-  if (targetId === 'aoiChart' && aoiChartInstance) aoiChartInstance.destroy();
-  if (targetId === 'aoiChartExpanded' && aoiChartExpandedInstance) aoiChartExpandedInstance.destroy();
+  if (targetId === 'fiChart' && fiChartInstance) fiChartInstance.destroy();
+  if (targetId === 'fiChartExpanded' && fiChartExpandedInstance) fiChartExpandedInstance.destroy();
   // eslint-disable-next-line no-undef
   const inst = new Chart(ctx, { type: 'bar', data, options });
-  if (targetId === 'aoiChart') aoiChartInstance = inst; else aoiChartExpandedInstance = inst;
+  if (targetId === 'fiChart') fiChartInstance = inst; else fiChartExpandedInstance = inst;
 }
 
 function renderYieldChart(targetId, labels, yields) {
@@ -153,11 +153,11 @@ function renderYieldChart(targetId, labels, yields) {
     maintainAspectRatio: false,
     scales: { y: { beginAtZero: false, min: minY, max: 100, ticks: { callback: (v) => v + '%' } } },
   };
-  if (targetId === 'aoiChart' && aoiChartInstance) aoiChartInstance.destroy();
-  if (targetId === 'aoiChartExpanded' && aoiChartExpandedInstance) aoiChartExpandedInstance.destroy();
+  if (targetId === 'fiChart' && fiChartInstance) fiChartInstance.destroy();
+  if (targetId === 'fiChartExpanded' && fiChartExpandedInstance) fiChartExpandedInstance.destroy();
   // eslint-disable-next-line no-undef
   const inst = new Chart(ctx, { type: 'line', data, options });
-  if (targetId === 'aoiChart') aoiChartInstance = inst; else aoiChartExpandedInstance = inst;
+  if (targetId === 'fiChart') fiChartInstance = inst; else fiChartExpandedInstance = inst;
 }
 
 function renderRateChart(targetId, labels, rates) {
@@ -173,11 +173,11 @@ function renderRateChart(targetId, labels, rates) {
     maintainAspectRatio: false,
     scales: { y: { beginAtZero: true, max: 100, ticks: { callback: (v) => v + '%' } } },
   };
-  if (targetId === 'aoiChart' && aoiChartInstance) aoiChartInstance.destroy();
-  if (targetId === 'aoiChartExpanded' && aoiChartExpandedInstance) aoiChartExpandedInstance.destroy();
+  if (targetId === 'fiChart' && fiChartInstance) fiChartInstance.destroy();
+  if (targetId === 'fiChartExpanded' && fiChartExpandedInstance) fiChartExpandedInstance.destroy();
   // eslint-disable-next-line no-undef
   const inst = new Chart(ctx, { type: 'bar', data, options });
-  if (targetId === 'aoiChart') aoiChartInstance = inst; else aoiChartExpandedInstance = inst;
+  if (targetId === 'fiChart') fiChartInstance = inst; else fiChartExpandedInstance = inst;
 }
 
 function fillTable(labels, accepted, rejected) {
@@ -277,22 +277,22 @@ function expandModal(show) {
     const thead = document.querySelector('.data-table thead');
     if (currentData.shift1 && currentData.shift2) {
       if (thead) thead.innerHTML = '<tr><th>Date / Shift</th><th>Accepted</th><th>Rejected</th><th>Accepted %</th><th>Rejected %</th></tr>';
-      renderShiftChart('aoiChartExpanded', currentData.labels, currentData.shift1, currentData.shift2);
+      renderShiftChart('fiChartExpanded', currentData.labels, currentData.shift1, currentData.shift2);
       fillShiftTable(currentData.labels, currentData.shift1, currentData.shift2);
     } else if (currentData.yields) {
       if (thead) thead.innerHTML = '<tr><th>Date</th><th>Yield %</th></tr>';
-      renderYieldChart('aoiChartExpanded', currentData.labels, currentData.yields);
+      renderYieldChart('fiChartExpanded', currentData.labels, currentData.yields);
       fillYieldTable(currentData.labels, currentData.yields);
     } else if (currentData.rates) {
       if (thead) thead.innerHTML = '<tr><th>Customer</th><th>Rejection %</th></tr>';
-      renderRateChart('aoiChartExpanded', currentData.labels, currentData.rates);
+      renderRateChart('fiChartExpanded', currentData.labels, currentData.rates);
       fillRateTable(currentData.labels, currentData.rates);
     } else if (currentData.assemblies) {
       chartBox.style.display = 'none';
       renderAssemblyTable('modal-data-table', currentData.assemblies, currentData.inspected, currentData.rejected, currentData.yields);
     } else {
       if (thead) thead.innerHTML = '<tr><th>Operator</th><th>Accepted</th><th>Rejected</th><th>Accepted %</th><th>Rejected %</th></tr>';
-      renderChart('aoiChartExpanded', currentData.labels, currentData.accepted, currentData.rejected);
+      renderChart('fiChartExpanded', currentData.labels, currentData.accepted, currentData.rejected);
       fillTable(currentData.labels, currentData.accepted, currentData.rejected);
     }
   }
@@ -302,7 +302,7 @@ document.getElementById('expand-chart').addEventListener('click', () => expandMo
 document.getElementById('modal-close').addEventListener('click', () => expandModal(false));
 
 document.getElementById('modal-download-chart').addEventListener('click', () => {
-  const canvas = document.getElementById('aoiChartExpanded');
+  const canvas = document.getElementById('fiChartExpanded');
   const link = document.createElement('a');
   link.href = canvas.toDataURL('image/png');
   link.download = 'chart.png';
@@ -376,41 +376,41 @@ function runChart() {
     : '';
   document.getElementById('result-chart-name').textContent = title + range;
   const qs = new URLSearchParams(params).toString();
-  fetch(`/analysis/aoi/data?${qs}`)
+  fetch(`/analysis/fi/data?${qs}`)
     .then((r) => r.json())
     .then((res) => {
       document.getElementById('preview-table').style.display = 'none';
-      document.getElementById('aoiChart').style.display = 'block';
+      document.getElementById('fiChart').style.display = 'block';
       if (res.shift1 && res.shift2) {
         currentData = { labels: res.labels || [], shift1: res.shift1, shift2: res.shift2 };
-        renderShiftChart('aoiChart', currentData.labels, currentData.shift1, currentData.shift2);
+        renderShiftChart('fiChart', currentData.labels, currentData.shift1, currentData.shift2);
         const s1 = res.shift1.avg_reject_rate?.toFixed ? res.shift1.avg_reject_rate.toFixed(1) : res.shift1.avg_reject_rate;
         const s2 = res.shift2.avg_reject_rate?.toFixed ? res.shift2.avg_reject_rate.toFixed(1) : res.shift2.avg_reject_rate;
-        document.getElementById('aoi-info').textContent = `1st Shift Avg Reject Rate: ${s1}% | 2nd Shift Avg Reject Rate: ${s2}%`;
+        document.getElementById('fi-info').textContent = `1st Shift Avg Reject Rate: ${s1}% | 2nd Shift Avg Reject Rate: ${s2}%`;
       } else if (res.yields) {
         currentData = { labels: res.labels || [], yields: res.yields || [] };
-        renderYieldChart('aoiChart', currentData.labels, currentData.yields);
+        renderYieldChart('fiChart', currentData.labels, currentData.yields);
         const avg = res.avg_yield?.toFixed ? res.avg_yield.toFixed(1) : res.avg_yield;
         const min = res.min_yield?.toFixed ? res.min_yield.toFixed(1) : res.min_yield;
         const max = res.max_yield?.toFixed ? res.max_yield.toFixed(1) : res.max_yield;
-        document.getElementById('aoi-info').textContent = `Avg Yield: ${avg}% | Min: ${min}% | Max: ${max}%`;
+        document.getElementById('fi-info').textContent = `Avg Yield: ${avg}% | Min: ${min}% | Max: ${max}%`;
       } else if (res.rates) {
         currentData = { labels: res.labels || [], rates: res.rates || [] };
-        renderRateChart('aoiChart', currentData.labels, currentData.rates);
+        renderRateChart('fiChart', currentData.labels, currentData.rates);
         const avg = res.avg_rate?.toFixed ? res.avg_rate.toFixed(1) : res.avg_rate;
         const maxRate = res.max_rate?.toFixed ? res.max_rate.toFixed(1) : res.max_rate;
         const minRate = res.min_rate?.toFixed ? res.min_rate.toFixed(1) : res.min_rate;
-        document.getElementById('aoi-info').textContent = `Max: ${res.max_customer} ${maxRate}% | Min: ${res.min_customer} ${minRate}% | Avg: ${avg}%`;
+        document.getElementById('fi-info').textContent = `Max: ${res.max_customer} ${maxRate}% | Min: ${res.min_customer} ${minRate}% | Avg: ${avg}%`;
       } else if (res.assemblies) {
         currentData = { assemblies: res.assemblies || [], inspected: res.inspected || [], rejected: res.rejected || [], yields: res.yields || [] };
-        document.getElementById('aoiChart').style.display = 'none';
+        document.getElementById('fiChart').style.display = 'none';
         document.getElementById('preview-table').style.display = 'table';
         renderAssemblyTable('preview-table', currentData.assemblies, currentData.inspected, currentData.rejected, currentData.yields);
-        document.getElementById('aoi-info').textContent = '';
+        document.getElementById('fi-info').textContent = '';
       } else {
         currentData = { labels: res.labels || [], accepted: res.accepted || [], rejected: res.rejected || [] };
-        renderChart('aoiChart', currentData.labels, currentData.accepted, currentData.rejected);
-        document.getElementById('aoi-info').textContent = '';
+        renderChart('fiChart', currentData.labels, currentData.accepted, currentData.rejected);
+        document.getElementById('fi-info').textContent = '';
       }
       document.getElementById('chart-description-result').textContent = document.getElementById('chart-description').value || '';
     });
@@ -419,7 +419,7 @@ function runChart() {
 document.getElementById('run-chart').addEventListener('click', runChart);
 
 async function copyChartImage() {
-  const canvas = document.getElementById('aoiChart');
+  const canvas = document.getElementById('fiChart');
   if (!navigator.clipboard || !navigator.clipboard.write) { alert('Clipboard API not supported.'); return; }
   try {
     const blob = await new Promise((resolve) => canvas.toBlob(resolve));
@@ -434,7 +434,7 @@ document.getElementById('copy-image').addEventListener('click', copyChartImage);
 
 document.getElementById('download-pdf').addEventListener('click', () => {
   const { jsPDF } = window.jspdf;
-  const canvas = document.getElementById('aoiChart');
+  const canvas = document.getElementById('fiChart');
   const dataURL = canvas.toDataURL('image/png', 1.0);
   const pdf = new jsPDF();
   const imgProps = pdf.getImageProperties(dataURL);
@@ -507,7 +507,7 @@ function loadParams(row) {
 }
 
 function loadSavedQueries() {
-  fetch('/analysis/aoi/saved')
+  fetch('/analysis/fi/saved')
     .then((r) => r.json())
     .then((rows) => {
       savedQueriesCache = defaultPresets().concat(Array.isArray(rows) ? rows : []);
@@ -551,7 +551,7 @@ function saveQuery() {
     params: collectParams(),
   };
   const method = existing ? 'PUT' : 'POST';
-  fetch('/analysis/aoi/saved', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+  fetch('/analysis/fi/saved', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     .then((res) => { if (!res.ok) throw new Error('save failed'); return res.json(); })
     .then(() => { document.getElementById('save-name').value=''; loadSavedQueries(); })
     .catch(() => alert('Failed to save chart. Ensure Supabase table exists.'));
@@ -580,7 +580,7 @@ if (uploadForm) {
     const fd = new FormData();
     fd.append('file', fileInput.files[0]);
     try {
-      const res = await fetch('/aoi_reports/upload', { method: 'POST', body: fd });
+      const res = await fetch('/fi_reports/upload', { method: 'POST', body: fd });
       if (!res.ok) {
         const text = await res.text();
         throw new Error(text || 'Upload failed');

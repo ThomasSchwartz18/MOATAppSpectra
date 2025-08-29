@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 
 {% block content %}
-<h2>AOI Daily Reports</h2>
+<h2>FI Daily Reports</h2>
 
   <div class="analysis-grid">
     <!-- Left: Builder / Upload Tabs -->
@@ -112,11 +112,11 @@
         <button type="button" id="copy-image">Copy Image</button>
       </div>
       <div class="preview-card" style="height: 300px; overflow:auto;">
-        <canvas id="aoiChart"></canvas>
+        <canvas id="fiChart"></canvas>
         <table id="preview-table" class="data-table" style="display:none;"></table>
       </div>
       <div id="chart-description-result" class="preview-info" style="margin-top:4px;"></div>
-      <div id="aoi-info" class="preview-info" style="margin-top:4px;"></div>
+      <div id="fi-info" class="preview-info" style="margin-top:4px;"></div>
     </div>
   </div>
 
@@ -128,7 +128,7 @@
       <button id="modal-close" class="modal-close">Close</button>
     </div>
     <div class="modal-chart-box">
-      <canvas id="aoiChartExpanded"></canvas>
+      <canvas id="fiChartExpanded"></canvas>
     </div>
     <div class="field-row" style="margin-top:10px;">
       <button type="button" id="modal-download-chart">Download Chart</button>
@@ -136,7 +136,7 @@
     </div>
     <div style="margin-top:10px;" class="section-title">Data</div>
     <table id="modal-data-table" class="data-table">
-      <thead><tr><th id="data-label-header">Operator</th><th>Accepted</th><th>Rejected</th><th>Accepted %</th><th>Rejected %</th></tr></thead>
+      <thead><tr><th>Operator</th><th>Accepted</th><th>Rejected</th><th>Accepted %</th><th>Rejected %</th></tr></thead>
       <tbody id="data-tbody"></tbody>
     </table>
   </div>
@@ -146,5 +146,6 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="{{ url_for('static', filename='js/aoi.js') }}"></script>
+<script src="{{ url_for('static', filename='js/fi.js') }}"></script>
 {% endblock %}
+

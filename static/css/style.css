@@ -266,6 +266,7 @@ body {
 
 .data-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
 .data-table th, .data-table td { border: 1px solid #000; padding: 4px; font-size: 12px; }
+.data-table th { cursor: pointer; }
 /* Saved Charts: separators instead of bullets */
 #saved-list { list-style: none; padding-left: 0 !important; margin: 0; border: 1px solid #DDD; border-radius: 6px; overflow: hidden; }
 #saved-list li { list-style: none; padding: 8px 10px; border-bottom: 1px solid #EEE; }

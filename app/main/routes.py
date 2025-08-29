@@ -19,10 +19,13 @@ from app.db import (
     fetch_recent_moat,
     fetch_saved_queries,
     fetch_saved_aoi_queries,
+    fetch_saved_fi_queries,
     insert_saved_query,
     update_saved_query,
     insert_saved_aoi_query,
     update_saved_aoi_query,
+    insert_saved_fi_query,
+    update_saved_fi_query,
     insert_aoi_report,
     insert_aoi_reports_bulk,
     insert_fi_report,
@@ -127,6 +130,44 @@ def add_fi_report():
     if error:
         abort(500, description=error)
     return jsonify(data), 201
+
+
+@main_bp.route('/fi_reports/upload', methods=['POST'])
+@admin_required
+def upload_fi_reports():
+    """Upload a CSV file of FI reports."""
+    uploaded = request.files.get('file')
+    if not uploaded or uploaded.filename == '':
+        abort(400, description='No file provided')
+
+    stream = io.StringIO(uploaded.stream.read().decode('utf-8'))
+    reader = csv.DictReader(stream)
+    required_columns = [
+        'Date',
+        'Shift',
+        'Operator',
+        'Customer',
+        'Assembly',
+        'Rev',
+        'Job Number',
+        'Quantity Inspected',
+        'Quantity Rejected',
+        'Additional Information',
+    ]
+    if reader.fieldnames != required_columns:
+        abort(400, description='CSV must contain the required columns')
+
+    rows = [{col: row.get(col, '') for col in required_columns} for row in reader]
+    if not rows:
+        return jsonify({'inserted': 0}), 200
+
+    inserted = 0
+    for r in rows:
+        _, err = insert_fi_report(r)
+        if err:
+            abort(500, description=err)
+        inserted += 1
+    return jsonify({'inserted': inserted}), 201
 
 
 @main_bp.route('/moat', methods=['GET'])
@@ -306,8 +347,7 @@ def aoi_daily_reports():
     return render_template('aoi_daily_reports.html', username=session.get('username'))
 
 
-@main_bp.route('/analysis/aoi/data', methods=['GET'])
-def aoi_daily_data():
+def _daily_data(fetch_func):
     if 'username' not in session:
         return redirect(url_for('auth.login'))
     start = request.args.get('start_date')
@@ -318,7 +358,7 @@ def aoi_daily_data():
     customers = request.args.get('customers', '')
     operators = request.args.get('operators', '')
 
-    data, error = fetch_aoi_reports()
+    data, error = fetch_func()
     if error:
         abort(500, description=error)
 
@@ -469,6 +509,29 @@ def aoi_daily_data():
             'min_customer': min_customer,
         })
 
+    if view == 'assembly':
+        agg = defaultdict(lambda: {'inspected': 0, 'rejected': 0})
+        for row in filtered:
+            asm = row.get('Assembly') or 'Unknown'
+            inspected = int(row.get('Quantity Inspected') or row.get('quantity_inspected') or 0)
+            rejected = int(row.get('Quantity Rejected') or row.get('quantity_rejected') or 0)
+            agg[asm]['inspected'] += inspected
+            agg[asm]['rejected'] += rejected
+
+        items = []
+        for asm, vals in agg.items():
+            ins = vals['inspected']
+            rej = vals['rejected']
+            yld = ((ins - rej) / ins * 100) if ins else 0
+            items.append((asm, ins, rej, yld))
+        items.sort(key=lambda x: x[0])
+        return jsonify({
+            'assemblies': [i[0] for i in items],
+            'inspected': [i[1] for i in items],
+            'rejected': [i[2] for i in items],
+            'yields': [i[3] for i in items],
+        })
+
     agg = defaultdict(lambda: {'accepted': 0, 'rejected': 0})
     for row in filtered:
         op = row.get('Operator') or 'Unknown'
@@ -486,6 +549,49 @@ def aoi_daily_data():
     rejected_vals = [v['rejected'] for _, v in items]
 
     return jsonify({'labels': labels, 'accepted': accepted_vals, 'rejected': rejected_vals})
+
+
+@main_bp.route('/analysis/aoi/data', methods=['GET'])
+def aoi_daily_data():
+    return _daily_data(fetch_aoi_reports)
+
+
+@main_bp.route('/analysis/fi', methods=['GET'])
+def fi_daily_reports():
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    return render_template('fi_daily_reports.html', username=session.get('username'))
+
+
+@main_bp.route('/analysis/fi/data', methods=['GET'])
+def fi_daily_data():
+    return _daily_data(fetch_fi_reports)
+
+
+@main_bp.route('/analysis/fi/saved', methods=['GET', 'POST', 'PUT'])
+def fi_saved_queries():
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    if request.method == 'GET':
+        data, error = fetch_saved_fi_queries()
+        if error:
+            abort(500, description=error)
+        return jsonify(data)
+
+    payload = request.get_json() or {}
+    keys = ["name", "description", "start_date", "end_date", "params"]
+    payload = {k: payload.get(k) for k in keys if k in payload}
+    overwrite = request.method == 'PUT' or request.args.get('overwrite')
+    if overwrite:
+        name = payload.get('name')
+        data, error = update_saved_fi_query(name, payload)
+        status = 200
+    else:
+        data, error = insert_saved_fi_query(payload)
+        status = 201
+    if error:
+        abort(500, description=error)
+    return jsonify(data), status
 
 
 @main_bp.route('/analysis/aoi/saved', methods=['GET', 'POST', 'PUT'])
