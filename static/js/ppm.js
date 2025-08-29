@@ -89,7 +89,7 @@ function withMetaTooltip(opts, metaLookup, showTooltips = true) {
     const dsLabel = context.dataset?.label || '';
     const lbl = context.label ?? context.dataIndex;
     const key = `${dsLabel}||${lbl}`;
-    const meta = metaLookup[key] || metaLookup[lbl];
+    const meta = metaLookup[key] || metaLookup[lbl] || metaLookup[context.dataIndex];
     const val = context.formattedValue;
     const base = baseCb ? baseCb(context) : (dsLabel ? `${dsLabel}: ${val}` : `${val}`);
     const parts = [];
@@ -586,7 +586,7 @@ let activePreset = null; // { id, name, kind, yTitle?, calc? }
 
 function presetsList() {
   return [
-    { id: 'avg_fc_per_board', name: 'Avg False Calls per Board (by Model)', kind: 'line-control', yTitle: 'Avg False Calls/Board', calc: (agg) => (agg.boardSum ? agg.fcSum / agg.boardSum : 0) },
+    { id: 'avg_fc_per_board', name: 'Avg False Calls per Board (by Model)', kind: 'line-control', yTitle: 'Avg False Calls/Board', calc: (agg) => (agg.boardSum ? agg.fcSum / agg.boardSum : 0), groupByModel: false },
     { id: 'fc_parts_per_total_parts', name: 'False Call % of Program (by Model)', kind: 'line-control', yTitle: 'False Call % of Program', calc: (agg) => (agg.partsSum ? (agg.fcSum / agg.partsSum) * 100 : 0) },
     { id: 'fc_rate_per_part', name: 'False Call Rate per Part (by Model)', kind: 'line-control', yTitle: 'False Call Rate per Part', calc: (agg) => (agg.partsSum ? (agg.fcSum / agg.partsSum) : 0) },
     { id: 'fc_avg_and_ppm', name: 'Avg FC/Board + FC PPM (by Model)', kind: 'fc_avg_and_ppm' },
@@ -752,6 +752,44 @@ async function runPresetChart() {
     const threshold = Number(f.minBoards) || 7;
     const allowed = new Set(Array.from(boardsByModel.entries()).filter(([,sum]) => (sum || 0) >= threshold).map(([m]) => m));
     filteredByBoards = filtered.filter((row) => allowed.has(String(row[cols.model] ?? 'Unknown')));
+  }
+
+  // For presets that skip model grouping, compute per-row values
+  if (kind === 'line-control' && activePreset.groupByModel === false) {
+    let rowsSeq = filteredByBoards.slice();
+    if (cols.date) {
+      rowsSeq.sort((a, b) => {
+        const da = Date.parse(String(a[cols.date]));
+        const db = Date.parse(String(b[cols.date]));
+        if (isNaN(da) && isNaN(db)) return 0;
+        if (isNaN(da)) return 1;
+        if (isNaN(db)) return -1;
+        return da - db;
+      });
+    }
+    const labels = [];
+    const values = [];
+    const metaLookup = {};
+    rowsSeq.forEach((row, idx) => {
+      const agg = {
+        fcSum: Number(row[cols.fcParts] ?? 0),
+        boardSum: Number(row[cols.totalBoards] ?? 0),
+        partsSum: Number(row[cols.totalParts] ?? 0),
+      };
+      const val = activePreset.calc ? activePreset.calc(agg) : 0;
+      const label = cols.date && row[cols.date]
+        ? String(row[cols.date]).slice(0, 10)
+        : String(row[cols.model] ?? 'Unknown');
+      labels.push(label);
+      values.push(val);
+      metaLookup[idx] = {
+        date: cols.date && row[cols.date] ? [String(row[cols.date]).slice(0, 10)] : [],
+        line: cols.line && row[cols.line] !== undefined ? [String(row[cols.line])] : [],
+        model: cols.model && row[cols.model] !== undefined ? [String(row[cols.model])] : [],
+      };
+    });
+    const limits = computeControlLimits(values);
+    return { kind, labels, values, limits, metaLookup };
   }
 
   // group by model
