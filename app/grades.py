@@ -10,7 +10,8 @@ def compute_operator_grades(rows: Iterable[dict]) -> dict:
 
     Args:
         rows: Iterable of dictionaries from the ``combined_reports`` table. Each
-            row should contain at minimum the keys ``Job Number``, ``Operator``,
+            row should contain at minimum the keys ``Job Number`` (or
+            ``aoi_Job Number``), ``Operator`` (or ``aoi_Operator``),
             ``aoi_Quantity Inspected`` and ``fi_Quantity Rejected``.
 
     Returns:
@@ -23,7 +24,7 @@ def compute_operator_grades(rows: Iterable[dict]) -> dict:
     # Sum AOI quantities per job to compute operator share
     job_totals: defaultdict[str, float] = defaultdict(float)
     for row in rows:
-        job = row.get("Job Number")
+        job = row.get("aoi_Job Number") or row.get("Job Number")
         inspected = float(row.get("aoi_Quantity Inspected", 0) or 0)
         if job is not None:
             job_totals[job] += inspected
@@ -31,8 +32,8 @@ def compute_operator_grades(rows: Iterable[dict]) -> dict:
     # Accumulate statistics per operator
     operator_stats: defaultdict[str, dict] = defaultdict(lambda: {"inspected": 0.0, "weighted_missed": 0.0})
     for row in rows:
-        job = row.get("Job Number")
-        operator = row.get("Operator")
+        job = row.get("aoi_Job Number") or row.get("Job Number")
+        operator = row.get("aoi_Operator") or row.get("Operator")
         inspected = float(row.get("aoi_Quantity Inspected", 0) or 0)
         fi_rejected = float(
             row.get("fi_Quantity Rejected")
