@@ -13,9 +13,77 @@
     <tbody></tbody>
   </table>
 </div>
+
+<div class="section-card" style="margin-top:12px;">
+  <div class="section-title">Escape Pareto</div>
+  <div class="field-row">
+    <div class="field">
+      <label for="paretoGroup">Group by</label>
+      <select id="paretoGroup">
+        <option value="model">Model</option>
+        <option value="operator">Operator</option>
+        <option value="shift">Shift</option>
+      </select>
+    </div>
+  </div>
+  <div style="height:320px; margin-top:6px;">
+    <canvas id="escapePareto"></canvas>
+  </div>
+  <small>Bars: FI rejects; Line: cumulative share; Tooltip shows escape rate per 1k.</small>
+  </div>
+
+<div class="section-card" style="margin-top:12px;">
+  <div class="section-title">AOI→FI Time-Gap Risk</div>
+  <div style="height:280px; margin-top:6px;">
+    <canvas id="gapRisk"></canvas>
+  </div>
+  <small>Histogram of gaps (bars) with FI share by bucket (line).</small>
+</div>
+
+<div class="section-card" style="margin-top:12px;">
+  <div class="section-title">Operator Learning Curves (rolling 10-job median)</div>
+  <div style="height:320px; margin-top:6px;">
+    <canvas id="learningCurves"></canvas>
+  </div>
+  <small>Per-operator escape rates per 1k with rolling median overlay.</small>
+</div>
+
+<div class="section-card" style="margin-top:12px;">
+  <div class="section-title">SMT vs TH Accountability</div>
+  <div id="smtThHeatmap" class="data-table" style="display:inline-block; padding:8px;"></div>
+  <small>Rates per 1k by AOI station vs FI part-type.</small>
+</div>
+
+<div class="section-card" style="margin-top:12px;">
+  <div class="section-title">Shift / Weekday Effect</div>
+  <div style="display:flex; gap:16px; align-items:stretch;">
+    <div style="flex:1; height:260px"><canvas id="shiftBox"></canvas></div>
+    <div style="flex:1;">
+      <div id="weekdayHeatmap" class="data-table" style="display:inline-block; padding:8px;"></div>
+    </div>
+  </div>
+  <small>Left: summary stats by shift; Right: average escape per 1k by weekday x shift.</small>
+</div>
+
+<div class="section-card" style="margin-top:12px;">
+  <div class="section-title">Program Quality Trend (by model/rev)</div>
+  <div style="height:320px; margin-top:6px;">
+    <canvas id="programTrend"></canvas>
+  </div>
+  <small>Escape rate per 1k by calendar month.</small>
+</div>
+
+<div class="section-card" style="margin-top:12px;">
+  <div class="section-title">Case-mix Adjusted Operator Ranking</div>
+  <div style="height:420px; margin-top:6px;">
+    <canvas id="adjustedRanking"></canvas>
+  </div>
+  <small>Fixed-effects approximation: controls for model, shift, and volume.</small>
+</div>
 {% endblock %}
 
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="{{ url_for('static', filename='js/aoi_grades.js') }}"></script>
+<script src="{{ url_for('static', filename='js/aoi_grades_extras.js') }}"></script>
 {% endblock %}

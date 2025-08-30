@@ -40,6 +40,41 @@ from app.db import (
 
 from app.grades import calculate_aoi_grades
 
+# Helpers for AOI Grades analytics
+from collections import defaultdict, Counter
+
+
+def _parse_date(val):
+    if not val:
+        return None
+    try:
+        return datetime.fromisoformat(str(val)).date()
+    except Exception:
+        return None
+
+
+def _aoi_passed(row):
+    ins = float(row.get('aoi_Quantity Inspected') or row.get('Quantity Inspected') or 0)
+    rej = float(row.get('aoi_Quantity Rejected') or row.get('Quantity Rejected') or 0)
+    v = ins - rej
+    return v if v > 0 else 0
+
+
+def _fi_rejected(row):
+    return float(row.get('fi_Quantity Rejected') or 0)
+
+
+def _fi_inspected(row):
+    return float(row.get('fi_Quantity Inspected') or 0)
+
+
+def _gap_days(row):
+    a = _parse_date(row.get('aoi_Date'))
+    f = _parse_date(row.get('fi_Date'))
+    if a and f:
+        return (f - a).days
+    return None
+
 main_bp = Blueprint('main', __name__)
 
 
@@ -531,28 +566,18 @@ def aoi_grades():
     if error:
         abort(500, description=error)
 
-    from datetime import datetime
-
-    def parse_date(val):
-        if not val:
-            return None
-        try:
-            return datetime.fromisoformat(str(val)).date()
-        except Exception:
-            return None
-
     def to_set(values):
         return {v.strip() for v in values.split(',') if v.strip()}
 
-    start_dt = parse_date(start)
-    end_dt = parse_date(end)
+    start_dt = _parse_date(start)
+    end_dt = _parse_date(end)
     operator_set = to_set(operators)
     job_set = to_set(job_numbers)
 
     filtered = []
     for row in data:
         date_val = row.get('aoi_Date') or row.get('Date') or row.get('date')
-        dt = parse_date(date_val)
+        dt = _parse_date(date_val)
         if start_dt and (not dt or dt < start_dt):
             continue
         if end_dt and (not dt or dt > end_dt):
@@ -567,6 +592,403 @@ def aoi_grades():
 
     grades = calculate_aoi_grades(filtered)
     return jsonify(grades)
+
+
+@main_bp.route('/analysis/aoi/grades/escape_pareto', methods=['GET'])
+def aoi_grades_escape_pareto():
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    group = request.args.get('group', 'model')  # 'model'|'operator'|'shift'
+    start = _parse_date(request.args.get('start_date'))
+    end = _parse_date(request.args.get('end_date'))
+    data, error = fetch_combined_reports()
+    if error:
+        abort(500, description=error)
+
+    key_map = {
+        'model': lambda r: r.get('aoi_Assembly') or r.get('Model') or r.get('Assembly') or 'Unknown',
+        'operator': lambda r: r.get('aoi_Operator') or r.get('Operator') or 'Unknown',
+        'shift': lambda r: r.get('aoi_Shift') or r.get('Shift') or 'Unknown',
+    }
+    key_fn = key_map.get(group, key_map['model'])
+
+    agg = defaultdict(lambda: {'fi_rej': 0.0, 'aoi_passed': 0.0})
+    total_rej = 0.0
+
+    for row in data:
+        dt = _parse_date(row.get('aoi_Date') or row.get('Date') or row.get('date'))
+        if start and (not dt or dt < start):
+            continue
+        if end and (not dt or dt > end):
+            continue
+        key = key_fn(row)
+        passed = _aoi_passed(row)
+        fi_rej = _fi_rejected(row)
+        agg[key]['fi_rej'] += fi_rej
+        agg[key]['aoi_passed'] += passed
+        total_rej += fi_rej
+
+    items = []
+    for k, v in agg.items():
+        denom = v['aoi_passed']
+        rate = (1000.0 * v['fi_rej'] / denom) if denom else 0.0
+        items.append({'key': k, 'fi_rej': v['fi_rej'], 'escape_rate_per_1k': rate})
+    items.sort(key=lambda x: x['fi_rej'], reverse=True)
+
+    cumulative = 0.0
+    out = []
+    for it in items:
+        share = (it['fi_rej'] / total_rej) if total_rej else 0.0
+        cumulative += share
+        out.append({**it, 'cum_share': cumulative})
+    return jsonify({'group': group, 'items': out, 'total_fi_rejects': total_rej})
+
+
+@main_bp.route('/analysis/aoi/grades/gap_risk', methods=['GET'])
+def aoi_grades_gap_risk():
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    start = _parse_date(request.args.get('start_date'))
+    end = _parse_date(request.args.get('end_date'))
+    data, error = fetch_combined_reports()
+    if error:
+        abort(500, description=error)
+
+    buckets = [
+        (lambda d: d is not None and d <= 1, '≤1d'),
+        (lambda d: d is not None and 2 <= d <= 3, '2–3d'),
+        (lambda d: d is not None and 4 <= d <= 7, '4–7d'),
+        (lambda d: d is None or d > 7, '>7d'),
+    ]
+    hist = Counter()
+    fi_by_bucket = Counter()
+    total_fi = 0.0
+
+    for row in data:
+        dt = _parse_date(row.get('aoi_Date') or row.get('Date') or row.get('date'))
+        if start and (not dt or dt < start):
+            continue
+        if end and (not dt or dt > end):
+            continue
+        gd = _gap_days(row)
+        label = None
+        for pred, name in buckets:
+            if pred(gd):
+                label = name
+                break
+        hist[label] += 1
+        rej = _fi_rejected(row)
+        fi_by_bucket[label] += rej
+        total_fi += rej
+
+    labels = ['≤1d', '2–3d', '4–7d', '>7d']
+    return jsonify({
+        'labels': labels,
+        'histogram': [hist.get(l, 0) for l in labels],
+        'fi_share': [ (fi_by_bucket.get(l, 0.0) / total_fi) if total_fi else 0.0 for l in labels ],
+    })
+
+
+@main_bp.route('/analysis/aoi/grades/learning_curves', methods=['GET'])
+def aoi_grades_learning_curves():
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    window = int(request.args.get('window', 10))
+    op_filter = request.args.get('operators')
+    start = _parse_date(request.args.get('start_date'))
+    end = _parse_date(request.args.get('end_date'))
+    data, error = fetch_combined_reports()
+    if error:
+        abort(500, description=error)
+
+    per_op = defaultdict(list)
+    job_totals = defaultdict(float)
+    for row in data:
+        dt = _parse_date(row.get('aoi_Date') or row.get('Date') or row.get('date'))
+        if start and (not dt or dt < start):
+            continue
+        if end and (not dt or dt > end):
+            continue
+        job = row.get('aoi_Job Number') or row.get('Job Number') or 'Unknown'
+        job_totals[job] += _aoi_passed(row)
+
+    job_fi_rej = defaultdict(float)
+    for row in data:
+        dt = _parse_date(row.get('aoi_Date') or row.get('Date') or row.get('date'))
+        if start and (not dt or dt < start):
+            continue
+        if end and (not dt or dt > end):
+            continue
+        job = row.get('aoi_Job Number') or row.get('Job Number') or 'Unknown'
+        job_fi_rej[job] = max(job_fi_rej[job], _fi_rejected(row))
+
+    allowed = None
+    if op_filter:
+        allowed = {s.strip() for s in op_filter.split(',') if s.strip()}
+
+    for row in data:
+        dt = _parse_date(row.get('aoi_Date') or row.get('Date') or row.get('date'))
+        if start and (not dt or dt < start):
+            continue
+        if end and (not dt or dt > end):
+            continue
+        op = row.get('aoi_Operator') or row.get('Operator') or 'Unknown'
+        if allowed and op not in allowed:
+            continue
+        job = row.get('aoi_Job Number') or row.get('Job Number') or 'Unknown'
+        passed = _aoi_passed(row)
+        total = job_totals.get(job, 0.0)
+        share = (passed / total) if total else 0.0
+        attr_missed = share * job_fi_rej.get(job, 0.0)
+        rate = (1000.0 * attr_missed / passed) if passed else 0.0
+        if dt:
+            per_op[op].append((dt, rate))
+
+    out = {}
+    for op, seq in per_op.items():
+        seq.sort(key=lambda x: x[0])
+        vals = [r for _, r in seq]
+        dates = [d.isoformat() for d, _ in seq]
+        roll = []
+        for i in range(len(vals)):
+            start_i = max(0, i - window + 1)
+            sub = sorted(vals[start_i : i + 1])
+            m = sub[len(sub)//2] if sub else 0.0
+            roll.append(m)
+        out[op] = { 'dates': dates, 'rates': vals, 'rolling_median': roll }
+
+    return jsonify(out)
+
+
+@main_bp.route('/analysis/aoi/grades/smt_th_heatmap', methods=['GET'])
+def aoi_grades_smt_th_heatmap():
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    start = _parse_date(request.args.get('start_date'))
+    end = _parse_date(request.args.get('end_date'))
+    data, error = fetch_combined_reports()
+    if error:
+        abort(500, description=error)
+
+    # Buckets
+    stations = set()
+    parts = set()
+    agg = defaultdict(lambda: {'fi_rej': 0.0, 'passed': 0.0})
+    for row in data:
+        dt = _parse_date(row.get('aoi_Date') or row.get('Date') or row.get('date'))
+        if start and (not dt or dt < start):
+            continue
+        if end and (not dt or dt > end):
+            continue
+        station = row.get('aoi_Station') or row.get('Station') or 'Unknown'
+        part = row.get('fi_Part Type') or row.get('fi_part_type') or 'Unknown'
+        stations.add(station)
+        parts.add(part)
+        key = (station, part)
+        agg[key]['fi_rej'] += _fi_rejected(row)
+        agg[key]['passed'] += _aoi_passed(row)
+
+    stations = sorted(stations)
+    parts = sorted(parts)
+    matrix = []
+    for s in stations:
+        row_vals = []
+        for p in parts:
+            v = agg.get((s, p), {'fi_rej': 0.0, 'passed': 0.0})
+            rate = (1000.0 * v['fi_rej'] / v['passed']) if v['passed'] else 0.0
+            row_vals.append(rate)
+        matrix.append(row_vals)
+    return jsonify({'stations': stations, 'part_types': parts, 'matrix': matrix})
+
+
+@main_bp.route('/analysis/aoi/grades/shift_effect', methods=['GET'])
+def aoi_grades_shift_effect():
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    start = _parse_date(request.args.get('start_date'))
+    end = _parse_date(request.args.get('end_date'))
+    data, error = fetch_combined_reports()
+    if error:
+        abort(500, description=error)
+
+    # Build per-record escape rate per 1k
+    per_shift = defaultdict(list)
+    per_weekday_shift = defaultdict(lambda: defaultdict(list))
+    for row in data:
+        dt = _parse_date(row.get('aoi_Date') or row.get('Date') or row.get('date'))
+        if start and (not dt or dt < start):
+            continue
+        if end and (not dt or dt > end):
+            continue
+        shift = row.get('aoi_Shift') or row.get('Shift') or 'Unknown'
+        passed = _aoi_passed(row)
+        rej = _fi_rejected(row)
+        rate = (1000.0 * rej / passed) if passed else 0.0
+        per_shift[shift].append(rate)
+        if dt:
+            wd = dt.weekday()  # 0=Mon
+            per_weekday_shift[wd][shift].append(rate)
+
+    # Summaries
+    def _summary(xs):
+        xs = sorted(xs)
+        n = len(xs)
+        if n == 0:
+            return { 'n': 0, 'mean': 0, 'q1': 0, 'median': 0, 'q3': 0 }
+        def q(p):
+            k = int(p*(n-1))
+            return xs[k]
+        return {
+            'n': n,
+            'mean': sum(xs)/n,
+            'q1': q(0.25),
+            'median': q(0.5),
+            'q3': q(0.75),
+        }
+
+    shift_labels = sorted(per_shift.keys())
+    shift_stats = { s: _summary(per_shift[s]) for s in shift_labels }
+
+    weekdays = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun']
+    heat = []
+    all_shifts = sorted({s for d in per_weekday_shift.values() for s in d.keys()})
+    for i in range(7):
+        row_vals = []
+        for s in all_shifts:
+            xs = per_weekday_shift[i][s]
+            v = (sum(xs)/len(xs)) if xs else 0.0
+            row_vals.append(v)
+        heat.append(row_vals)
+
+    return jsonify({
+        'shifts': shift_labels,
+        'shift_stats': shift_stats,
+        'weekday_labels': weekdays,
+        'weekday_shifts': all_shifts,
+        'weekday_heat': heat,
+    })
+
+
+@main_bp.route('/analysis/aoi/grades/program_trend', methods=['GET'])
+def aoi_grades_program_trend():
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    start = _parse_date(request.args.get('start_date'))
+    end = _parse_date(request.args.get('end_date'))
+    data, error = fetch_combined_reports()
+    if error:
+        abort(500, description=error)
+
+    # Aggregate by model/rev and calendar month
+    from collections import defaultdict
+    agg = defaultdict(lambda: defaultdict(lambda: {'fi': 0.0, 'passed': 0.0}))
+    for row in data:
+        dt = _parse_date(row.get('aoi_Date') or row.get('Date') or row.get('date'))
+        if start and (not dt or dt < start):
+            continue
+        if end and (not dt or dt > end):
+            continue
+        model = row.get('aoi_Assembly') or row.get('Assembly') or 'Unknown'
+        rev = row.get('aoi_Rev') or row.get('Rev') or ''
+        key = f"{model} {rev}".strip()
+        month = dt.replace(day=1).isoformat() if dt else 'Unknown'
+        agg[key][month]['fi'] += _fi_rejected(row)
+        agg[key][month]['passed'] += _aoi_passed(row)
+
+    # Build aligned series per key
+    months = sorted({m for d in agg.values() for m in d.keys() if m != 'Unknown'})
+    datasets = []
+    for key, m in agg.items():
+        data_points = []
+        for mon in months:
+            v = m.get(mon, {'fi': 0.0, 'passed': 0.0})
+            rate = (1000.0 * v['fi'] / v['passed']) if v['passed'] else 0.0
+            data_points.append(rate)
+        datasets.append({'label': key, 'data': data_points})
+    return jsonify({'months': months, 'datasets': datasets})
+
+
+@main_bp.route('/analysis/aoi/grades/adjusted_operator_ranking', methods=['GET'])
+def aoi_grades_adjusted_operator_ranking():
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    import numpy as np
+    start = _parse_date(request.args.get('start_date'))
+    end = _parse_date(request.args.get('end_date'))
+    data, error = fetch_combined_reports()
+    if error:
+        abort(500, description=error)
+
+    rows = []
+    for row in data:
+        dt = _parse_date(row.get('aoi_Date') or row.get('Date') or row.get('date'))
+        if start and (not dt or dt < start):
+            continue
+        if end and (not dt or dt > end):
+            continue
+        op = row.get('aoi_Operator') or row.get('Operator') or 'Unknown'
+        model = row.get('aoi_Assembly') or row.get('Assembly') or 'Unknown'
+        shift = row.get('aoi_Shift') or row.get('Shift') or 'Unknown'
+        passed = _aoi_passed(row)
+        rej = _fi_rejected(row)
+        y = (1000.0 * rej / passed) if passed else 0.0
+        rows.append((op, model, shift, passed, y))
+
+    if not rows:
+        return jsonify({'operators': [], 'effects': []})
+
+    # Build design matrix: intercept + model dummies + shift dummies + log(volume)
+    ops = sorted({r[0] for r in rows})
+    models = sorted({r[1] for r in rows})
+    shifts = sorted({r[2] for r in rows})
+    op_index = {k: i for i, k in enumerate(ops)}
+    model_index = {k: i for i, k in enumerate(models)}
+    shift_index = {k: i for i, k in enumerate(shifts)}
+
+    n = len(rows)
+    p = 1 + (len(models)-1) + (len(shifts)-1) + 1 + len(ops)  # intercept + effects + log(vol) + operator effects
+    X = np.zeros((n, p))
+    y = np.zeros(n)
+
+    # Column layout
+    col = 0
+    intercept_col = col; col += 1
+    model_cols = {m: intercept_col + 1 + i for i, m in enumerate(models[1:])}
+    col = intercept_col + 1 + max(0, len(models)-1)
+    shift_cols = {s: col + i for i, s in enumerate(shifts[1:])}
+    col += max(0, len(shifts)-1)
+    logv_col = col; col += 1
+    op_cols = {o: col + i for i, o in enumerate(ops)}
+
+    for i, (op, model, shift, passed, yi) in enumerate(rows):
+        X[i, intercept_col] = 1.0
+        if model in model_cols:
+            X[i, model_cols[model]] = 1.0
+        if shift in shift_cols:
+            X[i, shift_cols[shift]] = 1.0
+        X[i, logv_col] = np.log(max(passed, 1.0))
+        X[i, op_cols[op]] = 1.0
+        y[i] = yi
+
+    # Ridge regularization for stability
+    lam = 1.0
+    XtX = X.T @ X + lam * np.eye(X.shape[1])
+    Xty = X.T @ y
+    beta = np.linalg.solve(XtX, Xty)
+
+    effects = []
+    for op in ops:
+        eff = float(beta[op_cols[op]])
+        # naive CI based on residual variance and count per operator
+        idx = [i for i, r in enumerate(rows) if r[0] == op]
+        resid = y[idx] - X[idx] @ beta
+        var = float((resid @ resid) / max(1, len(idx)-1))
+        se = (var ** 0.5) / (len(idx) ** 0.5)
+        effects.append({'operator': op, 'effect': eff, 'lower': eff - 1.96*se, 'upper': eff + 1.96*se, 'n': len(idx)})
+
+    # Sort best (lower effect is better) ascending
+    effects.sort(key=lambda d: d['effect'])
+    return jsonify({'operators': ops, 'effects': effects})
 
 
 @main_bp.route('/analysis/aoi/grades/view', methods=['GET'])

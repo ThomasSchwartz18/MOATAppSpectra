@@ -3,3 +3,8 @@ supabase
 dotenv
 openpyxl
 xlrd
+pandas
+fastapi
+uvicorn
+pytest
+numpy
