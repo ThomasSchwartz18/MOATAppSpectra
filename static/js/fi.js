@@ -235,7 +235,7 @@ function fillRateTable(labels, rates) {
 function renderAssemblyTable(tableId, assemblies, inspected, rejected, yields) {
   const table = document.getElementById(tableId);
   if (!table) return;
-  table.innerHTML = '<thead><tr><th>Assembly</th><th>Inspected</th><th>Rejected</th><th>Yield %</th></tr></thead><tbody></tbody>';
+  table.innerHTML = '<thead><tr><th>Assembly</th><th>Total Inspected</th><th>Total Rejected</th><th>Yield %</th></tr></thead><tbody></tbody>';
   const tbody = table.querySelector('tbody');
   assemblies.forEach((asm, i) => {
     const y = yields[i]?.toFixed ? yields[i].toFixed(1) : yields[i];
@@ -334,7 +334,7 @@ document.getElementById('modal-download-csv').addEventListener('click', () => {
       csv += `${lab},${currentData.rates[i].toFixed(1)}\n`;
     });
   } else if (currentData.assemblies) {
-    csv = 'Assembly,Inspected,Rejected,Yield %\n';
+    csv = 'Assembly,Total Inspected,Total Rejected,Yield %\n';
     currentData.assemblies.forEach((asm, i) => {
       const y = currentData.yields[i]?.toFixed ? currentData.yields[i].toFixed(1) : currentData.yields[i];
       csv += `${asm},${currentData.inspected[i]},${currentData.rejected[i]},${y}\n`;

@@ -226,3 +226,24 @@ function renderShiftEffect() {
       host.innerHTML = html;
     });
 }
+
+function renderCustomerYield() {
+  const el = document.getElementById('customerYield');
+  if (!el) return;
+  fetch('/analysis/aoi/grades/customer_yield')
+    .then((r) => r.json())
+    .then((res) => {
+      const labels = res.labels || [];
+      const yields = res.yields || [];
+      if (window._customerYield) window._customerYield.destroy();
+      window._customerYield = new Chart(el.getContext('2d'), {
+        type: 'bar',
+        data: { labels, datasets: [ { label: 'True Yield %', data: yields, backgroundColor: 'hsl(140 70% 50% / 0.6)' } ] },
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, max: 100, ticks: { callback: (v) => v + '%' } } } },
+      });
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (document.getElementById('customerYield')) renderCustomerYield();
+});

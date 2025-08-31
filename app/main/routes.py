@@ -869,6 +869,52 @@ def aoi_grades_shift_effect():
     })
 
 
+@main_bp.route('/analysis/aoi/grades/customer_yield', methods=['GET'])
+def aoi_grades_customer_yield():
+    """Return per-customer true yield using AOI and FI rejects.
+
+    True yield per customer = (AOI inspected - AOI rejected - FI rejected) / AOI inspected.
+    """
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    start = _parse_date(request.args.get('start_date'))
+    end = _parse_date(request.args.get('end_date'))
+    data, error = fetch_combined_reports()
+    if error:
+        abort(500, description=error)
+
+    from collections import defaultdict
+
+    agg = defaultdict(lambda: {'inspected': 0.0, 'aoi_rej': 0.0, 'fi_rej': 0.0})
+    for row in data:
+        dt = _parse_date(row.get('aoi_Date') or row.get('Date') or row.get('date'))
+        if start and (not dt or dt < start):
+            continue
+        if end and (not dt or dt > end):
+            continue
+        cust = row.get('aoi_Customer') or row.get('Customer') or 'Unknown'
+        aoi_ins = float(row.get('aoi_Quantity Inspected') or row.get('Quantity Inspected') or 0)
+        aoi_rej = float(row.get('aoi_Quantity Rejected') or row.get('Quantity Rejected') or 0)
+        fi_rej = float(row.get('fi_Quantity Rejected') or 0)
+        agg[cust]['inspected'] += aoi_ins
+        agg[cust]['aoi_rej'] += aoi_rej
+        agg[cust]['fi_rej'] += fi_rej
+
+    items = []
+    for cust, vals in agg.items():
+        ins = vals['inspected']
+        true_accepted = max(0.0, ins - vals['aoi_rej'] - vals['fi_rej'])
+        yld = (true_accepted / ins * 100.0) if ins else 0.0
+        items.append((cust, yld))
+
+    # Sort by yield descending for readability
+    items.sort(key=lambda x: x[1], reverse=True)
+    return jsonify({
+        'labels': [i[0] for i in items],
+        'yields': [i[1] for i in items],
+    })
+
+
 @main_bp.route('/analysis/aoi/grades/program_trend', methods=['GET'])
 def aoi_grades_program_trend():
     if 'username' not in session:
