@@ -1,4 +1,6 @@
 import os
+import json
+from pathlib import Path
 
 from flask import Flask, current_app
 from supabase import create_client
@@ -20,6 +22,16 @@ def create_app():
         os.environ["SUPABASE_SERVICE_KEY"],
     )
     app.config["SUPABASE"] = supabase
+
+    phrases_path = (
+        os.environ.get("NON_AOI_PHRASES_FILE")
+        or Path(__file__).resolve().parent.parent / "config" / "non_aoi_phrases.json"
+    )
+    try:
+        with open(phrases_path, "r", encoding="utf-8") as fh:
+            app.config["NON_AOI_PHRASES"] = json.load(fh)
+    except Exception:
+        app.config["NON_AOI_PHRASES"] = []
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)

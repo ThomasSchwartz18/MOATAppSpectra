@@ -1,8 +1,5 @@
 import re
 
-# Reasons in FI Additional Information that should be excluded from AOI analysis
-NON_AOI_REASONS = ["Missing Coating"]
-
 
 def parse_fi_rejections(info: str, ignore_phrases: list[str]) -> int:
     """Parse FI Additional Information and sum counts not in ignore list."""
