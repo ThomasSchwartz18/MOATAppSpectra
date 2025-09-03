@@ -39,10 +39,10 @@ from app.db import (
 )
 
 from app.grades import calculate_aoi_grades
+from fi_utils import parse_fi_rejections, NON_AOI_REASONS
 
 # Helpers for AOI Grades analytics
 from collections import defaultdict, Counter
-
 
 def _parse_date(val):
     if not val:
@@ -74,6 +74,7 @@ def _gap_days(row):
     if a and f:
         return (f - a).days
     return None
+
 
 main_bp = Blueprint('main', __name__)
 
@@ -588,6 +589,8 @@ def aoi_grades():
         job_number = row.get('aoi_Job Number') or row.get('Job Number')
         if job_set and (job_number not in job_set):
             continue
+        info = row.get('fi_Additional Information') or ""
+        row['fi_Quantity Rejected'] = parse_fi_rejections(info, NON_AOI_REASONS)
         filtered.append(row)
 
     grades = calculate_aoi_grades(filtered)
