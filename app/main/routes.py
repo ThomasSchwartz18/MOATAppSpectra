@@ -7,6 +7,7 @@ from flask import (
     abort,
     request,
     jsonify,
+    current_app,
 )
 from functools import wraps
 import csv
@@ -39,7 +40,7 @@ from app.db import (
 )
 
 from app.grades import calculate_aoi_grades
-from fi_utils import parse_fi_rejections, NON_AOI_REASONS
+from fi_utils import parse_fi_rejections
 
 # Helpers for AOI Grades analytics
 from collections import defaultdict, Counter
@@ -590,7 +591,8 @@ def aoi_grades():
         if job_set and (job_number not in job_set):
             continue
         info = row.get('fi_Additional Information') or ""
-        row['fi_Quantity Rejected'] = parse_fi_rejections(info, NON_AOI_REASONS)
+        phrases = current_app.config.get("NON_AOI_PHRASES", [])
+        row['fi_Quantity Rejected'] = parse_fi_rejections(info, phrases)
         filtered.append(row)
 
     grades = calculate_aoi_grades(filtered)
