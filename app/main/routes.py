@@ -668,6 +668,7 @@ def aoi_grades_gap_risk():
     hist = Counter()
     fi_by_bucket = Counter()
     total_fi = 0.0
+    phrases = current_app.config.get("NON_AOI_PHRASES", [])
 
     for row in data:
         dt = _parse_date(row.get('aoi_Date') or row.get('Date') or row.get('date'))
@@ -682,7 +683,8 @@ def aoi_grades_gap_risk():
                 label = name
                 break
         hist[label] += 1
-        rej = _fi_rejected(row)
+        info = row.get('fi_Additional Information') or ""
+        rej = parse_fi_rejections(info, phrases)
         fi_by_bucket[label] += rej
         total_fi += rej
 
@@ -725,7 +727,10 @@ def aoi_grades_learning_curves():
         if end and (not dt or dt > end):
             continue
         job = row.get('aoi_Job Number') or row.get('Job Number') or 'Unknown'
-        job_fi_rej[job] = max(job_fi_rej[job], _fi_rejected(row))
+        info = row.get('fi_Additional Information') or ""
+        phrases = current_app.config.get("NON_AOI_PHRASES", [])
+        rej = parse_fi_rejections(info, phrases)
+        job_fi_rej[job] = max(job_fi_rej[job], rej)
 
     allowed = None
     if op_filter:
@@ -819,6 +824,7 @@ def aoi_grades_shift_effect():
     # Build per-record escape rate per 1k
     per_shift = defaultdict(list)
     per_weekday_shift = defaultdict(lambda: defaultdict(list))
+    phrases = current_app.config.get("NON_AOI_PHRASES", [])
     for row in data:
         dt = _parse_date(row.get('aoi_Date') or row.get('Date') or row.get('date'))
         if start and (not dt or dt < start):
@@ -827,7 +833,8 @@ def aoi_grades_shift_effect():
             continue
         shift = row.get('aoi_Shift') or row.get('Shift') or 'Unknown'
         passed = _aoi_passed(row)
-        rej = _fi_rejected(row)
+        info = row.get('fi_Additional Information') or ""
+        rej = parse_fi_rejections(info, phrases)
         rate = (1000.0 * rej / passed) if passed else 0.0
         per_shift[shift].append(rate)
         if dt:
@@ -933,6 +940,7 @@ def aoi_grades_program_trend():
     # Aggregate by model/rev and calendar month
     from collections import defaultdict
     agg = defaultdict(lambda: defaultdict(lambda: {'fi': 0.0, 'passed': 0.0}))
+    phrases = current_app.config.get("NON_AOI_PHRASES", [])
     for row in data:
         dt = _parse_date(row.get('aoi_Date') or row.get('Date') or row.get('date'))
         if start and (not dt or dt < start):
@@ -943,7 +951,9 @@ def aoi_grades_program_trend():
         rev = row.get('aoi_Rev') or row.get('Rev') or ''
         key = f"{model} {rev}".strip()
         month = dt.replace(day=1).isoformat() if dt else 'Unknown'
-        agg[key][month]['fi'] += _fi_rejected(row)
+        info = row.get('fi_Additional Information') or ""
+        rej = parse_fi_rejections(info, phrases)
+        agg[key][month]['fi'] += rej
         agg[key][month]['passed'] += _aoi_passed(row)
 
     # Build aligned series per key
@@ -971,6 +981,7 @@ def aoi_grades_adjusted_operator_ranking():
         abort(500, description=error)
 
     rows = []
+    phrases = current_app.config.get("NON_AOI_PHRASES", [])
     for row in data:
         dt = _parse_date(row.get('aoi_Date') or row.get('Date') or row.get('date'))
         if start and (not dt or dt < start):
@@ -981,7 +992,8 @@ def aoi_grades_adjusted_operator_ranking():
         model = row.get('aoi_Assembly') or row.get('Assembly') or 'Unknown'
         shift = row.get('aoi_Shift') or row.get('Shift') or 'Unknown'
         passed = _aoi_passed(row)
-        rej = _fi_rejected(row)
+        info = row.get('fi_Additional Information') or ""
+        rej = parse_fi_rejections(info, phrases)
         y = (1000.0 * rej / passed) if passed else 0.0
         rows.append((op, model, shift, passed, y))
 
