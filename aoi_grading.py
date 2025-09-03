@@ -130,10 +130,8 @@ def compute_aoi_grades(
     if col_op not in df.columns:
         df[col_op] = None
 
-    # Job-level aggregates.
+    # Job-level aggregates for FI totals.
     job_group = df.groupby(col_job, dropna=False)
-
-    # Job-level rejects (R_j) and FI inspected (for reference).
     df["fi_rejects_job"] = job_group[col_fi_rejected].transform("max").fillna(0.0)
     df["fi_inspected_job"] = job_group[col_fi_inspected].transform("max").fillna(0.0)
 
@@ -165,6 +163,9 @@ def compute_aoi_grades(
 
     # Scope-adjusted passed.
     df["scope_passed"] = df["aoi_passed"] * df["scope_beta"]
+
+    # Recompute job grouping to include new columns.
+    job_group = df.groupby(col_job, dropna=False)
 
     # Per-job total scope; compute share within job.
     total_scope = job_group["scope_passed"].transform("sum")
