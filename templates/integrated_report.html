@@ -17,6 +17,21 @@
   </div>
 </div>
 
+<div id="charts" class="section-card">
+  <div class="chart-block">
+    <canvas id="yieldTrendChart"></canvas>
+    <p id="yieldTrendDesc"></p>
+  </div>
+  <div class="chart-block">
+    <canvas id="operatorRejectChart"></canvas>
+    <p id="operatorRejectDesc"></p>
+  </div>
+  <div class="chart-block">
+    <canvas id="modelFalseCallsChart"></canvas>
+    <p id="modelFalseCallsDesc"></p>
+  </div>
+</div>
+
 <div class="field-row" id="download-controls">
   <div class="field">
     <label for="file-format">Format</label>
@@ -31,6 +46,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="{{ url_for('static', filename='js/integrated_report.js') }}"></script>

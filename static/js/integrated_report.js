@@ -4,6 +4,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const downloadBtn = document.getElementById('download-report');
   const formatSelect = document.getElementById('file-format');
   let reportData = null;
+  let yieldChart, operatorChart, modelChart;
+
+  if (downloadControls) downloadControls.style.display = 'none';
 
   runBtn?.addEventListener('click', () => {
     const start = document.getElementById('start-date').value;
@@ -36,6 +39,7 @@ document.addEventListener('DOMContentLoaded', () => {
     ];
 
     reportData = { start, end, yieldData, operators, models };
+    renderCharts(reportData);
     downloadControls.style.display = 'flex';
   });
 
@@ -50,10 +54,98 @@ document.addEventListener('DOMContentLoaded', () => {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
       doc.text('Integrated Report', 10, 10);
+      let y = 20;
+
+      const addChart = (canvasId, descId) => {
+        const canvas = document.getElementById(canvasId);
+        const img = canvas.toDataURL('image/png');
+        doc.addImage(img, 'PNG', 10, y, 180, 80);
+        y += 85;
+        const desc = document.getElementById(descId).textContent;
+        const lines = doc.splitTextToSize(desc, 180);
+        doc.text(lines, 10, y);
+        y += lines.length * 10 + 10;
+      };
+
+      addChart('yieldTrendChart', 'yieldTrendDesc');
+      addChart('operatorRejectChart', 'operatorRejectDesc');
+      addChart('modelFalseCallsChart', 'modelFalseCallsDesc');
+
       doc.save('integrated-report.pdf');
     } else if (format === 'xlsx') {
       const wb = XLSX.utils.book_new();
-      const ws = XLSX.utils.aoa_to_sheet([['Integrated Report']]);
+      const ws = XLSX.utils.aoa_to_sheet([]);
+      let row = 1;
+
+      XLSX.utils.sheet_add_aoa(ws, [['Integrated Report']], { origin: `A${row}` });
+      row += 2;
+
+      // Yield data table and chart
+      XLSX.utils.sheet_add_aoa(ws, [['Date', 'Yield %']], { origin: `A${row}` });
+      XLSX.utils.sheet_add_aoa(
+        ws,
+        reportData.yieldData.dates.map((d, i) => [d, reportData.yieldData.yields[i]]),
+        { origin: `A${row + 1}` }
+      );
+      const yieldImg = document
+        .getElementById('yieldTrendChart')
+        .toDataURL('image/png');
+      XLSX.utils.sheet_add_image(ws, yieldImg, {
+        tl: { col: 3, row: row - 1 },
+        ext: { width: 400, height: 200 },
+      });
+      XLSX.utils.sheet_add_aoa(
+        ws,
+        [[document.getElementById('yieldTrendDesc').textContent]],
+        { origin: `A${row + reportData.yieldData.dates.length + 2}` }
+      );
+      row += reportData.yieldData.dates.length + 6;
+
+      // Operator reject rate table and chart
+      XLSX.utils.sheet_add_aoa(ws, [['Operator', 'Inspected', 'Rejected']], {
+        origin: `A${row}`,
+      });
+      XLSX.utils.sheet_add_aoa(
+        ws,
+        reportData.operators.map((o) => [o.name, o.inspected, o.rejected]),
+        { origin: `A${row + 1}` }
+      );
+      const opImg = document
+        .getElementById('operatorRejectChart')
+        .toDataURL('image/png');
+      XLSX.utils.sheet_add_image(ws, opImg, {
+        tl: { col: 4, row: row - 1 },
+        ext: { width: 400, height: 200 },
+      });
+      XLSX.utils.sheet_add_aoa(
+        ws,
+        [[document.getElementById('operatorRejectDesc').textContent]],
+        { origin: `A${row + reportData.operators.length + 2}` }
+      );
+      row += reportData.operators.length + 6;
+
+      // False calls by model table and chart
+      XLSX.utils.sheet_add_aoa(ws, [['Model', 'False Calls']], {
+        origin: `A${row}`,
+      });
+      XLSX.utils.sheet_add_aoa(
+        ws,
+        reportData.models.map((m) => [m.name, m.falseCalls]),
+        { origin: `A${row + 1}` }
+      );
+      const modelImg = document
+        .getElementById('modelFalseCallsChart')
+        .toDataURL('image/png');
+      XLSX.utils.sheet_add_image(ws, modelImg, {
+        tl: { col: 3, row: row - 1 },
+        ext: { width: 400, height: 200 },
+      });
+      XLSX.utils.sheet_add_aoa(
+        ws,
+        [[document.getElementById('modelFalseCallsDesc').textContent]],
+        { origin: `A${row + reportData.models.length + 2}` }
+      );
+
       XLSX.utils.book_append_sheet(wb, ws, 'Report');
       XLSX.writeFile(wb, 'integrated-report.xlsx');
     }
@@ -62,5 +154,77 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('email-report')?.addEventListener('click', () => {
     alert('Email sent (placeholder).');
   });
+
+  function renderCharts(data) {
+    const { yieldData, operators, models } = data;
+
+    yieldChart?.destroy();
+    operatorChart?.destroy();
+    modelChart?.destroy();
+
+    const yieldCtx = document
+      .getElementById('yieldTrendChart')
+      .getContext('2d');
+    yieldChart = new Chart(yieldCtx, {
+      type: 'line',
+      data: {
+        labels: yieldData.dates,
+        datasets: [
+          {
+            label: 'Yield %',
+            data: yieldData.yields,
+            borderColor: 'blue',
+            fill: false,
+          },
+        ],
+      },
+    });
+    document.getElementById(
+      'yieldTrendDesc'
+    ).textContent = `Yield percentages from ${data.start} to ${data.end}.`;
+
+    const operatorCtx = document
+      .getElementById('operatorRejectChart')
+      .getContext('2d');
+    const accepted = operators.map((o) => o.inspected - o.rejected);
+    const rejected = operators.map((o) => o.rejected);
+    operatorChart = new Chart(operatorCtx, {
+      type: 'bar',
+      data: {
+        labels: operators.map((o) => o.name),
+        datasets: [
+          { label: 'Accepted', data: accepted, backgroundColor: 'green' },
+          { label: 'Rejected', data: rejected, backgroundColor: 'red' },
+        ],
+      },
+      options: {
+        scales: {
+          x: { stacked: true },
+          y: { stacked: true },
+        },
+      },
+    });
+    document.getElementById('operatorRejectDesc').textContent =
+      'Stacked bar chart of accepted vs rejected units per operator.';
+
+    const modelCtx = document
+      .getElementById('modelFalseCallsChart')
+      .getContext('2d');
+    modelChart = new Chart(modelCtx, {
+      type: 'bar',
+      data: {
+        labels: models.map((m) => m.name),
+        datasets: [
+          {
+            label: 'False Calls',
+            data: models.map((m) => m.falseCalls),
+            backgroundColor: 'orange',
+          },
+        ],
+      },
+    });
+    document.getElementById('modelFalseCallsDesc').textContent =
+      'Bar chart of false calls per model.';
+  }
 });
 
