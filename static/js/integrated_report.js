@@ -36,6 +36,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const format = formatSelect.value;
     if (format === 'pdf') {
       const { jsPDF } = window.jspdf;
+      if (window.jspdfAutoTable) {
+        window.jspdfAutoTable(jsPDF);
+      }
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
@@ -174,6 +177,12 @@ document.addEventListener('DOMContentLoaded', () => {
         [255, 165, 0],
         true
       );
+      doc.autoTable({
+        startY: y,
+        head: [['Model Name', 'Avg False Calls']],
+        body: (reportData.problemAssemblies || []).map((m) => [m.name, m.falseCalls]),
+      });
+      y = doc.lastAutoTable.finalY + 10;
 
       doc.save('integrated-report.pdf');
     } else if (format === 'xlsx') {
