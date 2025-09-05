@@ -48,8 +48,20 @@ document.addEventListener('DOMContentLoaded', () => {
       const chartHeight = chartWidth / 3;
 
       const addChart = (canvasId, title, lines, color) => {
-        const text = doc.splitTextToSize(lines.join('\n'), chartWidth - 2);
-        const blockHeight = 10 + chartHeight + 6 + text.length * 6 + 10;
+        const defaultSize = doc.getFontSize();
+        const lineHeight = 5;
+        const padding = 1;
+        doc.setFontSize(10);
+        const processed = lines.map((line) => {
+          const textLines = doc.splitTextToSize(line, chartWidth - 4);
+          return {
+            textLines,
+            height: textLines.length * lineHeight + padding * 2,
+          };
+        });
+        doc.setFontSize(defaultSize);
+        const descHeight = 6 + processed.reduce((a, l) => a + l.height, 0);
+        const blockHeight = 10 + chartHeight + 5 + descHeight + 10;
         if (y + blockHeight > pageHeight) {
           doc.addPage();
           y = 20;
@@ -64,6 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
         doc.rect(x, y, chartWidth, 8, 'F');
         doc.setTextColor(255, 255, 255);
         doc.setFont('helvetica', 'bold');
+        doc.setFontSize(defaultSize);
         doc.text(title, x + 4, y + 5);
         let innerY = y + 10;
 
@@ -76,11 +89,26 @@ document.addEventListener('DOMContentLoaded', () => {
         doc.addImage(img, 'PNG', x + 2, innerY + 2, chartWidth - 4, chartHeight - 4);
         innerY += chartHeight + 5;
 
-        // description
+        // description header
         doc.setFont('helvetica', 'bold');
+        doc.setFontSize(defaultSize);
         doc.text(title, x + 2, innerY);
+        innerY += 6;
+
+        // description lines with alternating bands
         doc.setFont('helvetica', 'normal');
-        doc.text(text, x + 2, innerY + 6);
+        doc.setFontSize(10);
+        processed.forEach((line, i) => {
+          doc.setFillColor(i % 2 === 0 ? 240 : 255);
+          doc.rect(x, innerY, chartWidth, line.height, 'F');
+          doc.text(line.textLines, x + 2, innerY + lineHeight + padding);
+          innerY += line.height;
+        });
+        doc.setFontSize(defaultSize);
+
+        // Surround block with border
+        doc.setDrawColor(0);
+        doc.rect(x, y, chartWidth, blockHeight);
 
         if (col === 0) {
           col = 1;
