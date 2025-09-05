@@ -240,15 +240,26 @@ document.addEventListener('DOMContentLoaded', () => {
     const avgFc =
       (data.models || []).reduce((a, m) => a + m.falseCalls, 0) /
       ((data.models || []).length || 1);
-    const over20 = (data.models || [])
-      .filter((m) => m.falseCalls > 20)
-      .map((m) => m.name);
+    const problemAssemblies = (data.models || []).filter(
+      (m) => m.falseCalls > 20
+    );
+    const over20 = problemAssemblies.map((m) => m.name);
     data.modelSummary = { avgFalseCalls: avgFc, over20 };
+    data.problemAssemblies = problemAssemblies;
   }
 
   function renderCharts(data) {
-    const { yieldData, operators, models, yieldSummary, operatorSummary, modelSummary } =
-      data;
+    const {
+      yieldData,
+      operators,
+      models,
+      yieldSummary,
+      operatorSummary,
+      modelSummary,
+      problemAssemblies,
+      start,
+      end,
+    } = data;
 
     yieldChart?.destroy();
     operatorChart?.destroy();
@@ -273,10 +284,13 @@ document.addEventListener('DOMContentLoaded', () => {
       },
     });
     const yd = yieldSummary || {};
-    document.getElementById('yieldTrendDesc').textContent =
-      `Average ${yd.avg?.toFixed(1) ?? '0'}%. ` +
-      `Worst day ${yd.worstDay?.date || 'N/A'} (${yd.worstDay?.yield?.toFixed(1) ?? '0'}%). ` +
-      `Worst assembly ${yd.worstAssembly?.assembly || 'N/A'} (${yd.worstAssembly?.yield?.toFixed(1) ?? '0'}%).`;
+    const yDesc = document.getElementById('yieldTrendDesc');
+    yDesc.style.whiteSpace = 'pre-line';
+    yDesc.textContent =
+      `Date range: ${start} - ${end}\n` +
+      `Average yield: ${yd.avg?.toFixed(1) ?? '0'}%\n` +
+      `Lowest yield date: ${yd.worstDay?.date || 'N/A'} (${yd.worstDay?.yield?.toFixed(1) ?? '0'}%)\n` +
+      `Worst assembly: ${yd.worstAssembly?.assembly || 'N/A'} (${yd.worstAssembly?.yield?.toFixed(1) ?? '0'}%)`;
 
     const operatorCanvas = document.getElementById('operatorRejectChart');
     operatorCanvas.width = 800;
@@ -301,11 +315,14 @@ document.addEventListener('DOMContentLoaded', () => {
       },
     });
     const os = operatorSummary || {};
-    document.getElementById('operatorRejectDesc').textContent =
-      `Total boards ${os.totalBoards ?? 0}. Avg reject rate ${
-        os.avgRate?.toFixed(2) ?? '0'
-      }%. Min ${os.min?.name || 'N/A'} (${os.min?.rate?.toFixed(2) ?? '0'}%), ` +
-      `Max ${os.max?.name || 'N/A'} (${os.max?.rate?.toFixed(2) ?? '0'}%).`;
+    const oDesc = document.getElementById('operatorRejectDesc');
+    oDesc.style.whiteSpace = 'pre-line';
+    oDesc.textContent =
+      `Date range: ${start} - ${end}\n` +
+      `Total boards: ${os.totalBoards ?? 0}\n` +
+      `Average reject rate: ${os.avgRate?.toFixed(2) ?? '0'}%\n` +
+      `Min reject rate: ${os.min?.name || 'N/A'} (${os.min?.rate?.toFixed(2) ?? '0'}%)\n` +
+      `Max reject rate: ${os.max?.name || 'N/A'} (${os.max?.rate?.toFixed(2) ?? '0'}%)`;
 
     const modelCanvas = document.getElementById('modelFalseCallsChart');
     modelCanvas.width = 800;
@@ -325,10 +342,27 @@ document.addEventListener('DOMContentLoaded', () => {
       },
     });
     const ms = modelSummary || {};
-    document.getElementById('modelFalseCallsDesc').textContent =
-      `Avg false calls/board ${ms.avgFalseCalls?.toFixed(2) ?? '0'}. Models >20: ${
-        ms.over20?.join(', ') || 'None'
-      }.`;
+    const mDesc = document.getElementById('modelFalseCallsDesc');
+    mDesc.style.whiteSpace = 'pre-line';
+    mDesc.textContent =
+      `Date range: ${start} - ${end}\n` +
+      `Average false calls/board: ${ms.avgFalseCalls?.toFixed(2) ?? '0'}\n` +
+      `Problem assemblies (>20 false calls/board): ${ms.over20?.join(', ') || 'None'}`;
+
+    const table = document.getElementById('problemAssemblies');
+    const tbody = table.querySelector('tbody');
+    tbody.innerHTML = '';
+    (problemAssemblies || []).forEach((m) => {
+      const tr = document.createElement('tr');
+      const nameTd = document.createElement('td');
+      nameTd.textContent = m.name;
+      const fcTd = document.createElement('td');
+      fcTd.textContent = m.falseCalls;
+      tr.appendChild(nameTd);
+      tr.appendChild(fcTd);
+      tbody.appendChild(tr);
+    });
+    table.style.display = (problemAssemblies || []).length ? 'table' : 'none';
   }
 });
 
