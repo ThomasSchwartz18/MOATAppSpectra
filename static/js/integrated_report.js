@@ -40,41 +40,56 @@ document.addEventListener('DOMContentLoaded', () => {
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
       doc.text('Integrated Report', 10, 10);
+      // Track current position and column for two-column layout
       let y = 20;
+      let col = 0;
+      let rowBottom = 20;
+      const chartWidth = (pageWidth - 30) / 2;
+      const chartHeight = chartWidth / 3;
 
       const addChart = (canvasId, title, lines, color) => {
-        const chartWidth = pageWidth - 20;
-        const chartHeight = chartWidth / 2;
-        const blockHeight = 10 + chartHeight + 6 + lines.length * 6 + 10;
+        const text = doc.splitTextToSize(lines.join('\n'), chartWidth - 2);
+        const blockHeight = 10 + chartHeight + 6 + text.length * 6 + 10;
         if (y + blockHeight > pageHeight) {
           doc.addPage();
           y = 20;
+          col = 0;
+          rowBottom = 20;
         }
+        const x = 10 + col * (chartWidth + 10);
+        const blockBottom = y + blockHeight;
 
         // header
         doc.setFillColor(...color);
-        doc.rect(10, y, chartWidth, 8, 'F');
+        doc.rect(x, y, chartWidth, 8, 'F');
         doc.setTextColor(255, 255, 255);
         doc.setFont('helvetica', 'bold');
-        doc.text(title, 14, y + 5);
-        y += 10;
+        doc.text(title, x + 4, y + 5);
+        let innerY = y + 10;
 
         // chart box
         doc.setTextColor(0, 0, 0);
         doc.setDrawColor(0);
-        doc.rect(10, y, chartWidth, chartHeight);
+        doc.rect(x, innerY, chartWidth, chartHeight);
         const canvas = document.getElementById(canvasId);
         const img = canvas.toDataURL('image/png');
-        doc.addImage(img, 'PNG', 12, y + 2, chartWidth - 4, chartHeight - 4);
-        y += chartHeight + 5;
+        doc.addImage(img, 'PNG', x + 2, innerY + 2, chartWidth - 4, chartHeight - 4);
+        innerY += chartHeight + 5;
 
         // description
         doc.setFont('helvetica', 'bold');
-        doc.text(title, 12, y);
+        doc.text(title, x + 2, innerY);
         doc.setFont('helvetica', 'normal');
-        const text = doc.splitTextToSize(lines.join('\n'), chartWidth - 2);
-        doc.text(text, 12, y + 6);
-        y += text.length * 6 + 10;
+        doc.text(text, x + 2, innerY + 6);
+
+        if (col === 0) {
+          col = 1;
+          rowBottom = blockBottom;
+        } else {
+          col = 0;
+          y = Math.max(rowBottom, blockBottom) + 10;
+          rowBottom = y;
+        }
       };
 
       const yd = reportData.yieldSummary || {};
