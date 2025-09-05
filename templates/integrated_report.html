@@ -17,26 +17,27 @@
   </div>
 </div>
 
-<div id="charts" class="section-card">
-  <div class="chart-block">
-    <canvas id="yieldTrendChart"></canvas>
-    <p id="yieldTrendDesc"></p>
+  <div id="charts" class="section-card">
+    <div class="chart-block">
+      <canvas id="yieldTrendChart"></canvas>
+      <div class="chart-summary">
+        <p id="yieldTrendDesc"></p>
+      </div>
+    </div>
+    <div class="chart-block">
+      <canvas id="operatorRejectChart"></canvas>
+      <div class="chart-summary">
+        <p id="operatorRejectDesc"></p>
+      </div>
+    </div>
+    <div class="chart-block">
+      <canvas id="modelFalseCallsChart"></canvas>
+      <div class="chart-summary">
+        <p id="modelFalseCallsDesc"></p>
+        <table id="problem-assemblies" class="data-table"><tbody></tbody></table>
+      </div>
+    </div>
   </div>
-  <div class="chart-block">
-    <canvas id="operatorRejectChart"></canvas>
-    <p id="operatorRejectDesc"></p>
-  </div>
-  <div class="chart-block">
-    <canvas id="modelFalseCallsChart"></canvas>
-    <p id="modelFalseCallsDesc"></p>
-    <table id="problemAssemblies" class="data-table">
-      <thead>
-        <tr><th>Assembly</th><th>False Calls/Board</th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
-  </div>
-</div>
 
 <div class="field-row" id="download-controls">
   <div class="field">

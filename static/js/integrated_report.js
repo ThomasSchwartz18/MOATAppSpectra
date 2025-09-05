@@ -349,7 +349,7 @@ document.addEventListener('DOMContentLoaded', () => {
       `Average false calls/board: ${ms.avgFalseCalls?.toFixed(2) ?? '0'}\n` +
       `Problem assemblies (>20 false calls/board): ${ms.over20?.join(', ') || 'None'}`;
 
-    const table = document.getElementById('problemAssemblies');
+    const table = document.getElementById('problem-assemblies');
     const tbody = table.querySelector('tbody');
     tbody.innerHTML = '';
     (problemAssemblies || []).forEach((m) => {
