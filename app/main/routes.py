@@ -574,7 +574,6 @@ def api_integrated_report():
 
     by_date = defaultdict(lambda: {'inspected': 0.0, 'aoi_rej': 0.0, 'fi_rej': 0.0})
     by_assembly = defaultdict(lambda: {'inspected': 0.0, 'aoi_rej': 0.0, 'fi_rej': 0.0})
-    by_operator = defaultdict(lambda: {'inspected': 0.0, 'rejected': 0.0})
 
     for row in combined or []:
         dt = _parse_date(row.get('aoi_Date') or row.get('Date') or row.get('date'))
@@ -596,7 +595,6 @@ def api_integrated_report():
             fi_rej = parse_fi_rejections(info, phrases)
 
         assembly = row.get('aoi_Assembly') or row.get('Assembly') or 'Unknown'
-        operator = row.get('aoi_Operator') or row.get('Operator') or 'Unknown'
 
         by_date[dt]['inspected'] += inspected
         by_date[dt]['aoi_rej'] += aoi_rej
@@ -606,8 +604,24 @@ def api_integrated_report():
         by_assembly[assembly]['aoi_rej'] += aoi_rej
         by_assembly[assembly]['fi_rej'] += fi_rej
 
+    # Operator statistics now come from AOI reports exclusively
+    aoi_reports, error = fetch_aoi_reports()
+    if error:
+        abort(500, description=error)
+
+    by_operator = defaultdict(lambda: {'inspected': 0.0, 'rejected': 0.0})
+    for row in aoi_reports or []:
+        dt = _parse_date(row.get('aoi_Date') or row.get('Date'))
+        if start and (not dt or dt < start):
+            continue
+        if end and (not dt or dt > end):
+            continue
+
+        inspected = float(row.get('aoi_Quantity Inspected') or row.get('Quantity Inspected') or 0)
+        rejected = float(row.get('aoi_Quantity Rejected') or row.get('Quantity Rejected') or 0)
+        operator = row.get('aoi_Operator') or row.get('Operator') or 'Unknown'
         by_operator[operator]['inspected'] += inspected
-        by_operator[operator]['rejected'] += aoi_rej
+        by_operator[operator]['rejected'] += rejected
 
     dates = sorted(d for d in by_date.keys() if d)
     yields = []
