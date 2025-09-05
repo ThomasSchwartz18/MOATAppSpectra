@@ -631,7 +631,13 @@ def api_integrated_report():
             continue
         if end and (not dt or dt > end):
             continue
-        model = row.get('Model') or row.get('model') or 'Unknown'
+        model = (
+            row.get('Model')
+            or row.get('model')
+            or row.get('Model Name')
+            or row.get('model_name')
+            or 'Unknown'
+        )
         fc = float(row.get('FalseCall Parts') or row.get('falsecall_parts') or 0)
         boards = float(row.get('Total Boards') or row.get('total_boards') or 0)
         model_group[model]['fc'] += fc
