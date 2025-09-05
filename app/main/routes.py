@@ -898,26 +898,29 @@ def aoi_grades_customer_yield():
     from collections import defaultdict
 
     agg = defaultdict(lambda: {'inspected': 0.0, 'aoi_rej': 0.0, 'fi_rej': 0.0})
+    label_map = {}
     for row in data:
         dt = _parse_date(row.get('aoi_Date') or row.get('Date') or row.get('date'))
         if start and (not dt or dt < start):
             continue
         if end and (not dt or dt > end):
             continue
-        cust = row.get('aoi_Customer') or row.get('Customer') or 'Unknown'
+        raw = (row.get('aoi_Customer') or row.get('Customer') or 'Unknown').strip()
+        norm = raw.lower()
+        label_map.setdefault(norm, raw)
         aoi_ins = float(row.get('aoi_Quantity Inspected') or row.get('Quantity Inspected') or 0)
         aoi_rej = float(row.get('aoi_Quantity Rejected') or row.get('Quantity Rejected') or 0)
         fi_rej = float(row.get('fi_Quantity Rejected') or 0)
-        agg[cust]['inspected'] += aoi_ins
-        agg[cust]['aoi_rej'] += aoi_rej
-        agg[cust]['fi_rej'] += fi_rej
+        agg[norm]['inspected'] += aoi_ins
+        agg[norm]['aoi_rej'] += aoi_rej
+        agg[norm]['fi_rej'] += fi_rej
 
     items = []
-    for cust, vals in agg.items():
+    for norm, vals in agg.items():
         ins = vals['inspected']
         true_accepted = max(0.0, ins - vals['aoi_rej'] - vals['fi_rej'])
         yld = (true_accepted / ins * 100.0) if ins else 0.0
-        items.append((cust, yld))
+        items.append((label_map[norm], yld))
 
     # Sort by yield descending for readability
     items.sort(key=lambda x: x[1], reverse=True)
@@ -1102,7 +1105,7 @@ def _daily_data(fetch_func):
     job_numbers = set(to_list(job_numbers))
     rev_numbers = set(to_list(rev_numbers))
     assemblies = set(to_list(assemblies))
-    customers = set(to_list(customers))
+    customers = set(x.lower() for x in to_list(customers))
     operators = set(to_list(operators))
 
     filtered = []
@@ -1118,7 +1121,7 @@ def _daily_data(fetch_func):
             continue
         if assemblies and (row.get('Assembly') not in assemblies):
             continue
-        if customers and (row.get('Customer') not in customers):
+        if customers and ((row.get('Customer') or '').lower() not in customers):
             continue
         if operators and (row.get('Operator') not in operators):
             continue
@@ -1197,21 +1200,24 @@ def _daily_data(fetch_func):
 
     if view == 'customer_rate':
         agg = defaultdict(lambda: {'accepted': 0, 'rejected': 0})
+        label_map = {}
         for row in filtered:
-            cust = row.get('Customer') or 'Unknown'
+            raw = (row.get('Customer') or 'Unknown').strip()
+            norm = raw.lower()
+            label_map.setdefault(norm, raw)
             inspected = int(row.get('Quantity Inspected') or row.get('quantity_inspected') or 0)
             rejected = int(row.get('Quantity Rejected') or row.get('quantity_rejected') or 0)
             accepted = inspected - rejected
             if accepted < 0:
                 accepted = 0
-            agg[cust]['accepted'] += accepted
-            agg[cust]['rejected'] += rejected
+            agg[norm]['accepted'] += accepted
+            agg[norm]['rejected'] += rejected
 
         items = []
-        for cust, vals in agg.items():
+        for norm, vals in agg.items():
             tot = vals['accepted'] + vals['rejected']
             rate = (vals['rejected'] / tot * 100) if tot else 0
-            items.append((cust, rate))
+            items.append((label_map[norm], rate))
         items.sort(key=lambda x: x[1], reverse=True)
         labels = [i[0] for i in items]
         rates = [i[1] for i in items]
