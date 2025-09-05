@@ -150,6 +150,19 @@ document.addEventListener('DOMContentLoaded', () => {
         [0, 123, 255]
       );
 
+      doc.autoTable({
+        startY: rowBottom + 10,
+        head: [['Date', 'Yield %']],
+        body: (reportData.yieldData.dates || []).map((d, i) => [
+          d,
+          (reportData.yieldData.yields[i] ?? 0).toFixed(1),
+        ]),
+        margin: { left: 10, right: 10 },
+      });
+      y = doc.lastAutoTable.finalY + 10;
+      col = 0;
+      rowBottom = y;
+
       const os = reportData.operatorSummary || {};
       addChart(
         'operatorRejectChart',
