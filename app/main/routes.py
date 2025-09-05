@@ -717,7 +717,7 @@ def api_integrated_report():
                 'yields': yields,
                 'assemblyYields': assembly_yields,
             },
-            'operators': operator_rows,
+            'operators': ops,
             'models': model_rows,
             'yieldSummary': yield_summary,
             'operatorSummary': operator_summary,
