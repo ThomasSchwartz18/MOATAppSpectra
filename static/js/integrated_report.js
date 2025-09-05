@@ -49,7 +49,14 @@ document.addEventListener('DOMContentLoaded', () => {
       let rowBottom = 20;
       const chartWidth = (pageWidth - 30) / 2;
 
-      const addChart = (canvasId, title, lines, color, fullWidth = false) => {
+      const addChart = (
+        canvasId,
+        title,
+        lines,
+        color,
+        table,
+        fullWidth = false
+      ) => {
         const defaultSize = doc.getFontSize();
         const lineHeight = 5;
         const padding = 1;
@@ -72,15 +79,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         doc.setFontSize(defaultSize);
         const descHeight = 6 + processed.reduce((a, l) => a + l.height, 0);
-        const blockHeight = 10 + height + 5 + descHeight + 10;
-        if (y + blockHeight > pageHeight) {
+        const blockHeightEstimate = 10 + height + 5 + descHeight + 10;
+        if (y + blockHeightEstimate > pageHeight) {
           doc.addPage();
           y = 20;
           col = 0;
           rowBottom = 20;
         }
         const x = fullWidth ? 10 : 10 + col * (chartWidth + 10);
-        const blockBottom = y + blockHeight;
 
         // header
         doc.setFillColor(...color);
@@ -117,9 +123,23 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         doc.setFontSize(defaultSize);
 
+        // table if provided
+        let blockBottom = innerY;
+        if (table) {
+          doc.autoTable({
+            startY: innerY,
+            head: table.head,
+            body: table.body,
+            margin: { left: x, right: pageWidth - x - width },
+            tableWidth: width,
+            headStyles: { fillColor: color },
+          });
+          blockBottom = doc.lastAutoTable.finalY;
+        }
+
         // Surround block with border
         doc.setDrawColor(0);
-        doc.rect(x, y, width, blockHeight);
+        doc.rect(x, y, width, blockBottom - y);
 
         if (fullWidth) {
           col = 0;
@@ -148,21 +168,15 @@ document.addEventListener('DOMContentLoaded', () => {
           } (${yd.worstAssembly?.yield?.toFixed(1) ?? '0'}%)`,
         ],
         [0, 123, 255],
+        {
+          head: [['Date', 'Yield %']],
+          body: (reportData.yieldData.dates || []).map((d, i) => [
+            d,
+            (reportData.yieldData.yields[i] ?? 0).toFixed(1),
+          ]),
+        },
         true
       );
-
-      doc.autoTable({
-        startY: rowBottom + 10,
-        head: [['Date', 'Yield %']],
-        body: (reportData.yieldData.dates || []).map((d, i) => [
-          d,
-          (reportData.yieldData.yields[i] ?? 0).toFixed(1),
-        ]),
-        margin: { left: 10, right: 10 },
-      });
-      y = doc.lastAutoTable.finalY + 10;
-      col = 0;
-      rowBottom = y;
 
       const os = reportData.operatorSummary || {};
       addChart(
@@ -176,22 +190,16 @@ document.addEventListener('DOMContentLoaded', () => {
           `Worst: ${os.max?.name || 'N/A'} (${os.max?.rate?.toFixed(2) ?? '0'}%)`,
         ],
         [0, 200, 0],
+        {
+          head: [['Operator', 'Inspected', 'Rejected']],
+          body: (reportData.operators || []).map((o) => [
+            o.name,
+            o.inspected,
+            o.rejected,
+          ]),
+        },
         true
       );
-
-      doc.autoTable({
-        startY: y,
-        head: [['Operator', 'Inspected', 'Rejected']],
-        body: (reportData.operators || []).map((o) => [
-          o.name,
-          o.inspected,
-          o.rejected,
-        ]),
-        margin: { left: 10, right: 10 },
-      });
-      y = doc.lastAutoTable.finalY + 10;
-      rowBottom = y;
-      col = 0;
 
       const ms = reportData.modelSummary || {};
       addChart(
@@ -203,14 +211,15 @@ document.addEventListener('DOMContentLoaded', () => {
           `Models >20 false calls: ${ms.over20?.join(', ') || 'None'}`,
         ],
         [255, 165, 0],
+        {
+          head: [['Model Name', 'Avg False Calls']],
+          body: (reportData.problemAssemblies || []).map((m) => [
+            m.name,
+            m.falseCalls,
+          ]),
+        },
         true
       );
-      doc.autoTable({
-        startY: y,
-        head: [['Model Name', 'Avg False Calls']],
-        body: (reportData.problemAssemblies || []).map((m) => [m.name, m.falseCalls]),
-      });
-      y = doc.lastAutoTable.finalY + 10;
 
       doc.save('integrated-report.pdf');
     } else if (format === 'xlsx') {
