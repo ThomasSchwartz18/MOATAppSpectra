@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const downloadBtn = document.getElementById('download-report');
   const formatSelect = document.getElementById('file-format');
   let reportData = null;
-  let yieldChart, operatorChart, modelChart, fcVsNgChart;
+  let yieldChart, operatorChart, modelChart, fcVsNgChart, fcNgRatioChart;
 
   if (downloadControls) downloadControls.style.display = 'none';
 
@@ -243,6 +243,29 @@ document.addEventListener('DOMContentLoaded', () => {
         true
       );
 
+      const nr = reportData.fcNgRatioSummary || {};
+      addChart(
+        'fcNgRatioChart',
+        'False Call/NG Ratio',
+        [
+          `Date range: ${reportData.start} - ${reportData.end}`,
+          `Top ratios: ${(nr.top || [])
+            .map((m) => `${m.name} (${m.ratio.toFixed(2)})`)
+            .join(', ') || 'None'}`,
+        ],
+        [0, 128, 128],
+        {
+          head: [['Model', 'FC Parts', 'NG Parts', 'FC/NG']],
+          body: (reportData.fcNgRatio?.models || []).map((m, i) => [
+            m,
+            reportData.fcNgRatio?.fcParts?.[i]?.toFixed(1) ?? 0,
+            reportData.fcNgRatio?.ngParts?.[i]?.toFixed(1) ?? 0,
+            reportData.fcNgRatio?.ratios?.[i]?.toFixed(2) ?? 0,
+          ]),
+        },
+        true
+      );
+
       doc.save('integrated-report.pdf');
     } else if (format === 'xlsx') {
       const wb = XLSX.utils.book_new();
@@ -409,6 +432,19 @@ document.addEventListener('DOMContentLoaded', () => {
           : 'decreased'
         : 'stable';
     data.fcVsNgSummary = { correlation: corr, fcTrend };
+
+    const ratioData = data.fcNgRatio || {};
+    const rModels = ratioData.models || [];
+    const rRatios =
+      ratioData.ratios ||
+      rModels.map((_, i) => {
+        const fcPart = ratioData.fcParts?.[i] || 0;
+        const ngPart = ratioData.ngParts?.[i] || 0;
+        return ngPart ? fcPart / ngPart : 0;
+      });
+    const pairs = rModels.map((m, i) => ({ name: m, ratio: rRatios[i] }));
+    pairs.sort((a, b) => b.ratio - a.ratio);
+    data.fcNgRatioSummary = { top: pairs.slice(0, 3) };
   }
 
   function renderCharts(data) {
@@ -422,6 +458,8 @@ document.addEventListener('DOMContentLoaded', () => {
       problemAssemblies,
       fcVsNgRate,
       fcVsNgSummary,
+      fcNgRatio,
+      fcNgRatioSummary,
       start,
       end,
     } = data;
@@ -430,6 +468,7 @@ document.addEventListener('DOMContentLoaded', () => {
     operatorChart?.destroy();
     modelChart?.destroy();
     fcVsNgChart?.destroy();
+    fcNgRatioChart?.destroy();
 
     const yieldCanvas = document.getElementById('yieldTrendChart');
     yieldCanvas.width = 800;
@@ -663,6 +702,50 @@ document.addEventListener('DOMContentLoaded', () => {
       fcTbody.appendChild(tr);
     });
     fcTable.style.display = (fcVsNgRate?.dates || []).length ? 'table' : 'none';
+
+    const ratioCanvas = document.getElementById('fcNgRatioChart');
+    ratioCanvas.width = 800;
+    ratioCanvas.height = 400;
+    const ratioCtx = ratioCanvas.getContext('2d');
+    fcNgRatioChart = new Chart(ratioCtx, {
+      type: 'bar',
+      data: {
+        labels: fcNgRatio?.models || [],
+        datasets: [
+          {
+            label: 'FC/NG Ratio',
+            data: fcNgRatio?.ratios || [],
+            backgroundColor: 'teal',
+          },
+        ],
+      },
+    });
+    const nr = fcNgRatioSummary || {};
+    const ratioDesc = document.getElementById('fcNgRatioDesc');
+    ratioDesc.style.whiteSpace = 'pre-line';
+    ratioDesc.textContent =
+      `Date range: ${start} - ${end}\n` +
+      `Top ratios: ${(nr.top || [])
+        .map((m) => `${m.name} (${m.ratio.toFixed(2)})`)
+        .join(', ') || 'None'}`;
+
+    const ratioTable = document.getElementById('fcNgRatioTable');
+    const ratioTbody = ratioTable.querySelector('tbody');
+    ratioTbody.innerHTML = '';
+    (fcNgRatio?.models || []).forEach((m, i) => {
+      const tr = document.createElement('tr');
+      const modelTd = document.createElement('td');
+      modelTd.textContent = m;
+      const fcTd = document.createElement('td');
+      fcTd.textContent = (fcNgRatio.fcParts?.[i] ?? 0).toFixed(1);
+      const ngTd = document.createElement('td');
+      ngTd.textContent = (fcNgRatio.ngParts?.[i] ?? 0).toFixed(1);
+      const ratioTd = document.createElement('td');
+      ratioTd.textContent = (fcNgRatio.ratios?.[i] ?? 0).toFixed(2);
+      tr.append(modelTd, fcTd, ngTd, ratioTd);
+      ratioTbody.appendChild(tr);
+    });
+    ratioTable.style.display = (fcNgRatio?.models || []).length ? 'table' : 'none';
   }
 });
 
