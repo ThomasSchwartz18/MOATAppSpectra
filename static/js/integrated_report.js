@@ -27,7 +27,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .catch(() => alert('Failed to run report.'));
   });
 
-  downloadBtn?.addEventListener('click', () => {
+  downloadBtn?.addEventListener('click', async () => {
     if (!reportData) {
       alert('Run the report first.');
       return;
@@ -41,230 +41,153 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       const doc = new jsPDF();
       const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      doc.text('Integrated Report', 10, 10);
-      // Track current position and column for two-column layout
-      let y = 20;
-      let col = 0;
-      let rowBottom = 20;
-      const chartWidth = (pageWidth - 30) / 2;
 
-      const addChart = (
-        canvasId,
-        title,
-        lines,
-        color,
-        table,
-        fullWidth = false
-      ) => {
-        const defaultSize = doc.getFontSize();
-        const lineHeight = 5;
-        const padding = 1;
-        const width = fullWidth ? pageWidth - 20 : chartWidth;
-        const height = width / 3;
-
-        if (fullWidth && col === 1) {
-          y = Math.max(rowBottom, y) + 10;
-          col = 0;
-          rowBottom = y;
-        }
-
-        doc.setFontSize(10);
-        const processed = lines.map((line) => {
-          const textLines = doc.splitTextToSize(line, width - 4);
-          return {
-            textLines,
-            height: textLines.length * lineHeight + padding * 2,
-          };
+      const loadImage = (url) =>
+        new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = reject;
+          img.src = url;
         });
-        doc.setFontSize(defaultSize);
-        const descHeight = 6 + processed.reduce((a, l) => a + l.height, 0);
-        const blockHeightEstimate = 10 + height + 5 + descHeight + 10;
-        if (y + blockHeightEstimate > pageHeight) {
-          doc.addPage();
-          y = 20;
-          col = 0;
-          rowBottom = 20;
-        }
-        const x = fullWidth ? 10 : 10 + col * (chartWidth + 10);
 
-        // header
-        doc.setFillColor(...color);
-        doc.rect(x, y, width, 8, 'F');
-        doc.setTextColor(255, 255, 255);
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(defaultSize);
-        doc.text(title, x + 4, y + 5);
-        let innerY = y + 10;
+      // Title page
+      const logo = await loadImage('/static/images/company-logo.png');
+      doc.addImage(logo, 'PNG', (pageWidth - 40) / 2, 20, 40, 20);
+      doc.setFontSize(18);
+      doc.text('Integrated Report', pageWidth / 2, 50, { align: 'center' });
+      doc.setFontSize(12);
+      doc.text(
+        `${reportData.start} - ${reportData.end}`,
+        pageWidth / 2,
+        60,
+        { align: 'center' }
+      );
 
-        // chart box
-        doc.setTextColor(0, 0, 0);
-        doc.setDrawColor(0);
-        doc.rect(x, innerY, width, height);
-        const canvas = document.getElementById(canvasId);
-        const img = canvas.toDataURL('image/png');
-        doc.addImage(img, 'PNG', x + 2, innerY + 2, width - 4, height - 4);
-        innerY += height + 5;
+      const chartConfigs = [
+        { title: 'Yield Trend' },
+        { title: 'Operator Reject Rate' },
+        { title: 'Model False Calls' },
+        { title: 'False Call vs NG Rate' },
+        { title: 'False Call/NG Ratio' },
+      ];
 
-        // description header
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(defaultSize);
-        doc.text(title, x + 2, innerY);
-        innerY += 6;
+      let listY = 70;
+      doc.setFontSize(10);
+      chartConfigs.forEach((c) => {
+        doc.text(c.title, pageWidth / 2, listY, { align: 'center' });
+        listY += 6;
+      });
 
-        // description lines with alternating bands
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(10);
-        processed.forEach((line, i) => {
-          doc.setFillColor(i % 2 === 0 ? 240 : 255);
-          doc.rect(x, innerY, width, line.height, 'F');
-          doc.text(line.textLines, x + 2, innerY + lineHeight + padding);
-          innerY += line.height;
-        });
-        doc.setFontSize(defaultSize);
-
-        // table if provided
-        let blockBottom = innerY;
-        if (table) {
-          doc.autoTable({
-            startY: innerY,
-            head: table.head,
-            body: table.body,
-            margin: { left: x, right: pageWidth - x - width },
-            tableWidth: width,
-            headStyles: { fillColor: color },
-          });
-          blockBottom = doc.lastAutoTable.finalY;
-        }
-
-        // Surround block with border
-        doc.setDrawColor(0);
-        doc.rect(x, y, width, blockBottom - y);
-
-        if (fullWidth) {
-          col = 0;
-          y = blockBottom + 10;
-          rowBottom = y;
-        } else if (col === 0) {
-          col = 1;
-          rowBottom = blockBottom;
-        } else {
-          col = 0;
-          y = Math.max(rowBottom, blockBottom) + 10;
-          rowBottom = y;
-        }
+      // Definitions with data for each chart
+      const yd = reportData.yieldSummary || {};
+      chartConfigs[0].canvasId = 'yieldTrendChart';
+      chartConfigs[0].lines = [
+        `Date range: ${reportData.start} - ${reportData.end}`,
+        `Average: ${yd.avg?.toFixed(1) ?? '0'}%`,
+        `Worst day: ${yd.worstDay?.date || 'N/A'} (${yd.worstDay?.yield?.toFixed(1) ?? '0'}%)`,
+        `Worst assembly: ${
+          yd.worstAssembly?.assembly || 'N/A'
+        } (${yd.worstAssembly?.yield?.toFixed(1) ?? '0'}%)`,
+      ];
+      chartConfigs[0].table = {
+        head: [['Date', 'Yield %']],
+        body: (reportData.yieldData.dates || []).map((d, i) => [
+          d,
+          (reportData.yieldData.yields[i] ?? 0).toFixed(1),
+        ]),
       };
 
-      const yd = reportData.yieldSummary || {};
-      addChart(
-        'yieldTrendChart',
-        'Yield Trend',
-        [
-          `Date range: ${reportData.start} - ${reportData.end}`,
-          `Average: ${yd.avg?.toFixed(1) ?? '0'}%`,
-          `Worst day: ${yd.worstDay?.date || 'N/A'} (${yd.worstDay?.yield?.toFixed(1) ?? '0'}%)`,
-          `Worst assembly: ${
-            yd.worstAssembly?.assembly || 'N/A'
-          } (${yd.worstAssembly?.yield?.toFixed(1) ?? '0'}%)`,
-        ],
-        [0, 123, 255],
-        {
-          head: [['Date', 'Yield %']],
-          body: (reportData.yieldData.dates || []).map((d, i) => [
-            d,
-            (reportData.yieldData.yields[i] ?? 0).toFixed(1),
-          ]),
-        },
-        true
-      );
-
       const os = reportData.operatorSummary || {};
-      addChart(
-        'operatorRejectChart',
-        'Operator Reject Rate',
-        [
-          `Date range: ${reportData.start} - ${reportData.end}`,
-          `Total boards: ${os.totalBoards ?? 0}`,
-          `Avg reject rate: ${os.avgRate?.toFixed(2) ?? '0'}%`,
-          `Best: ${os.min?.name || 'N/A'} (${os.min?.rate?.toFixed(2) ?? '0'}%)`,
-          `Worst: ${os.max?.name || 'N/A'} (${os.max?.rate?.toFixed(2) ?? '0'}%)`,
-        ],
-        [0, 200, 0],
-        {
-          head: [['Operator', 'Inspected', 'Rejected', 'Reject %']],
-          body: (reportData.operators || []).map((o) => [
-            o.name,
-            o.inspected,
-            o.rejected,
-            o.rate?.toFixed(2),
-          ]),
-        },
-        true
-      );
+      chartConfigs[1].canvasId = 'operatorRejectChart';
+      chartConfigs[1].lines = [
+        `Date range: ${reportData.start} - ${reportData.end}`,
+        `Total boards: ${os.totalBoards ?? 0}`,
+        `Avg reject rate: ${os.avgRate?.toFixed(2) ?? '0'}%`,
+        `Best: ${os.min?.name || 'N/A'} (${os.min?.rate?.toFixed(2) ?? '0'}%)`,
+        `Worst: ${os.max?.name || 'N/A'} (${os.max?.rate?.toFixed(2) ?? '0'}%)`,
+      ];
+      chartConfigs[1].table = {
+        head: [['Operator', 'Inspected', 'Rejected', 'Reject %']],
+        body: (reportData.operators || []).map((o) => [
+          o.name,
+          o.inspected,
+          o.rejected,
+          o.rate?.toFixed(2),
+        ]),
+      };
 
       const ms = reportData.modelSummary || {};
-      addChart(
-        'modelFalseCallsChart',
-        'Model False Calls',
-        [
-          `Date range: ${reportData.start} - ${reportData.end}`,
-          `Avg false calls/board: ${ms.avgFalseCalls?.toFixed(2) ?? '0'}`,
-          `Models >20 false calls: ${ms.over20?.join(', ') || 'None'}`,
-        ],
-        [255, 165, 0],
-        {
-          head: [['Model Name', 'Avg False Calls']],
-          body: (reportData.problemAssemblies || []).map((m) => [
-            m.name,
-            m.falseCalls,
-          ]),
-        },
-        true
-      );
+      chartConfigs[2].canvasId = 'modelFalseCallsChart';
+      chartConfigs[2].lines = [
+        `Date range: ${reportData.start} - ${reportData.end}`,
+        `Avg false calls/board: ${ms.avgFalseCalls?.toFixed(2) ?? '0'}`,
+        `Models >20 false calls: ${ms.over20?.join(', ') || 'None'}`,
+      ];
+      chartConfigs[2].table = {
+        head: [['Model Name', 'Avg False Calls']],
+        body: (reportData.problemAssemblies || []).map((m) => [
+          m.name,
+          m.falseCalls,
+        ]),
+      };
 
       const fr = reportData.fcVsNgSummary || {};
-      addChart(
-        'fcVsNgRateChart',
-        'False Call vs NG Rate',
-        [
-          `Date range: ${reportData.start} - ${reportData.end}`,
-          `Correlation: ${fr.correlation?.toFixed(2) ?? '0'}`,
-          `False call rate has ${fr.fcTrend} over period`,
-        ],
-        [128, 0, 128],
-        {
-          head: [['Date', 'NG PPM', 'FalseCall PPM']],
-          body: (reportData.fcVsNgRate?.dates || []).map((d, i) => [
-            d,
-            reportData.fcVsNgRate?.ngPpm[i]?.toFixed(1) ?? 0,
-            reportData.fcVsNgRate?.fcPpm[i]?.toFixed(1) ?? 0,
-          ]),
-        },
-        true
-      );
+      chartConfigs[3].canvasId = 'fcVsNgRateChart';
+      chartConfigs[3].lines = [
+        `Date range: ${reportData.start} - ${reportData.end}`,
+        `Correlation: ${fr.correlation?.toFixed(2) ?? '0'}`,
+        `False call rate has ${fr.fcTrend} over period`,
+      ];
+      chartConfigs[3].table = {
+        head: [['Date', 'NG PPM', 'FalseCall PPM']],
+        body: (reportData.fcVsNgRate?.dates || []).map((d, i) => [
+          d,
+          reportData.fcVsNgRate?.ngPpm[i]?.toFixed(1) ?? 0,
+          reportData.fcVsNgRate?.fcPpm[i]?.toFixed(1) ?? 0,
+        ]),
+      };
 
       const nr = reportData.fcNgRatioSummary || {};
-      addChart(
-        'fcNgRatioChart',
-        'False Call/NG Ratio',
-        [
-          `Date range: ${reportData.start} - ${reportData.end}`,
-          `Top ratios: ${(nr.top || [])
-            .map((m) => `${m.name} (${m.ratio.toFixed(2)})`)
-            .join(', ') || 'None'}`,
-        ],
-        [0, 128, 128],
-        {
-          head: [['Model', 'FC Parts', 'NG Parts', 'FC/NG']],
-          body: (reportData.fcNgRatio?.models || []).map((m, i) => [
-            m,
-            reportData.fcNgRatio?.fcParts?.[i]?.toFixed(1) ?? 0,
-            reportData.fcNgRatio?.ngParts?.[i]?.toFixed(1) ?? 0,
-            reportData.fcNgRatio?.ratios?.[i]?.toFixed(2) ?? 0,
-          ]),
-        },
-        true
-      );
+      chartConfigs[4].canvasId = 'fcNgRatioChart';
+      chartConfigs[4].lines = [
+        `Date range: ${reportData.start} - ${reportData.end}`,
+        `Top ratios: ${(nr.top || [])
+          .map((m) => `${m.name} (${m.ratio.toFixed(2)})`)
+          .join(', ') || 'None'}`,
+      ];
+      chartConfigs[4].table = {
+        head: [['Model', 'FC Parts', 'NG Parts', 'FC/NG']],
+        body: (reportData.fcNgRatio?.models || []).map((m, i) => [
+          m,
+          reportData.fcNgRatio?.fcParts?.[i]?.toFixed(1) ?? 0,
+          reportData.fcNgRatio?.ngParts?.[i]?.toFixed(1) ?? 0,
+          reportData.fcNgRatio?.ratios?.[i]?.toFixed(2) ?? 0,
+        ]),
+      };
+
+      // Render each chart on its own page
+      chartConfigs.forEach((cfg) => {
+        doc.addPage();
+        doc.setFontSize(16);
+        doc.text(cfg.title, pageWidth / 2, 20, { align: 'center' });
+
+        const canvas = document.getElementById(cfg.canvasId);
+        const img = canvas.toDataURL('image/png');
+        const imgWidth = pageWidth - 20;
+        const imgHeight = imgWidth / 3;
+        doc.addImage(img, 'PNG', 10, 30, imgWidth, imgHeight);
+
+        let y = 35 + imgHeight;
+        doc.setFontSize(10);
+        cfg.lines.forEach((line) => {
+          doc.text(line, 10, y);
+          y += 5;
+        });
+
+        if (cfg.table) {
+          doc.autoTable({ startY: y + 2, head: cfg.table.head, body: cfg.table.body });
+        }
+      });
 
       doc.save('integrated-report.pdf');
     } else if (format === 'xlsx') {
