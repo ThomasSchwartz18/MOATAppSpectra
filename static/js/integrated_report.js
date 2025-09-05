@@ -147,7 +147,8 @@ document.addEventListener('DOMContentLoaded', () => {
             yd.worstAssembly?.assembly || 'N/A'
           } (${yd.worstAssembly?.yield?.toFixed(1) ?? '0'}%)`,
         ],
-        [0, 123, 255]
+        [0, 123, 255],
+        true
       );
 
       doc.autoTable({
