@@ -510,6 +510,14 @@ document.addEventListener('DOMContentLoaded', () => {
           },
         ],
       },
+      options: {
+        scales: {
+          x: {
+            ticks: { display: false },
+            grid: { display: false },
+          },
+        },
+      },
     });
     const ms = modelSummary || {};
     const mDesc = document.getElementById('modelFalseCallsDesc');
