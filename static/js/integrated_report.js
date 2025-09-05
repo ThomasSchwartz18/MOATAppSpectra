@@ -4,7 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const downloadBtn = document.getElementById('download-report');
   const formatSelect = document.getElementById('file-format');
   let reportData = null;
-  let yieldChart, operatorChart, modelChart;
+  let yieldChart, operatorChart, modelChart, fcVsNgChart;
 
   if (downloadControls) downloadControls.style.display = 'none';
 
@@ -222,6 +222,27 @@ document.addEventListener('DOMContentLoaded', () => {
         true
       );
 
+      const fr = reportData.fcVsNgSummary || {};
+      addChart(
+        'fcVsNgRateChart',
+        'False Call vs NG Rate',
+        [
+          `Date range: ${reportData.start} - ${reportData.end}`,
+          `Correlation: ${fr.correlation?.toFixed(2) ?? '0'}`,
+          `False call rate has ${fr.fcTrend} over period`,
+        ],
+        [128, 0, 128],
+        {
+          head: [['Date', 'NG PPM', 'FalseCall PPM']],
+          body: (reportData.fcVsNgRate?.dates || []).map((d, i) => [
+            d,
+            reportData.fcVsNgRate?.ngPpm[i]?.toFixed(1) ?? 0,
+            reportData.fcVsNgRate?.fcPpm[i]?.toFixed(1) ?? 0,
+          ]),
+        },
+        true
+      );
+
       doc.save('integrated-report.pdf');
     } else if (format === 'xlsx') {
       const wb = XLSX.utils.book_new();
@@ -359,6 +380,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const over20 = problemAssemblies.map((m) => m.name);
     data.modelSummary = { avgFalseCalls: avgFc, over20 };
     data.problemAssemblies = problemAssemblies;
+
+    const fc = data.fcVsNgRate || {};
+    const ngVals = fc.ngPpm || [];
+    const fcVals = fc.fcPpm || [];
+    const n = Math.min(ngVals.length, fcVals.length);
+    let corr = 0;
+    if (n > 1) {
+      const avgNg = ngVals.reduce((a, b) => a + b, 0) / n;
+      const avgFc = fcVals.reduce((a, b) => a + b, 0) / n;
+      let num = 0;
+      let denNg = 0;
+      let denFc = 0;
+      for (let i = 0; i < n; i += 1) {
+        const x = ngVals[i] - avgNg;
+        const y = fcVals[i] - avgFc;
+        num += x * y;
+        denNg += x * x;
+        denFc += y * y;
+      }
+      const den = Math.sqrt(denNg * denFc);
+      corr = den ? num / den : 0;
+    }
+    const fcTrend =
+      fcVals.length > 1
+        ? fcVals[0] < fcVals[fcVals.length - 1]
+          ? 'increased'
+          : 'decreased'
+        : 'stable';
+    data.fcVsNgSummary = { correlation: corr, fcTrend };
   }
 
   function renderCharts(data) {
@@ -370,6 +420,8 @@ document.addEventListener('DOMContentLoaded', () => {
       operatorSummary,
       modelSummary,
       problemAssemblies,
+      fcVsNgRate,
+      fcVsNgSummary,
       start,
       end,
     } = data;
@@ -377,6 +429,7 @@ document.addEventListener('DOMContentLoaded', () => {
     yieldChart?.destroy();
     operatorChart?.destroy();
     modelChart?.destroy();
+    fcVsNgChart?.destroy();
 
     const yieldCanvas = document.getElementById('yieldTrendChart');
     yieldCanvas.width = 800;
@@ -560,6 +613,56 @@ document.addEventListener('DOMContentLoaded', () => {
       tbody.appendChild(tr);
     });
     table.style.display = (problemAssemblies || []).length ? 'table' : 'none';
+
+    const fcCanvas = document.getElementById('fcVsNgRateChart');
+    fcCanvas.width = 800;
+    fcCanvas.height = 400;
+    const fcCtx = fcCanvas.getContext('2d');
+    fcVsNgChart = new Chart(fcCtx, {
+      type: 'line',
+      data: {
+        labels: fcVsNgRate?.dates || [],
+        datasets: [
+          {
+            label: 'NG PPM',
+            data: fcVsNgRate?.ngPpm || [],
+            borderColor: 'red',
+            fill: false,
+          },
+          {
+            label: 'FalseCall PPM',
+            data: fcVsNgRate?.fcPpm || [],
+            borderColor: 'blue',
+            fill: false,
+          },
+        ],
+      },
+    });
+    const fr = fcVsNgSummary || {};
+    const fcDesc = document.getElementById('fcVsNgDesc');
+    fcDesc.style.whiteSpace = 'pre-line';
+    fcDesc.textContent =
+      `Date range: ${start} - ${end}\n` +
+      `Correlation (FC vs NG): ${fr.correlation?.toFixed(2) ?? '0'}\n` +
+      `False call rate has ${fr.fcTrend} over period`;
+
+    const fcTable = document.getElementById('fcVsNgRateTable');
+    const fcTbody = fcTable.querySelector('tbody');
+    fcTbody.innerHTML = '';
+    (fcVsNgRate?.dates || []).forEach((d, i) => {
+      const tr = document.createElement('tr');
+      const dateTd = document.createElement('td');
+      dateTd.textContent = d;
+      const ngTd = document.createElement('td');
+      ngTd.textContent = (fcVsNgRate?.ngPpm[i] ?? 0).toFixed(1);
+      const fcTd = document.createElement('td');
+      fcTd.textContent = (fcVsNgRate?.fcPpm[i] ?? 0).toFixed(1);
+      tr.appendChild(dateTd);
+      tr.appendChild(ngTd);
+      tr.appendChild(fcTd);
+      fcTbody.appendChild(tr);
+    });
+    fcTable.style.display = (fcVsNgRate?.dates || []).length ? 'table' : 'none';
   }
 });
 

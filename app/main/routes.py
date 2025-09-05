@@ -635,6 +635,7 @@ def api_integrated_report():
     if error:
         abort(500, description=error)
     model_group = defaultdict(lambda: {'fc': 0.0, 'boards': 0.0})
+    fc_vs_ng = defaultdict(lambda: {'ng': 0.0, 'fc': 0.0, 'parts': 0.0})
     for row in moat or []:
         dt = _parse_date(row.get('Report Date') or row.get('report_date'))
         if start and (not dt or dt < start):
@@ -653,10 +654,43 @@ def api_integrated_report():
         model_group[model]['fc'] += fc
         model_group[model]['boards'] += boards
 
+        parts = float(row.get('Total Parts') or row.get('total_parts') or 0)
+        ng_parts_val = row.get('NG Parts') or row.get('ng_parts')
+        if ng_parts_val is not None:
+            try:
+                ng_parts = float(ng_parts_val)
+            except (TypeError, ValueError):
+                ng_parts = 0.0
+        else:
+            ng_ppm_val = (
+                row.get('NG PPM')
+                or row.get('ng_ppm')
+                or row.get('NG_PPM')
+                or 0
+            )
+            try:
+                ng_ppm = float(ng_ppm_val)
+            except (TypeError, ValueError):
+                ng_ppm = 0.0
+            ng_parts = (parts * ng_ppm) / 1_000_000 if parts and ng_ppm else 0.0
+        ag = fc_vs_ng[dt]
+        ag['ng'] += ng_parts
+        ag['fc'] += fc
+        ag['parts'] += parts
+
     model_rows = []
     for model, vals in model_group.items():
         fc_per_board = (vals['fc'] / vals['boards']) if vals['boards'] else 0.0
         model_rows.append({'name': model, 'falseCalls': fc_per_board})
+
+    fc_vs_ng_dates = sorted(d for d in fc_vs_ng.keys() if d)
+    ng_ppm_series: list[float] = []
+    fc_ppm_series: list[float] = []
+    for d in fc_vs_ng_dates:
+        vals = fc_vs_ng[d]
+        parts = vals['parts']
+        ng_ppm_series.append((vals['ng'] / parts * 1_000_000) if parts else 0.0)
+        fc_ppm_series.append((vals['fc'] / parts * 1_000_000) if parts else 0.0)
 
     # --- Precompute summaries -------------------------------------------------
     if yields:
@@ -719,6 +753,11 @@ def api_integrated_report():
             },
             'operators': ops,
             'models': model_rows,
+            'fcVsNgRate': {
+                'dates': [d.isoformat() for d in fc_vs_ng_dates],
+                'ngPpm': ng_ppm_series,
+                'fcPpm': fc_ppm_series,
+            },
             'yieldSummary': yield_summary,
             'operatorSummary': operator_summary,
             'modelSummary': model_summary,
