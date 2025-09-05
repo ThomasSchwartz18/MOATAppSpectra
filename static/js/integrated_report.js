@@ -191,11 +191,12 @@ document.addEventListener('DOMContentLoaded', () => {
         ],
         [0, 200, 0],
         {
-          head: [['Operator', 'Inspected', 'Rejected']],
+          head: [['Operator', 'Inspected', 'Rejected', 'Reject %']],
           body: (reportData.operators || []).map((o) => [
             o.name,
             o.inspected,
             o.rejected,
+            o.rate?.toFixed(2),
           ]),
         },
         true
@@ -266,12 +267,17 @@ document.addEventListener('DOMContentLoaded', () => {
       );
       XLSX.utils.sheet_add_aoa(
         ws,
-        [['Operator', 'Inspected', 'Rejected']],
+        [['Operator', 'Inspected', 'Rejected', 'Reject %']],
         { origin: `A${row + 2}` }
       );
       XLSX.utils.sheet_add_aoa(
         ws,
-        reportData.operators.map((o) => [o.name, o.inspected, o.rejected]),
+        reportData.operators.map((o) => [
+          o.name,
+          o.inspected,
+          o.rejected,
+          o.rate?.toFixed(2),
+        ]),
         { origin: `A${row + 3}` }
       );
       row += reportData.operators.length + 6;
@@ -457,9 +463,12 @@ document.addEventListener('DOMContentLoaded', () => {
       inspTd.textContent = op.inspected;
       const rejTd = document.createElement('td');
       rejTd.textContent = op.rejected;
+      const rateTd = document.createElement('td');
+      rateTd.textContent = `${op.rate?.toFixed(2) ?? '0.00'}%`;
       tr.appendChild(nameTd);
       tr.appendChild(inspTd);
       tr.appendChild(rejTd);
+      tr.appendChild(rateTd);
       oTbody.appendChild(tr);
     });
     oTable.style.display = (operators || []).length ? 'table' : 'none';
