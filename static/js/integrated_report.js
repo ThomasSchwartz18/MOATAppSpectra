@@ -1,6 +1,9 @@
 document.addEventListener('DOMContentLoaded', () => {
+  let pdfDoc;
   const runBtn = document.getElementById('run-report');
   const preview = document.getElementById('report-preview');
+  const pdfFrame = document.getElementById('pdf-preview');
+
   runBtn?.addEventListener('click', () => {
     const start = document.getElementById('start-date').value;
     const end = document.getElementById('end-date').value;
@@ -79,13 +82,24 @@ document.addEventListener('DOMContentLoaded', () => {
       tbody.appendChild(tr);
     });
     table.style.display = problem.length ? 'table' : 'none';
+
+    const { jsPDF } = window.jspdf;
+    pdfDoc = new jsPDF();
+    pdfDoc.text('Integrated Report', 10, 10);
+    const blob = pdfDoc.output('blob');
+    const url = URL.createObjectURL(blob);
+    if (pdfFrame) {
+      pdfFrame.src = url;
+      pdfFrame.style.display = 'block';
+    }
   });
 
   document.getElementById('download-pdf')?.addEventListener('click', () => {
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF();
-    pdf.text('Integrated Report', 10, 10);
-    pdf.save('integrated-report.pdf');
+    if (pdfDoc) {
+      pdfDoc.save('integrated-report.pdf');
+    } else {
+      alert('Run the report first.');
+    }
   });
 
   document.getElementById('download-xls')?.addEventListener('click', () => {
