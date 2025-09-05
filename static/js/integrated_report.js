@@ -152,6 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
       XLSX.utils.sheet_add_aoa(ws, [['Operator', 'Inspected', 'Rejected']], {
         origin: `A${row}`,
       });
+      // reportData.operators has been sorted by inspected count
       XLSX.utils.sheet_add_aoa(
         ws,
         reportData.operators.map((o) => [o.name, o.inspected, o.rejected]),
@@ -225,6 +226,8 @@ document.addEventListener('DOMContentLoaded', () => {
       ...o,
       rate: o.inspected ? (o.rejected / o.inspected) * 100 : 0,
     }));
+    // Sort operators by inspected count so charts and exports share the order
+    ops.sort((a, b) => b.inspected - a.inspected);
     data.operators = ops;
     const totalBoards = ops.reduce((a, o) => a + o.inspected, 0);
     const avgRate =
