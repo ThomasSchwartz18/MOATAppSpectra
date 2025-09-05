@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Integrated Report</h2>
+
+<div class="section-card">
+  <div class="field-row">
+    <div class="field">
+      <label for="start-date">Start Date</label>
+      <input type="date" id="start-date" />
+    </div>
+    <div class="field">
+      <label for="end-date">End Date</label>
+      <input type="date" id="end-date" />
+    </div>
+    <button type="button" id="run-report">Run</button>
+  </div>
+</div>
+
+<div id="report-preview" style="display:none; margin-top:20px;">
+  <div class="section-card">
+    <div class="section-title">True Yield</div>
+    <canvas id="yieldChart"></canvas>
+    <div id="yield-info" class="preview-info" style="white-space:pre-line;"></div>
+  </div>
+
+  <div class="section-card" style="margin-top:10px;">
+    <div class="section-title">Operator Reject Rate</div>
+    <canvas id="operatorChart"></canvas>
+    <div id="operator-info" class="preview-info" style="white-space:pre-line;"></div>
+  </div>
+
+  <div class="section-card" style="margin-top:10px;">
+    <div class="section-title">Avg False Calls per Board (by Model)</div>
+    <canvas id="falseChart"></canvas>
+    <div id="false-info" class="preview-info"></div>
+    <table id="problem-table" class="data-table" style="display:none;">
+      <thead><tr><th>Model</th><th>False Calls</th></tr></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+
+  <div class="field-row" style="margin-top:10px;">
+    <button id="download-pdf">Download PDF</button>
+    <button id="download-xls">Download XLS</button>
+    <button id="email-report">Email Report</button>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="{{ url_for('static', filename='js/integrated_report.js') }}"></script>
+{% endblock %}

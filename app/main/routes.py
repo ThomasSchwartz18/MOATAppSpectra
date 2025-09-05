@@ -546,6 +546,14 @@ def ppm_saved_queries():
     return jsonify(data), status
 
 
+@main_bp.route('/reports/integrated', methods=['GET'])
+def integrated_report():
+    """Render the Integrated Report page."""
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    return render_template('integrated_report.html', username=session.get('username'))
+
+
 @main_bp.route('/analysis/aoi/grades', methods=['GET'])
 def aoi_grades():
     """Return AOI grades computed from combined reports.
