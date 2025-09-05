@@ -171,7 +171,8 @@ document.addEventListener('DOMContentLoaded', () => {
           `Avg false calls/board: ${ms.avgFalseCalls?.toFixed(2) ?? '0'}`,
           `Models >20 false calls: ${ms.over20?.join(', ') || 'None'}`,
         ],
-        [255, 165, 0]
+        [255, 165, 0],
+        true
       );
 
       doc.save('integrated-report.pdf');
