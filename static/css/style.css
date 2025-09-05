@@ -234,6 +234,11 @@ h2 {
 .field label { font-size: 12px; }
 .field input, .field select { padding: 6px; }
 
+#download-controls {
+  display: none;
+  margin-top: 10px;
+}
+
 /* Tab styling for Chart Builder / Upload */
 .tab-bar {
   display: flex;
