@@ -16,31 +16,15 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    // --- Sample Yield Data ---
-    const yieldData = {
-      dates: ['2024-01-01', '2024-01-02', '2024-01-03'],
-      yields: [95, 90, 97],
-      assemblyYields: { ASM1: 95, ASM2: 88, ASM3: 92 },
-    };
-
-    // --- Operator Reject Rate ---
-    const operators = [
-      { name: 'Alice', inspected: 100, rejected: 5 },
-      { name: 'Bob', inspected: 120, rejected: 2 },
-      { name: 'Cara', inspected: 110, rejected: 10 },
-    ];
-
-    // --- False Calls by Model ---
-    const models = [
-      { name: 'ModelA', falseCalls: 15 },
-      { name: 'ModelB', falseCalls: 25 },
-      { name: 'ModelC', falseCalls: 5 },
-      { name: 'ModelD', falseCalls: 30 },
-    ];
-
-    reportData = { start, end, yieldData, operators, models };
-    renderCharts(reportData);
-    downloadControls.style.display = 'flex';
+    fetch(`/api/reports/integrated?start_date=${start}&end_date=${end}`)
+      .then((res) => res.json())
+      .then((data) => {
+        reportData = { ...data, start, end };
+        computeSummary(reportData);
+        renderCharts(reportData);
+        downloadControls.style.display = 'flex';
+      })
+      .catch(() => alert('Failed to run report.'));
   });
 
   downloadBtn?.addEventListener('click', () => {
@@ -155,8 +139,53 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Email sent (placeholder).');
   });
 
+  function computeSummary(data) {
+    const yields = data.yieldData.yields || [];
+    const dates = data.yieldData.dates || [];
+    const avgYield =
+      yields.reduce((a, b) => a + b, 0) / (yields.length || 1);
+    let worstIdx = 0;
+    yields.forEach((v, i) => {
+      if (v < yields[worstIdx]) worstIdx = i;
+    });
+    const worstDay = {
+      date: dates[worstIdx] || null,
+      yield: yields[worstIdx] || 0,
+    };
+    let worstAsm = { assembly: null, yield: Infinity };
+    Object.entries(data.yieldData.assemblyYields || {}).forEach(([k, v]) => {
+      if (v < worstAsm.yield) worstAsm = { assembly: k, yield: v };
+    });
+    data.yieldSummary = { avg: avgYield, worstDay, worstAssembly: worstAsm };
+
+    const ops = (data.operators || []).map((o) => ({
+      ...o,
+      rate: o.inspected ? (o.rejected / o.inspected) * 100 : 0,
+    }));
+    data.operators = ops;
+    const totalBoards = ops.reduce((a, o) => a + o.inspected, 0);
+    const avgRate =
+      ops.reduce((a, o) => a + o.rate, 0) / (ops.length || 1);
+    let minOp = ops[0] || { name: '', rate: 0 };
+    let maxOp = ops[0] || { name: '', rate: 0 };
+    ops.forEach((o) => {
+      if (o.rate < minOp.rate) minOp = o;
+      if (o.rate > maxOp.rate) maxOp = o;
+    });
+    data.operatorSummary = { totalBoards, avgRate, min: minOp, max: maxOp };
+
+    const avgFc =
+      (data.models || []).reduce((a, m) => a + m.falseCalls, 0) /
+      ((data.models || []).length || 1);
+    const over20 = (data.models || [])
+      .filter((m) => m.falseCalls > 20)
+      .map((m) => m.name);
+    data.modelSummary = { avgFalseCalls: avgFc, over20 };
+  }
+
   function renderCharts(data) {
-    const { yieldData, operators, models } = data;
+    const { yieldData, operators, models, yieldSummary, operatorSummary, modelSummary } =
+      data;
 
     yieldChart?.destroy();
     operatorChart?.destroy();
@@ -179,9 +208,11 @@ document.addEventListener('DOMContentLoaded', () => {
         ],
       },
     });
-    document.getElementById(
-      'yieldTrendDesc'
-    ).textContent = `Yield percentages from ${data.start} to ${data.end}.`;
+    const yd = yieldSummary || {};
+    document.getElementById('yieldTrendDesc').textContent =
+      `Average ${yd.avg?.toFixed(1) ?? '0'}%. ` +
+      `Worst day ${yd.worstDay?.date || 'N/A'} (${yd.worstDay?.yield?.toFixed(1) ?? '0'}%). ` +
+      `Worst assembly ${yd.worstAssembly?.assembly || 'N/A'} (${yd.worstAssembly?.yield?.toFixed(1) ?? '0'}%).`;
 
     const operatorCtx = document
       .getElementById('operatorRejectChart')
@@ -204,8 +235,12 @@ document.addEventListener('DOMContentLoaded', () => {
         },
       },
     });
+    const os = operatorSummary || {};
     document.getElementById('operatorRejectDesc').textContent =
-      'Stacked bar chart of accepted vs rejected units per operator.';
+      `Total boards ${os.totalBoards ?? 0}. Avg reject rate ${
+        os.avgRate?.toFixed(2) ?? '0'
+      }%. Min ${os.min?.name || 'N/A'} (${os.min?.rate?.toFixed(2) ?? '0'}%), ` +
+      `Max ${os.max?.name || 'N/A'} (${os.max?.rate?.toFixed(2) ?? '0'}%).`;
 
     const modelCtx = document
       .getElementById('modelFalseCallsChart')
@@ -223,8 +258,11 @@ document.addEventListener('DOMContentLoaded', () => {
         ],
       },
     });
+    const ms = modelSummary || {};
     document.getElementById('modelFalseCallsDesc').textContent =
-      'Bar chart of false calls per model.';
+      `Avg false calls/board ${ms.avgFalseCalls?.toFixed(2) ?? '0'}. Models >20: ${
+        ms.over20?.join(', ') || 'None'
+      }.`;
   }
 });
 

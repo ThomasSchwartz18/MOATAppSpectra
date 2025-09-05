@@ -546,6 +546,115 @@ def ppm_saved_queries():
     return jsonify(data), status
 
 
+@main_bp.route('/api/reports/integrated', methods=['GET'])
+def api_integrated_report():
+    """Aggregate yield, operator and false-call stats for the integrated report."""
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+
+    start = _parse_date(request.args.get('start_date'))
+    end = _parse_date(request.args.get('end_date'))
+
+    combined, error = fetch_combined_reports()
+    if error:
+        abort(500, description=error)
+
+    phrases = current_app.config.get('NON_AOI_PHRASES', [])
+    from collections import defaultdict
+
+    by_date = defaultdict(lambda: {'inspected': 0.0, 'aoi_rej': 0.0, 'fi_rej': 0.0})
+    by_assembly = defaultdict(lambda: {'inspected': 0.0, 'aoi_rej': 0.0, 'fi_rej': 0.0})
+    by_operator = defaultdict(lambda: {'inspected': 0.0, 'rejected': 0.0})
+
+    for row in combined or []:
+        dt = _parse_date(row.get('aoi_Date') or row.get('Date') or row.get('date'))
+        if start and (not dt or dt < start):
+            continue
+        if end and (not dt or dt > end):
+            continue
+
+        inspected = float(row.get('aoi_Quantity Inspected') or row.get('Quantity Inspected') or 0)
+        aoi_rej = float(row.get('aoi_Quantity Rejected') or row.get('Quantity Rejected') or 0)
+
+        fi_rej_val = row.get('fi_Quantity Rejected')
+        try:
+            fi_rej = float(fi_rej_val)
+        except (TypeError, ValueError):
+            fi_rej = 0.0
+        if fi_rej == 0.0:
+            info = row.get('fi_Additional Information') or row.get('fi_Add Info') or ''
+            fi_rej = parse_fi_rejections(info, phrases)
+
+        assembly = row.get('aoi_Assembly') or row.get('Assembly') or 'Unknown'
+        operator = row.get('aoi_Operator') or row.get('Operator') or 'Unknown'
+
+        by_date[dt]['inspected'] += inspected
+        by_date[dt]['aoi_rej'] += aoi_rej
+        by_date[dt]['fi_rej'] += fi_rej
+
+        by_assembly[assembly]['inspected'] += inspected
+        by_assembly[assembly]['aoi_rej'] += aoi_rej
+        by_assembly[assembly]['fi_rej'] += fi_rej
+
+        by_operator[operator]['inspected'] += inspected
+        by_operator[operator]['rejected'] += aoi_rej
+
+    dates = sorted(d for d in by_date.keys() if d)
+    yields = []
+    for d in dates:
+        vals = by_date[d]
+        rej = vals['aoi_rej'] + vals['fi_rej']
+        y = ((vals['inspected'] - rej) / vals['inspected'] * 100.0) if vals['inspected'] else 0.0
+        yields.append(y)
+
+    assembly_yields = {}
+    for asm, vals in by_assembly.items():
+        rej = vals['aoi_rej'] + vals['fi_rej']
+        assembly_yields[asm] = ((vals['inspected'] - rej) / vals['inspected'] * 100.0) if vals['inspected'] else 0.0
+
+    operator_rows = [
+        {
+            'name': op,
+            'inspected': vals['inspected'],
+            'rejected': vals['rejected'],
+        }
+        for op, vals in by_operator.items()
+    ]
+
+    moat, error = fetch_moat()
+    if error:
+        abort(500, description=error)
+    model_group = defaultdict(lambda: {'fc': 0.0, 'boards': 0.0})
+    for row in moat or []:
+        dt = _parse_date(row.get('Report Date') or row.get('report_date'))
+        if start and (not dt or dt < start):
+            continue
+        if end and (not dt or dt > end):
+            continue
+        model = row.get('Model') or row.get('model') or 'Unknown'
+        fc = float(row.get('FalseCall Parts') or row.get('falsecall_parts') or 0)
+        boards = float(row.get('Total Boards') or row.get('total_boards') or 0)
+        model_group[model]['fc'] += fc
+        model_group[model]['boards'] += boards
+
+    model_rows = []
+    for model, vals in model_group.items():
+        fc_per_board = (vals['fc'] / vals['boards']) if vals['boards'] else 0.0
+        model_rows.append({'name': model, 'falseCalls': fc_per_board})
+
+    return jsonify(
+        {
+            'yieldData': {
+                'dates': [d.isoformat() for d in dates],
+                'yields': yields,
+                'assemblyYields': assembly_yields,
+            },
+            'operators': operator_rows,
+            'models': model_rows,
+        }
+    )
+
+
 @main_bp.route('/reports/integrated', methods=['GET'])
 def integrated_report():
     """Render the Integrated Report page."""
