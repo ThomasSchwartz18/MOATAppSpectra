@@ -178,6 +178,20 @@ document.addEventListener('DOMContentLoaded', () => {
         true
       );
 
+      doc.autoTable({
+        startY: y,
+        head: [['Operator', 'Inspected', 'Rejected']],
+        body: (reportData.operators || []).map((o) => [
+          o.name,
+          o.inspected,
+          o.rejected,
+        ]),
+        margin: { left: 10, right: 10 },
+      });
+      y = doc.lastAutoTable.finalY + 10;
+      rowBottom = y;
+      col = 0;
+
       const ms = reportData.modelSummary || {};
       addChart(
         'modelFalseCallsChart',
