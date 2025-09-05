@@ -636,7 +636,16 @@ function resolveColumns(rows) {
   };
 }
 
-function uniqueSorted(arr) { return Array.from(new Set(arr.filter((x)=>x!=null && x!==''))).sort(); }
+function uniqueSorted(arr) {
+  const map = new Map();
+  arr.forEach((v) => {
+    if (v != null && v !== '') {
+      const key = String(v).toLowerCase();
+      if (!map.has(key)) map.set(key, v);
+    }
+  });
+  return Array.from(map.values()).sort((a, b) => a.localeCompare(b));
+}
 
 function initFiltersUI() {
   fetch('/moat')

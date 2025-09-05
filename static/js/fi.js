@@ -7,7 +7,14 @@ let operatorOptions = [];
 let activePreset = null;
 
 function uniqueSorted(arr) {
-  return Array.from(new Set(arr.filter((x) => x != null && x !== ''))).sort();
+  const map = new Map();
+  arr.forEach((v) => {
+    if (v != null && v !== '') {
+      const key = String(v).toLowerCase();
+      if (!map.has(key)) map.set(key, v);
+    }
+  });
+  return Array.from(map.values()).sort((a, b) => a.localeCompare(b));
 }
 
 function populateDynamicSelect(wrapperId, className, options, values = []) {
