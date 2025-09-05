@@ -365,15 +365,54 @@ document.addEventListener('DOMContentLoaded', () => {
     modelCanvas.width = 800;
     modelCanvas.height = 400;
     const modelCtx = modelCanvas.getContext('2d');
+
+    // Calculate control limits for false calls by model
+    const falseCalls = models.map((m) => m.falseCalls);
+    const mean =
+      falseCalls.reduce((sum, v) => sum + v, 0) / (falseCalls.length || 1);
+    const stdDev = Math.sqrt(
+      falseCalls.reduce((sum, v) => sum + Math.pow(v - mean, 2), 0) /
+        (falseCalls.length || 1)
+    );
+    const upperCL = mean + 3 * stdDev;
+    const lowerCL = Math.max(mean - 3 * stdDev, 0);
+
     modelChart = new Chart(modelCtx, {
-      type: 'bar',
+      type: 'line',
       data: {
         labels: models.map((m) => m.name),
         datasets: [
           {
             label: 'False Calls',
-            data: models.map((m) => m.falseCalls),
+            data: falseCalls,
+            borderColor: 'orange',
             backgroundColor: 'orange',
+            tension: 0,
+            fill: false,
+          },
+          {
+            label: 'Mean',
+            data: Array(falseCalls.length).fill(mean),
+            borderColor: 'blue',
+            borderDash: [5, 5],
+            pointRadius: 0,
+            fill: false,
+          },
+          {
+            label: '+3σ',
+            data: Array(falseCalls.length).fill(upperCL),
+            borderColor: 'green',
+            borderDash: [5, 5],
+            pointRadius: 0,
+            fill: false,
+          },
+          {
+            label: '-3σ',
+            data: Array(falseCalls.length).fill(lowerCL),
+            borderColor: 'red',
+            borderDash: [5, 5],
+            pointRadius: 0,
+            fill: false,
           },
         ],
       },
@@ -384,6 +423,7 @@ document.addEventListener('DOMContentLoaded', () => {
     mDesc.textContent =
       `Date range: ${start} - ${end}\n` +
       `Average false calls/board: ${ms.avgFalseCalls?.toFixed(2) ?? '0'}\n` +
+      `Line chart shows mean and ±3σ control limits; models outside may need review.\n` +
       `Problem assemblies (>20 false calls/board): ${ms.over20?.join(', ') || 'None'}`;
 
     const table = document.getElementById('problem-assemblies');
