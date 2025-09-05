@@ -636,6 +636,7 @@ def api_integrated_report():
         abort(500, description=error)
     model_group = defaultdict(lambda: {'fc': 0.0, 'boards': 0.0})
     fc_vs_ng = defaultdict(lambda: {'ng': 0.0, 'fc': 0.0, 'parts': 0.0})
+    fc_ng_ratio = defaultdict(lambda: {'fc': 0.0, 'ng': 0.0})
     for row in moat or []:
         dt = _parse_date(row.get('Report Date') or row.get('report_date'))
         if start and (not dt or dt < start):
@@ -678,10 +679,23 @@ def api_integrated_report():
         ag['fc'] += fc
         ag['parts'] += parts
 
+        fc_ng_ratio[model]['fc'] += fc
+        fc_ng_ratio[model]['ng'] += ng_parts
+
     model_rows = []
     for model, vals in model_group.items():
         fc_per_board = (vals['fc'] / vals['boards']) if vals['boards'] else 0.0
         model_rows.append({'name': model, 'falseCalls': fc_per_board})
+
+    fc_ng_models = []
+    fc_ng_fc_parts: list[float] = []
+    fc_ng_ng_parts: list[float] = []
+    fc_ng_ratios: list[float] = []
+    for model, vals in fc_ng_ratio.items():
+        fc_ng_models.append(model)
+        fc_ng_fc_parts.append(vals['fc'])
+        fc_ng_ng_parts.append(vals['ng'])
+        fc_ng_ratios.append((vals['fc'] / vals['ng']) if vals['ng'] else 0.0)
 
     fc_vs_ng_dates = sorted(d for d in fc_vs_ng.keys() if d)
     ng_ppm_series: list[float] = []
@@ -757,6 +771,12 @@ def api_integrated_report():
                 'dates': [d.isoformat() for d in fc_vs_ng_dates],
                 'ngPpm': ng_ppm_series,
                 'fcPpm': fc_ppm_series,
+            },
+            'fcNgRatio': {
+                'models': fc_ng_models,
+                'fcParts': fc_ng_fc_parts,
+                'ngParts': fc_ng_ng_parts,
+                'ratios': fc_ng_ratios,
             },
             'yieldSummary': yield_summary,
             'operatorSummary': operator_summary,
