@@ -13,6 +13,7 @@ from functools import wraps
 import csv
 import io
 import os
+import re
 from datetime import datetime, date
 from openpyxl import load_workbook
 import xlrd
@@ -234,11 +235,20 @@ def upload_ppm_reports():
         abort(400, description='No file provided')
 
     base = os.path.splitext(os.path.basename(uploaded.filename))[0]
-    parts = base.split()
-    if len(parts) < 3:
-        abort(400, description='Filename must be "PPMReportControl YYYY-MM-DD LX"')
-    report_date = parts[1]
-    line = parts[2]
+    m = re.match(
+        r"^PPMReportControl\s+(\d{4}-\d{2}-\d{2})(?:\s+to\s+(\d{4}-\d{2}-\d{2}))?\s+(L\w+)$",
+        base,
+    )
+    if not m:
+        abort(
+            400,
+            description=(
+                'Filename must be "PPMReportControl YYYY-MM-DD LX" or '
+                '"PPMReportControl YYYY-MM-DD to YYYY-MM-DD LX"'
+            ),
+        )
+    start_date, end_date, line = m.groups()
+    report_date = end_date or start_date
 
     try:
         uploaded.stream.seek(0)
