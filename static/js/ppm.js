@@ -1198,7 +1198,7 @@ function downloadTableCSV() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function downloadPDF() {
+async function downloadPDF() {
   const meta = window.currentChartMeta;
   if (!meta) return;
 
@@ -1219,9 +1219,27 @@ function downloadPDF() {
 
   // eslint-disable-next-line no-undef
   const { jsPDF } = window.jspdf;
-  const pdf = new jsPDF({ orientation: 'l', unit: 'pt', format: 'letter' });
-  const pageW = pdf.internal.pageSize.getWidth();
-  const pageH = pdf.internal.pageSize.getHeight();
+  const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'letter' });
+
+  const title = document.getElementById('chart-title').value || 'Report';
+  const start = document.getElementById('start-date').value || '';
+  const end = document.getElementById('end-date').value || '';
+  const range = start || end ? `${start} to ${end}` : '';
+
+  const logo = new Image();
+  logo.src = '/static/images/company-logo.png';
+  await logo.decode();
+  const pageW = doc.internal.pageSize.getWidth();
+  doc.addImage(logo, 'PNG', (pageW - 40) / 2, 20, 40, 40);
+  doc.setFontSize(18);
+  doc.text(title, pageW / 2, 70, { align: 'center' });
+  if (range) {
+    doc.setFontSize(12);
+    doc.text(range, pageW / 2, 80, { align: 'center' });
+  }
+
+  doc.addPage();
+  const pageH = doc.internal.pageSize.getHeight();
   const margin = 36;
   const usableW = pageW - margin * 2;
   const usableH = pageH - margin * 2;
@@ -1230,9 +1248,22 @@ function downloadPDF() {
   const renderH = off.height * scale;
   const x = (pageW - renderW) / 2;
   const y = (pageH - renderH) / 2;
-  pdf.addImage(imgData, 'PNG', x, y, renderW, renderH, undefined, 'FAST');
-  const title = document.getElementById('chart-title').value || 'chart';
-  pdf.save(`${title}.pdf`);
+  doc.addImage(imgData, 'PNG', x, y, renderW, renderH, undefined, 'FAST');
+
+  doc.addPage();
+  const labels = meta.labels || currentData.labels;
+  const dataset = meta.datasets && meta.datasets[0] && Array.isArray(meta.datasets[0].data)
+    ? meta.datasets[0].data
+    : currentData.values || [];
+  const body = [];
+  (labels || []).forEach((lab, i) => {
+    const val = dataset[i];
+    body.push([lab, val?.toFixed ? val.toFixed(4) : val]);
+  });
+  // eslint-disable-next-line no-undef
+  doc.autoTable({ head: [['Label', 'Value']], body });
+
+  doc.save(`${title}.pdf`);
 
   tmpChart.destroy();
   off.remove();
