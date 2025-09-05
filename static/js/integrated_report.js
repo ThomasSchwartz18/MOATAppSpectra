@@ -127,13 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
       XLSX.utils.sheet_add_aoa(ws, [['Integrated Report']], { origin: `A${row}` });
       row += 2;
 
-      // Yield data table and chart
-      XLSX.utils.sheet_add_aoa(ws, [['Date', 'Yield %']], { origin: `A${row}` });
-      XLSX.utils.sheet_add_aoa(
-        ws,
-        reportData.yieldData.dates.map((d, i) => [d, reportData.yieldData.yields[i]]),
-        { origin: `A${row + 1}` }
-      );
+      // Yield chart, description, and table
       const yieldImg = document
         .getElementById('yieldTrendChart')
         .toDataURL('image/png');
@@ -144,20 +138,17 @@ document.addEventListener('DOMContentLoaded', () => {
       XLSX.utils.sheet_add_aoa(
         ws,
         [[document.getElementById('yieldTrendDesc').textContent]],
-        { origin: `A${row + reportData.yieldData.dates.length + 2}` }
+        { origin: `A${row}` }
+      );
+      XLSX.utils.sheet_add_aoa(ws, [['Date', 'Yield %']], { origin: `A${row + 2}` });
+      XLSX.utils.sheet_add_aoa(
+        ws,
+        reportData.yieldData.dates.map((d, i) => [d, reportData.yieldData.yields[i]]),
+        { origin: `A${row + 3}` }
       );
       row += reportData.yieldData.dates.length + 6;
 
-      // Operator reject rate table and chart
-      XLSX.utils.sheet_add_aoa(ws, [['Operator', 'Inspected', 'Rejected']], {
-        origin: `A${row}`,
-      });
-      // reportData.operators has been sorted by inspected count
-      XLSX.utils.sheet_add_aoa(
-        ws,
-        reportData.operators.map((o) => [o.name, o.inspected, o.rejected]),
-        { origin: `A${row + 1}` }
-      );
+      // Operator chart, description, and table
       const opImg = document
         .getElementById('operatorRejectChart')
         .toDataURL('image/png');
@@ -168,7 +159,17 @@ document.addEventListener('DOMContentLoaded', () => {
       XLSX.utils.sheet_add_aoa(
         ws,
         [[document.getElementById('operatorRejectDesc').textContent]],
-        { origin: `A${row + reportData.operators.length + 2}` }
+        { origin: `A${row}` }
+      );
+      XLSX.utils.sheet_add_aoa(
+        ws,
+        [['Operator', 'Inspected', 'Rejected']],
+        { origin: `A${row + 2}` }
+      );
+      XLSX.utils.sheet_add_aoa(
+        ws,
+        reportData.operators.map((o) => [o.name, o.inspected, o.rejected]),
+        { origin: `A${row + 3}` }
       );
       row += reportData.operators.length + 6;
 
@@ -295,6 +296,21 @@ document.addEventListener('DOMContentLoaded', () => {
       `Lowest yield date: ${yd.worstDay?.date || 'N/A'} (${yd.worstDay?.yield?.toFixed(1) ?? '0'}%)\n` +
       `Worst assembly: ${yd.worstAssembly?.assembly || 'N/A'} (${yd.worstAssembly?.yield?.toFixed(1) ?? '0'}%)`;
 
+    const yTable = document.getElementById('yieldTrendTable');
+    const yTbody = yTable.querySelector('tbody');
+    yTbody.innerHTML = '';
+    (yieldData.dates || []).forEach((d, i) => {
+      const tr = document.createElement('tr');
+      const dateTd = document.createElement('td');
+      dateTd.textContent = d;
+      const yieldTd = document.createElement('td');
+      yieldTd.textContent = (yieldData.yields[i] ?? 0).toFixed(1);
+      tr.appendChild(dateTd);
+      tr.appendChild(yieldTd);
+      yTbody.appendChild(tr);
+    });
+    yTable.style.display = (yieldData.dates || []).length ? 'table' : 'none';
+
     const operatorCanvas = document.getElementById('operatorRejectChart');
     operatorCanvas.width = 800;
     operatorCanvas.height = 400;
@@ -326,6 +342,24 @@ document.addEventListener('DOMContentLoaded', () => {
       `Average reject rate: ${os.avgRate?.toFixed(2) ?? '0'}%\n` +
       `Min reject rate: ${os.min?.name || 'N/A'} (${os.min?.rate?.toFixed(2) ?? '0'}%)\n` +
       `Max reject rate: ${os.max?.name || 'N/A'} (${os.max?.rate?.toFixed(2) ?? '0'}%)`;
+
+    const oTable = document.getElementById('operatorRejectTable');
+    const oTbody = oTable.querySelector('tbody');
+    oTbody.innerHTML = '';
+    (operators || []).forEach((op) => {
+      const tr = document.createElement('tr');
+      const nameTd = document.createElement('td');
+      nameTd.textContent = op.name;
+      const inspTd = document.createElement('td');
+      inspTd.textContent = op.inspected;
+      const rejTd = document.createElement('td');
+      rejTd.textContent = op.rejected;
+      tr.appendChild(nameTd);
+      tr.appendChild(inspTd);
+      tr.appendChild(rejTd);
+      oTbody.appendChild(tr);
+    });
+    oTable.style.display = (operators || []).length ? 'table' : 'none';
 
     const modelCanvas = document.getElementById('modelFalseCallsChart');
     modelCanvas.width = 800;
