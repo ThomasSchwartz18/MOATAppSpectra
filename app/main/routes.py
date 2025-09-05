@@ -642,6 +642,58 @@ def api_integrated_report():
         fc_per_board = (vals['fc'] / vals['boards']) if vals['boards'] else 0.0
         model_rows.append({'name': model, 'falseCalls': fc_per_board})
 
+    # --- Precompute summaries -------------------------------------------------
+    if yields:
+        avg_yield = sum(yields) / len(yields)
+        worst_idx = min(range(len(yields)), key=lambda i: yields[i])
+        worst_day = {
+            'date': dates[worst_idx].isoformat(),
+            'yield': yields[worst_idx],
+        }
+    else:
+        avg_yield = 0.0
+        worst_day = {'date': None, 'yield': 0.0}
+
+    if assembly_yields:
+        worst_asm = min(assembly_yields.items(), key=lambda item: item[1])
+        worst_assembly = {'assembly': worst_asm[0], 'yield': worst_asm[1]}
+    else:
+        worst_assembly = {'assembly': None, 'yield': 0.0}
+
+    yield_summary = {
+        'avg': avg_yield,
+        'worstDay': worst_day,
+        'worstAssembly': worst_assembly,
+    }
+
+    ops = []
+    for op in operator_rows:
+        inspected = op['inspected']
+        rate = (op['rejected'] / inspected * 100.0) if inspected else 0.0
+        ops.append({**op, 'rate': rate})
+
+    total_boards = sum(o['inspected'] for o in operator_rows)
+    avg_rate = sum(o['rate'] for o in ops) / len(ops) if ops else 0.0
+    if ops:
+        min_op = min(ops, key=lambda o: o['rate'])
+        max_op = max(ops, key=lambda o: o['rate'])
+    else:
+        min_op = max_op = {'name': None, 'rate': 0.0}
+
+    operator_summary = {
+        'totalBoards': total_boards,
+        'avgRate': avg_rate,
+        'min': {'name': min_op['name'], 'rate': min_op['rate']},
+        'max': {'name': max_op['name'], 'rate': max_op['rate']},
+    }
+
+    avg_fc = sum(m['falseCalls'] for m in model_rows) / len(model_rows) if model_rows else 0.0
+    problem_assemblies = [m for m in model_rows if m['falseCalls'] > 20]
+    model_summary = {
+        'avgFalseCalls': avg_fc,
+        'over20': [m['name'] for m in problem_assemblies],
+    }
+
     return jsonify(
         {
             'yieldData': {
@@ -651,6 +703,10 @@ def api_integrated_report():
             },
             'operators': operator_rows,
             'models': model_rows,
+            'yieldSummary': yield_summary,
+            'operatorSummary': operator_summary,
+            'modelSummary': model_summary,
+            'problemAssemblies': problem_assemblies,
         }
     )
 
