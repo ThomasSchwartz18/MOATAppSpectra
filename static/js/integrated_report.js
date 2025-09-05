@@ -45,15 +45,23 @@ document.addEventListener('DOMContentLoaded', () => {
       let col = 0;
       let rowBottom = 20;
       const chartWidth = (pageWidth - 30) / 2;
-      const chartHeight = chartWidth / 3;
 
-      const addChart = (canvasId, title, lines, color) => {
+      const addChart = (canvasId, title, lines, color, fullWidth = false) => {
         const defaultSize = doc.getFontSize();
         const lineHeight = 5;
         const padding = 1;
+        const width = fullWidth ? pageWidth - 20 : chartWidth;
+        const height = width / 3;
+
+        if (fullWidth && col === 1) {
+          y = Math.max(rowBottom, y) + 10;
+          col = 0;
+          rowBottom = y;
+        }
+
         doc.setFontSize(10);
         const processed = lines.map((line) => {
-          const textLines = doc.splitTextToSize(line, chartWidth - 4);
+          const textLines = doc.splitTextToSize(line, width - 4);
           return {
             textLines,
             height: textLines.length * lineHeight + padding * 2,
@@ -61,19 +69,19 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         doc.setFontSize(defaultSize);
         const descHeight = 6 + processed.reduce((a, l) => a + l.height, 0);
-        const blockHeight = 10 + chartHeight + 5 + descHeight + 10;
+        const blockHeight = 10 + height + 5 + descHeight + 10;
         if (y + blockHeight > pageHeight) {
           doc.addPage();
           y = 20;
           col = 0;
           rowBottom = 20;
         }
-        const x = 10 + col * (chartWidth + 10);
+        const x = fullWidth ? 10 : 10 + col * (chartWidth + 10);
         const blockBottom = y + blockHeight;
 
         // header
         doc.setFillColor(...color);
-        doc.rect(x, y, chartWidth, 8, 'F');
+        doc.rect(x, y, width, 8, 'F');
         doc.setTextColor(255, 255, 255);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(defaultSize);
@@ -83,11 +91,11 @@ document.addEventListener('DOMContentLoaded', () => {
         // chart box
         doc.setTextColor(0, 0, 0);
         doc.setDrawColor(0);
-        doc.rect(x, innerY, chartWidth, chartHeight);
+        doc.rect(x, innerY, width, height);
         const canvas = document.getElementById(canvasId);
         const img = canvas.toDataURL('image/png');
-        doc.addImage(img, 'PNG', x + 2, innerY + 2, chartWidth - 4, chartHeight - 4);
-        innerY += chartHeight + 5;
+        doc.addImage(img, 'PNG', x + 2, innerY + 2, width - 4, height - 4);
+        innerY += height + 5;
 
         // description header
         doc.setFont('helvetica', 'bold');
@@ -100,7 +108,7 @@ document.addEventListener('DOMContentLoaded', () => {
         doc.setFontSize(10);
         processed.forEach((line, i) => {
           doc.setFillColor(i % 2 === 0 ? 240 : 255);
-          doc.rect(x, innerY, chartWidth, line.height, 'F');
+          doc.rect(x, innerY, width, line.height, 'F');
           doc.text(line.textLines, x + 2, innerY + lineHeight + padding);
           innerY += line.height;
         });
@@ -108,9 +116,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Surround block with border
         doc.setDrawColor(0);
-        doc.rect(x, y, chartWidth, blockHeight);
+        doc.rect(x, y, width, blockHeight);
 
-        if (col === 0) {
+        if (fullWidth) {
+          col = 0;
+          y = blockBottom + 10;
+          rowBottom = y;
+        } else if (col === 0) {
           col = 1;
           rowBottom = blockBottom;
         } else {
@@ -146,7 +158,8 @@ document.addEventListener('DOMContentLoaded', () => {
           `Best: ${os.min?.name || 'N/A'} (${os.min?.rate?.toFixed(2) ?? '0'}%)`,
           `Worst: ${os.max?.name || 'N/A'} (${os.max?.rate?.toFixed(2) ?? '0'}%)`,
         ],
-        [0, 200, 0]
+        [0, 200, 0],
+        true
       );
 
       const ms = reportData.modelSummary || {};
