@@ -435,16 +435,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const ratioData = data.fcNgRatio || {};
     const rModels = ratioData.models || [];
+    const rFcParts = ratioData.fcParts || [];
+    const rNgParts = ratioData.ngParts || [];
     const rRatios =
       ratioData.ratios ||
       rModels.map((_, i) => {
-        const fcPart = ratioData.fcParts?.[i] || 0;
-        const ngPart = ratioData.ngParts?.[i] || 0;
+        const fcPart = rFcParts[i] || 0;
+        const ngPart = rNgParts[i] || 0;
         return ngPart ? fcPart / ngPart : 0;
       });
-    const pairs = rModels.map((m, i) => ({ name: m, ratio: rRatios[i] }));
-    pairs.sort((a, b) => b.ratio - a.ratio);
-    data.fcNgRatioSummary = { top: pairs.slice(0, 3) };
+    const combined = rModels.map((m, i) => ({
+      model: m,
+      fc: rFcParts[i] || 0,
+      ng: rNgParts[i] || 0,
+      ratio: rRatios[i],
+    }));
+    combined.sort((a, b) => b.ratio - a.ratio);
+    const top = combined.slice(0, 10);
+    data.fcNgRatio = {
+      models: top.map((t) => t.model),
+      fcParts: top.map((t) => t.fc),
+      ngParts: top.map((t) => t.ng),
+      ratios: top.map((t) => t.ratio),
+    };
+    data.fcNgRatioSummary = { top: combined.slice(0, 3) };
   }
 
   function renderCharts(data) {
