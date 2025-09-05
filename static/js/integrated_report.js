@@ -37,23 +37,86 @@ document.addEventListener('DOMContentLoaded', () => {
     if (format === 'pdf') {
       const { jsPDF } = window.jspdf;
       const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
       doc.text('Integrated Report', 10, 10);
       let y = 20;
 
-      const addChart = (canvasId, descId) => {
+      const addChart = (canvasId, title, lines, color) => {
+        const chartWidth = pageWidth - 20;
+        const chartHeight = chartWidth / 2;
+        const blockHeight = 10 + chartHeight + 6 + lines.length * 6 + 10;
+        if (y + blockHeight > pageHeight) {
+          doc.addPage();
+          y = 20;
+        }
+
+        // header
+        doc.setFillColor(...color);
+        doc.rect(10, y, chartWidth, 8, 'F');
+        doc.setTextColor(255, 255, 255);
+        doc.setFont('helvetica', 'bold');
+        doc.text(title, 14, y + 5);
+        y += 10;
+
+        // chart box
+        doc.setTextColor(0, 0, 0);
+        doc.setDrawColor(0);
+        doc.rect(10, y, chartWidth, chartHeight);
         const canvas = document.getElementById(canvasId);
         const img = canvas.toDataURL('image/png');
-        doc.addImage(img, 'PNG', 10, y, 180, 80);
-        y += 85;
-        const desc = document.getElementById(descId).textContent;
-        const lines = doc.splitTextToSize(desc, 180);
-        doc.text(lines, 10, y);
-        y += lines.length * 10 + 10;
+        doc.addImage(img, 'PNG', 12, y + 2, chartWidth - 4, chartHeight - 4);
+        y += chartHeight + 5;
+
+        // description
+        doc.setFont('helvetica', 'bold');
+        doc.text(title, 12, y);
+        doc.setFont('helvetica', 'normal');
+        const text = doc.splitTextToSize(lines.join('\n'), chartWidth - 2);
+        doc.text(text, 12, y + 6);
+        y += text.length * 6 + 10;
       };
 
-      addChart('yieldTrendChart', 'yieldTrendDesc');
-      addChart('operatorRejectChart', 'operatorRejectDesc');
-      addChart('modelFalseCallsChart', 'modelFalseCallsDesc');
+      const yd = reportData.yieldSummary || {};
+      addChart(
+        'yieldTrendChart',
+        'Yield Trend',
+        [
+          `Date range: ${reportData.start} - ${reportData.end}`,
+          `Average: ${yd.avg?.toFixed(1) ?? '0'}%`,
+          `Worst day: ${yd.worstDay?.date || 'N/A'} (${yd.worstDay?.yield?.toFixed(1) ?? '0'}%)`,
+          `Worst assembly: ${
+            yd.worstAssembly?.assembly || 'N/A'
+          } (${yd.worstAssembly?.yield?.toFixed(1) ?? '0'}%)`,
+        ],
+        [0, 123, 255]
+      );
+
+      const os = reportData.operatorSummary || {};
+      addChart(
+        'operatorRejectChart',
+        'Operator Reject Rate',
+        [
+          `Date range: ${reportData.start} - ${reportData.end}`,
+          `Total boards: ${os.totalBoards ?? 0}`,
+          `Avg reject rate: ${os.avgRate?.toFixed(2) ?? '0'}%`,
+          `Best: ${os.min?.name || 'N/A'} (${os.min?.rate?.toFixed(2) ?? '0'}%)`,
+          `Worst: ${os.max?.name || 'N/A'} (${os.max?.rate?.toFixed(2) ?? '0'}%)`,
+        ],
+        [0, 200, 0]
+      );
+
+      const ms = reportData.modelSummary || {};
+      addChart(
+        'modelFalseCallsChart',
+        'Model False Calls',
+        [
+          `Date range: ${reportData.start} - ${reportData.end}`,
+          `Avg false calls/board: ${ms.avgFalseCalls?.toFixed(2) ?? '0'}`,
+          `Models >20 false calls: ${ms.over20?.join(', ') || 'None'}`,
+        ],
+        [255, 165, 0]
+      );
 
       doc.save('integrated-report.pdf');
     } else if (format === 'xlsx') {
@@ -191,9 +254,10 @@ document.addEventListener('DOMContentLoaded', () => {
     operatorChart?.destroy();
     modelChart?.destroy();
 
-    const yieldCtx = document
-      .getElementById('yieldTrendChart')
-      .getContext('2d');
+    const yieldCanvas = document.getElementById('yieldTrendChart');
+    yieldCanvas.width = 800;
+    yieldCanvas.height = 400;
+    const yieldCtx = yieldCanvas.getContext('2d');
     yieldChart = new Chart(yieldCtx, {
       type: 'line',
       data: {
@@ -214,9 +278,10 @@ document.addEventListener('DOMContentLoaded', () => {
       `Worst day ${yd.worstDay?.date || 'N/A'} (${yd.worstDay?.yield?.toFixed(1) ?? '0'}%). ` +
       `Worst assembly ${yd.worstAssembly?.assembly || 'N/A'} (${yd.worstAssembly?.yield?.toFixed(1) ?? '0'}%).`;
 
-    const operatorCtx = document
-      .getElementById('operatorRejectChart')
-      .getContext('2d');
+    const operatorCanvas = document.getElementById('operatorRejectChart');
+    operatorCanvas.width = 800;
+    operatorCanvas.height = 400;
+    const operatorCtx = operatorCanvas.getContext('2d');
     const accepted = operators.map((o) => o.inspected - o.rejected);
     const rejected = operators.map((o) => o.rejected);
     operatorChart = new Chart(operatorCtx, {
@@ -242,9 +307,10 @@ document.addEventListener('DOMContentLoaded', () => {
       }%. Min ${os.min?.name || 'N/A'} (${os.min?.rate?.toFixed(2) ?? '0'}%), ` +
       `Max ${os.max?.name || 'N/A'} (${os.max?.rate?.toFixed(2) ?? '0'}%).`;
 
-    const modelCtx = document
-      .getElementById('modelFalseCallsChart')
-      .getContext('2d');
+    const modelCanvas = document.getElementById('modelFalseCallsChart');
+    modelCanvas.width = 800;
+    modelCanvas.height = 400;
+    const modelCtx = modelCanvas.getContext('2d');
     modelChart = new Chart(modelCtx, {
       type: 'bar',
       data: {
