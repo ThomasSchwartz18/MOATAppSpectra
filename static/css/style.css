@@ -13,6 +13,8 @@
   --border-muted: #ddd;
   --border-light: #eee;
   --border-hover: #cecece;
+  --border-thin: 1px;
+  --border-thick: 2px;
   --hover-bg: #e3e3e3;
   --danger: red;
   --nav-height: 56px;
@@ -58,7 +60,7 @@ h2 {
   padding: 0;
   margin: 0;
   align-items: center;
-  border: 1px solid var(--border);
+  border: var(--border-thin) solid var(--border);
 }
 
 .nav-item {
@@ -78,7 +80,7 @@ h2 {
 .nav-item:hover > a {
   color: var(--accent);
   background: var(--surface-alt);
-  border: 1px solid var(--border);
+  border: var(--border-thin) solid var(--border);
   border-top: none;
   border-bottom: none;
 }
@@ -92,7 +94,7 @@ h2 {
   position: absolute;
   background: var(--surface);
   min-width: 160px;
-  border: 1px solid var(--border);
+  border: var(--border-thin) solid var(--border);
   /* border-top: none; */
   z-index: 1;
 }
@@ -140,7 +142,7 @@ h2 {
   max-width: 300px;
   margin: 80px auto;
   padding: 20px;
-  border: 2px solid var(--border);
+  border: var(--border-thick) solid var(--border);
   background: var(--muted-dark);
 }
 
@@ -166,7 +168,7 @@ h2 {
 .login-container button {
   margin-top: 20px;
   padding: 10px;
-  border: 2px solid var(--border);
+  border: var(--border-thick) solid var(--border);
   background: var(--button-bg);
   cursor: pointer;
 }
@@ -183,7 +185,7 @@ h2 {
 }
 
 .preview-card {
-  border: 2px solid var(--border);
+  border: var(--border-thick) solid var(--border);
   padding: 10px;
   overflow-x: auto;
   overflow-y: hidden;
@@ -240,20 +242,20 @@ h2 {
 }
 
 .section-card {
-  border: 2px solid var(--border);
+  border: var(--border-thick) solid var(--border);
   background: var(--surface);
   padding: 10px;
 }
 
 .chart-block {
-  border: 2px solid var(--border);
+  border: var(--border-thick) solid var(--border);
   background: var(--surface);
   padding: 10px;
   margin-bottom: 20px;
 }
 
 .chart-summary {
-  border-top: 2px solid var(--accent);
+  border-top: var(--border-thick) solid var(--accent);
   background: var(--muted-light);
   padding: 8px;
   margin-top: 8px;
@@ -294,16 +296,16 @@ h2 {
 /* Tab styling for Chart Builder / Upload */
 .tab-bar {
   display: flex;
-  /* border-bottom: 2px solid var(--border); */
+  /* border-bottom: var(--border-thick) solid var(--border); */
   margin: -10px -10px 10px -10px;
 }
 
 .tab {
   padding: 6px 12px;
   cursor: pointer;
-  border-bottom: 2px solid var(--border);
-  border-right: 2px solid var(--border);
-  border-left: 2px solid var(--border);
+  border-bottom: var(--border-thick) solid var(--border);
+  border-right: var(--border-thick) solid var(--border);
+  border-left: var(--border-thick) solid var(--border);
   background: var(--tab-bg);
 }
 
@@ -327,7 +329,7 @@ h2 {
 
 .modal {
   background: var(--surface);
-  border: 2px solid var(--border);
+  border: var(--border-thick) solid var(--border);
   width: 96%;
   max-width: 1600px;
   height: 92vh;
@@ -339,19 +341,19 @@ h2 {
 }
 
 .modal-header { display:flex; justify-content: space-between; align-items:center; }
-.modal-close { cursor: pointer; border: 1px solid var(--border); padding: 4px 8px; background: var(--muted-dark); }
+.modal-close { cursor: pointer; border: var(--border-thin) solid var(--border); padding: 4px 8px; background: var(--muted-dark); }
 
 .data-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-.data-table th, .data-table td { border: 1px solid var(--border); padding: 4px; font-size: 12px; }
+.data-table th, .data-table td { border: var(--border-thin) solid var(--border); padding: 4px; font-size: 12px; }
 .data-table th { cursor: pointer; }
 /* Saved Charts: separators instead of bullets */
-#saved-list { list-style: none; padding-left: 0 !important; margin: 0; border: 1px solid var(--border-muted); border-radius: 6px; overflow: hidden; }
-#saved-list li { list-style: none; padding: 8px 10px; border-bottom: 1px solid var(--border-light); }
-#saved-list li:hover { list-style: none; padding: 8px 10px; border-bottom: 1px solid var(--border-hover); background: var(--hover-bg) }
+#saved-list { list-style: none; padding-left: 0 !important; margin: 0; border: var(--border-thin) solid var(--border-muted); border-radius: 6px; overflow: hidden; }
+#saved-list li { list-style: none; padding: 8px 10px; border-bottom: var(--border-thin) solid var(--border-light); }
+#saved-list li:hover { list-style: none; padding: 8px 10px; border-bottom: var(--border-thin) solid var(--border-hover); background: var(--hover-bg) }
 #saved-list li:last-child { border-bottom: none; }
 
 /* Expanded chart area fills modal */
-.modal-chart-box { flex: 1 1 auto; min-height: 60vh; border: 2px solid var(--border); padding: 8px; margin-top: 6px; overflow: hidden; }
+.modal-chart-box { flex: 1 1 auto; min-height: 60vh; border: var(--border-thick) solid var(--border); padding: 8px; margin-top: 6px; overflow: hidden; }
 .modal-chart-box canvas { width: 100% !important; height: 100% !important; max-height: none !important; }
 
 /* Make the bottom-right preview fill vertical space */
