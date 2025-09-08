@@ -39,10 +39,26 @@ header img {
     height: 40px;
     margin-right: 10px;
 }
+
+.report-details {
+    margin-top: 10px;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+.report-details p {
+    margin: 0;
+}
 .section-card {
     border: 2px solid var(--border);
     background: var(--surface);
     padding: 10px;
+}
+
+.cover-page .summary {
+    border-color: var(--accent);
+    background: var(--muted-light);
+    margin-top: 20px;
 }
 
 .chart-block {
@@ -72,6 +88,12 @@ header img {
 .chart-summary p {
     white-space: pre-line;
     margin: 0 0 8px 0;
+}
+
+.section-desc {
+    font-style: italic;
+    color: #555;
+    margin-bottom: 8px;
 }
 
 .data-table {
