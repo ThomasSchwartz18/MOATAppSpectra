@@ -127,12 +127,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const ngPart = rNgParts[i] || 0;
         return ngPart ? fcPart / ngPart : 0;
       });
-    const combined = rModels.map((m, i) => ({
-      model: m,
-      fc: rFcParts[i] || 0,
-      ng: rNgParts[i] || 0,
-      ratio: rRatios[i],
-    }));
+    const combined = rModels
+      .map((m, i) => ({
+        model: m,
+        fc: rFcParts[i] || 0,
+        ng: rNgParts[i] || 0,
+        ratio: rRatios[i],
+      }))
+      .filter((item) => item.ng > 2);
     combined.sort((a, b) => b.ratio - a.ratio);
     const top = combined.slice(0, 10);
     data.fcNgRatio = {
@@ -187,12 +189,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     const yd = yieldSummary || {};
     const yDesc = document.getElementById('yieldTrendDesc');
-    yDesc.style.whiteSpace = 'pre-line';
-    yDesc.textContent =
-      `Date range: ${start} - ${end}\n` +
-      `Average yield: ${yd.avg?.toFixed(1) ?? '0'}%\n` +
-      `Lowest yield date: ${yd.worstDay?.date || 'N/A'} (${yd.worstDay?.yield?.toFixed(1) ?? '0'}%)\n` +
-      `Worst assembly: ${yd.worstAssembly?.assembly || 'N/A'} (${yd.worstAssembly?.yield?.toFixed(1) ?? '0'}%)`;
+    yDesc.innerHTML =
+      `<strong>Date range:</strong> ${start} - ${end}<br>` +
+      `<strong>Average yield:</strong> ${yd.avg?.toFixed(1) ?? '0'}%<br>` +
+      `<strong>Lowest yield date:</strong> ${
+        yd.worstDay?.date || 'N/A'
+      } (${yd.worstDay?.yield?.toFixed(1) ?? '0'}%)<br>` +
+      `<strong>Worst assembly:</strong> ${
+        yd.worstAssembly?.assembly || 'N/A'
+      } (${yd.worstAssembly?.yield?.toFixed(1) ?? '0'}%)`;
 
     const yTable = document.getElementById('yieldTrendTable');
     const yTbody = yTable.querySelector('tbody');
@@ -233,13 +238,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     const os = operatorSummary || {};
     const oDesc = document.getElementById('operatorRejectDesc');
-    oDesc.style.whiteSpace = 'pre-line';
-    oDesc.textContent =
-      `Date range: ${start} - ${end}\n` +
-      `Total boards: ${os.totalBoards ?? 0}\n` +
-      `Average reject rate: ${os.avgRate?.toFixed(2) ?? '0'}%\n` +
-      `Min reject rate: ${os.min?.name || 'N/A'} (${os.min?.rate?.toFixed(2) ?? '0'}%)\n` +
-      `Max reject rate: ${os.max?.name || 'N/A'} (${os.max?.rate?.toFixed(2) ?? '0'}%)`;
+    oDesc.innerHTML =
+      `<strong>Date range:</strong> ${start} - ${end}<br>` +
+      `<strong>Total boards:</strong> ${os.totalBoards ?? 0}<br>` +
+      `<strong>Average reject rate:</strong> ${
+        os.avgRate?.toFixed(2) ?? '0'
+      }%<br>` +
+      `<strong>Min reject rate:</strong> ${
+        os.min?.name || 'N/A'
+      } (${os.min?.rate?.toFixed(2) ?? '0'}%)<br>` +
+      `<strong>Max reject rate:</strong> ${
+        os.max?.name || 'N/A'
+      } (${os.max?.rate?.toFixed(2) ?? '0'}%)`;
 
     const oTable = document.getElementById('operatorRejectTable');
     const oTbody = oTable.querySelector('tbody');
@@ -328,12 +338,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     const ms = modelSummary || {};
     const mDesc = document.getElementById('modelFalseCallsDesc');
-    mDesc.style.whiteSpace = 'pre-line';
-    mDesc.textContent =
-      `Date range: ${start} - ${end}\n` +
-      `Average false calls/board: ${ms.avgFalseCalls?.toFixed(2) ?? '0'}\n` +
-      `Line chart shows mean and ±3σ control limits; models outside may need review.\n` +
-      `Problem assemblies (>20 false calls/board): ${ms.over20?.join(', ') || 'None'}`;
+    mDesc.innerHTML =
+      `<strong>Date range:</strong> ${start} - ${end}<br>` +
+      `<strong>Average false calls/board:</strong> ${
+        ms.avgFalseCalls?.toFixed(2) ?? '0'
+      }<br>` +
+      'Line chart shows mean and ±3σ control limits; models outside may need review.<br>' +
+      `<strong>Problem assemblies (>20 false calls/board):</strong> ${
+        ms.over20?.join(', ') || 'None'
+      }`;
 
     const table = document.getElementById('problem-assemblies');
     const tbody = table.querySelector('tbody');
@@ -376,11 +389,12 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     const fr = fcVsNgSummary || {};
     const fcDesc = document.getElementById('fcVsNgDesc');
-    fcDesc.style.whiteSpace = 'pre-line';
-    fcDesc.textContent =
-      `Date range: ${start} - ${end}\n` +
-      `Correlation (FC vs NG): ${fr.correlation?.toFixed(2) ?? '0'}\n` +
-      `False call rate has ${fr.fcTrend} over period`;
+    fcDesc.innerHTML =
+      `<strong>Date range:</strong> ${start} - ${end}<br>` +
+      `<strong>Correlation (FC vs NG):</strong> ${
+        fr.correlation?.toFixed(2) ?? '0'
+      }<br>` +
+      `<strong>False call rate has</strong> ${fr.fcTrend} over period`;
 
     const fcTable = document.getElementById('fcVsNgRateTable');
     const fcTbody = fcTable.querySelector('tbody');
@@ -419,10 +433,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     const nr = fcNgRatioSummary || {};
     const ratioDesc = document.getElementById('fcNgRatioDesc');
-    ratioDesc.style.whiteSpace = 'pre-line';
-    ratioDesc.textContent =
-      `Date range: ${start} - ${end}\n` +
-      `Top ratios: ${(nr.top || [])
+    ratioDesc.innerHTML =
+      `<strong>Date range:</strong> ${start} - ${end}<br>` +
+      `<strong>Top ratios:</strong> ${(nr.top || [])
         .map((m) => `${m.name} (${m.ratio.toFixed(2)})`)
         .join(', ') || 'None'}`;
 

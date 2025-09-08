@@ -3,9 +3,9 @@
     <div class="chart-block">
         <img src="{{ fcVsNgRateImg }}" alt="FC vs NG Rate">
         <div class="chart-summary">
-            <p>Date range: {{ start }} - {{ end }}
-Correlation (FC vs NG): {{ fcVsNgSummary.correlation|round(2) }}
-False call rate has {{ fcVsNgSummary.fcTrend }} over period</p>
+            <p><strong>Date range:</strong> {{ start }} - {{ end }}<br>
+<strong>Correlation (FC vs NG):</strong> {{ fcVsNgSummary.correlation|round(2) }}<br>
+<strong>False call rate has</strong> {{ fcVsNgSummary.fcTrend }} over period</p>
             <table id="fcVsNgRateTable" class="data-table">
                 <thead><tr><th>Date</th><th>NG PPM</th><th>FalseCall PPM</th></tr></thead>
                 <tbody>
