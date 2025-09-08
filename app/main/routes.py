@@ -936,6 +936,79 @@ def build_report_payload(start=None, end=None):
         )
     )
 
+    # Centralized targets for key metrics so deltas can be computed uniformly
+    targets = {
+        'avg_yield': 98.0,
+        'operator_rate': 5.0,
+        'false_calls': 10.0,
+    }
+
+    def _kpi(label, value, target_key):
+        item = {'label': label, 'value': value}
+        target = targets.get(target_key)
+        if target is not None:
+            item['target'] = target
+            item['delta'] = value - target
+        return item
+
+    summary_kpis = [
+        _kpi('Average Yield', yield_summary['avg'], 'avg_yield'),
+        _kpi('Operator Defect Rate', operator_summary['avgRate'], 'operator_rate'),
+        _kpi('False Calls per Board', model_summary['avgFalseCalls'], 'false_calls'),
+    ]
+
+    summary_actions = [
+        {'label': m['name'], 'value': m['falseCalls']}
+        for m in problem_assemblies
+    ]
+
+    program_queue = [
+        {'label': m['name'], 'value': m['falseCalls']}
+        for m in problem_assemblies
+    ]
+
+    top_risks = [
+        _kpi(asm, assembly_yields[asm], 'avg_yield')
+        for asm, _ in sorted(assembly_yields.items(), key=lambda x: x[1])[:3]
+    ]
+
+    summary_charts = [
+        {'label': 'Yield Trend', 'data': yield_pairs},
+        {'label': 'FC vs NG', 'data': fc_vs_ng_pairs},
+    ]
+
+    executive_summary = {
+        'kpis': summary_kpis,
+        'actions': summary_actions,
+        'programQueue': program_queue,
+        'topRisks': top_risks,
+        'charts': summary_charts,
+    }
+
+    highlights = summary_actions
+    kpis = summary_kpis
+
+    charts = {
+        'yield': yield_pairs,
+        'fcVsNg': fc_vs_ng_pairs,
+        'fcNgRatio': fc_ng_ratio_pairs,
+    }
+
+    top_tables = {
+        'operators': ops,
+        'models': model_rows,
+    }
+
+    jobs = [
+        {'label': op['name'], 'value': op['inspected']} for op in ops
+    ]
+
+    appendix = {
+        'yield': yield_pairs,
+        'fcVsNg': fc_vs_ng_pairs,
+        'fcNgRatio': fc_ng_ratio_pairs,
+    }
+
     return {
         'yieldData': {
             'dates': dates_iso,
@@ -959,6 +1032,18 @@ def build_report_payload(start=None, end=None):
         'operatorSummary': operator_summary,
         'modelSummary': model_summary,
         'problemAssemblies': problem_assemblies,
+        'summary_kpis': summary_kpis,
+        'summary_actions': summary_actions,
+        'program_queue': program_queue,
+        'top_risks': top_risks,
+        'summary_charts': summary_charts,
+        'executive_summary': executive_summary,
+        'highlights': highlights,
+        'kpis': kpis,
+        'charts': charts,
+        'top_tables': top_tables,
+        'jobs': jobs,
+        'appendix': appendix,
     }
 
 
