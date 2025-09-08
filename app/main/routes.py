@@ -248,6 +248,7 @@ def upload_ppm_reports():
     m = re.match(
         r"^PPMReportControl\s+(\d{4}-\d{2}-\d{2})(?:\s+to\s+(\d{4}-\d{2}-\d{2}))?\s+(L\w+)$",
         base,
+        re.IGNORECASE,
     )
     if not m:
         abort(
