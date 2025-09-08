@@ -2,5 +2,16 @@
     <header>
         <img src="{{ url_for('static', filename='images/company-logo.png') }}" alt="Company logo">
         <h1>Integrated Report</h1>
+        <div class="report-details">
+            <p>{{ start }} - {{ end }}</p>
+            <p>{{ generated_at }}</p>
+            <p>{{ report_id }}</p>
+            <p>Thomas Schwartz</p>
+            <p>{{ confidentiality }}</p>
+            <p>&lt;{{ contact }}&gt;</p>
+        </div>
     </header>
+    {% if show_summary %}
+        {% include 'report/summary.html' %}
+    {% endif %}
 </section>

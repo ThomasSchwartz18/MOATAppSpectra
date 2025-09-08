@@ -42,6 +42,9 @@ def test_export_integrated_report_accepts_custom_fields(app_instance, monkeypatc
             "author": "Alice",
             "logo_url": "http://logo",
             "footer_left": "left foot",
+            "report_id": "ID123",
+            "contact": "joe@example.com",
+            "confidentiality": "Top Secret",
         }
         resp = client.get("/reports/integrated/export?show_summary=0", json=payload)
         assert resp.status_code == 200
@@ -54,3 +57,7 @@ def test_export_integrated_report_accepts_custom_fields(app_instance, monkeypatc
         assert captured["author"] == "Alice"
         assert captured["logo_url"] == "http://logo"
         assert captured["footer_left"] == "left foot"
+        assert captured["report_id"] == "ID123"
+        assert captured["contact"] == "joe@example.com"
+        assert captured["confidentiality"] == "Top Secret"
+        assert captured["generated_at"]
