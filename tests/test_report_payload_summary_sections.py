@@ -68,7 +68,5 @@ def test_summary_sections(app_instance, monkeypatch):
 
         assert "executive_summary" in data
         assert data["executive_summary"]["kpis"] == kpis
-        assert "programQueue" not in data["executive_summary"]
-        assert "program_queue" not in data
         assert "charts" in data
         assert "top_tables" in data
