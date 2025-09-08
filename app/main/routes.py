@@ -18,6 +18,15 @@ import re
 from datetime import datetime, date
 from openpyxl import load_workbook
 import xlrd
+import base64
+import math
+try:
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+except Exception:  # pragma: no cover
+    matplotlib = None
+    plt = None
 
 from app.db import (
     fetch_aoi_reports,
@@ -557,6 +566,105 @@ def ppm_saved_queries():
     return jsonify(data), status
 
 
+def _fig_to_data_uri(fig):
+    if plt is None:
+        return ''
+    buf = io.BytesIO()
+    fig.savefig(buf, format='png', bbox_inches='tight')
+    plt.close(fig)
+    buf.seek(0)
+    b64 = base64.b64encode(buf.read()).decode('utf-8')
+    return f"data:image/png;base64,{b64}"
+
+
+def _generate_report_charts(payload):
+    if plt is None:
+        return {
+            'yieldTrendImg': '',
+            'operatorRejectImg': '',
+            'modelFalseCallsImg': '',
+            'fcVsNgRateImg': '',
+            'fcNgRatioImg': '',
+        }
+    charts: dict[str, str] = {}
+
+    # Yield trend chart
+    fig, ax = plt.subplots(figsize=(8, 4))
+    dates = payload.get('yieldData', {}).get('dates', [])
+    yields = payload.get('yieldData', {}).get('yields', [])
+    if dates and yields:
+        ax.plot(dates, yields, marker='o')
+        ax.set_xlabel('Date')
+        ax.set_ylabel('Yield %')
+        ax.set_title('Yield Trend')
+        ax.tick_params(axis='x', rotation=45)
+    charts['yieldTrendImg'] = _fig_to_data_uri(fig)
+
+    # Operator reject chart (stacked bar)
+    fig, ax = plt.subplots(figsize=(8, 4))
+    ops = payload.get('operators', [])
+    if ops:
+        names = [o['name'] for o in ops]
+        accepted = [o['inspected'] - o['rejected'] for o in ops]
+        rejected = [o['rejected'] for o in ops]
+        ax.bar(names, accepted, label='Accepted')
+        ax.bar(names, rejected, bottom=accepted, label='Rejected')
+        ax.set_ylabel('Boards')
+        ax.set_title('Operator Rejects')
+        ax.tick_params(axis='x', rotation=45)
+        ax.legend()
+    charts['operatorRejectImg'] = _fig_to_data_uri(fig)
+
+    # Model false calls chart with control limits
+    fig, ax = plt.subplots(figsize=(8, 4))
+    models = payload.get('models', [])
+    if models:
+        labels = [m['name'] for m in models]
+        vals = [m['falseCalls'] for m in models]
+        ax.plot(labels, vals, marker='o', color='orange', label='False Calls')
+        mean = sum(vals) / len(vals)
+        std = math.sqrt(sum((v - mean) ** 2 for v in vals) / len(vals))
+        upper = mean + 3 * std
+        lower = max(mean - 3 * std, 0)
+        ax.plot(labels, [mean] * len(labels), linestyle='--', color='blue', label='Mean')
+        ax.plot(labels, [upper] * len(labels), linestyle='--', color='green', label='+3σ')
+        ax.plot(labels, [lower] * len(labels), linestyle='--', color='red', label='-3σ')
+        ax.set_ylabel('False Calls/Board')
+        ax.set_title('False Calls by Model')
+        ax.tick_params(axis='x', rotation=45)
+        ax.legend()
+    charts['modelFalseCallsImg'] = _fig_to_data_uri(fig)
+
+    # FC vs NG rate chart
+    fig, ax = plt.subplots(figsize=(8, 4))
+    fc_vs_ng = payload.get('fcVsNgRate', {})
+    dates = fc_vs_ng.get('dates', [])
+    ng_ppm = fc_vs_ng.get('ngPpm', [])
+    fc_ppm = fc_vs_ng.get('fcPpm', [])
+    if dates:
+        ax.plot(dates, ng_ppm, color='red', label='NG PPM')
+        ax.plot(dates, fc_ppm, color='blue', label='FalseCall PPM')
+        ax.set_ylabel('PPM')
+        ax.set_title('FC vs NG Rate')
+        ax.tick_params(axis='x', rotation=45)
+        ax.legend()
+    charts['fcVsNgRateImg'] = _fig_to_data_uri(fig)
+
+    # FC/NG ratio chart
+    fig, ax = plt.subplots(figsize=(8, 4))
+    fc_ng = payload.get('fcNgRatio', {})
+    models = fc_ng.get('models', [])
+    ratios = fc_ng.get('ratios', [])
+    if models:
+        ax.bar(models, ratios, color='teal')
+        ax.set_ylabel('FC/NG Ratio')
+        ax.set_title('FC/NG Ratio by Model')
+        ax.tick_params(axis='x', rotation=45)
+    charts['fcNgRatioImg'] = _fig_to_data_uri(fig)
+
+    return charts
+
+
 def build_report_payload(start=None, end=None):
     """Aggregate yield, operator and false-call stats for the integrated report."""
     combined, error = fetch_combined_reports()
@@ -695,15 +803,21 @@ def build_report_payload(start=None, end=None):
         fc_per_board = (vals['fc'] / vals['boards']) if vals['boards'] else 0.0
         model_rows.append({'name': model, 'falseCalls': fc_per_board})
 
-    fc_ng_models = []
-    fc_ng_fc_parts: list[float] = []
-    fc_ng_ng_parts: list[float] = []
-    fc_ng_ratios: list[float] = []
+    combined_ratios = []
     for model, vals in fc_ng_ratio.items():
-        fc_ng_models.append(model)
-        fc_ng_fc_parts.append(vals['fc'])
-        fc_ng_ng_parts.append(vals['ng'])
-        fc_ng_ratios.append((vals['fc'] / vals['ng']) if vals['ng'] else 0.0)
+        ratio = (vals['fc'] / vals['ng']) if vals['ng'] else 0.0
+        combined_ratios.append({'model': model, 'fc': vals['fc'], 'ng': vals['ng'], 'ratio': ratio})
+    combined_ratios.sort(key=lambda x: x['ratio'], reverse=True)
+    top_ratios = combined_ratios[:10]
+    fc_ng_ratio_data = {
+        'models': [t['model'] for t in top_ratios],
+        'fcParts': [t['fc'] for t in top_ratios],
+        'ngParts': [t['ng'] for t in top_ratios],
+        'ratios': [t['ratio'] for t in top_ratios],
+    }
+    fc_ng_ratio_summary = {
+        'top': [{'name': t['model'], 'ratio': t['ratio']} for t in combined_ratios[:3]]
+    }
 
     fc_vs_ng_dates = sorted(d for d in fc_vs_ng.keys() if d)
     ng_ppm_series: list[float] = []
@@ -713,6 +827,25 @@ def build_report_payload(start=None, end=None):
         parts = vals['parts']
         ng_ppm_series.append((vals['ng'] / parts * 1_000_000) if parts else 0.0)
         fc_ppm_series.append((vals['fc'] / parts * 1_000_000) if parts else 0.0)
+
+    # Correlation and trend for FC vs NG
+    n = min(len(ng_ppm_series), len(fc_ppm_series))
+    if n > 1:
+        avg_ng = sum(ng_ppm_series) / n
+        avg_fc = sum(fc_ppm_series) / n
+        num = sum((ng_ppm_series[i] - avg_ng) * (fc_ppm_series[i] - avg_fc) for i in range(n))
+        den_ng = sum((ng_ppm_series[i] - avg_ng) ** 2 for i in range(n))
+        den_fc = sum((fc_ppm_series[i] - avg_fc) ** 2 for i in range(n))
+        corr = num / math.sqrt(den_ng * den_fc) if den_ng and den_fc else 0.0
+        fc_trend = (
+            'increased'
+            if fc_ppm_series[0] < fc_ppm_series[-1]
+            else 'decreased' if fc_ppm_series[0] > fc_ppm_series[-1] else 'stable'
+        )
+    else:
+        corr = 0.0
+        fc_trend = 'stable'
+    fc_vs_ng_summary = {'correlation': corr, 'fcTrend': fc_trend}
 
     # --- Precompute summaries -------------------------------------------------
     if yields:
@@ -779,12 +912,9 @@ def build_report_payload(start=None, end=None):
             'ngPpm': ng_ppm_series,
             'fcPpm': fc_ppm_series,
         },
-        'fcNgRatio': {
-            'models': fc_ng_models,
-            'fcParts': fc_ng_fc_parts,
-            'ngParts': fc_ng_ng_parts,
-            'ratios': fc_ng_ratios,
-        },
+        'fcVsNgSummary': fc_vs_ng_summary,
+        'fcNgRatio': fc_ng_ratio_data,
+        'fcNgRatioSummary': fc_ng_ratio_summary,
         'yieldSummary': yield_summary,
         'operatorSummary': operator_summary,
         'modelSummary': model_summary,
@@ -820,7 +950,10 @@ def export_integrated_report():
     start = _parse_date(request.args.get('start_date'))
     end = _parse_date(request.args.get('end_date'))
     payload = build_report_payload(start, end)
-    html = render_template('report.html', **payload)
+    payload['start'] = start.isoformat() if start else ''
+    payload['end'] = end.isoformat() if end else ''
+    charts = _generate_report_charts(payload)
+    html = render_template('report.html', **payload, **charts)
     if request.args.get('format') == 'pdf':
         from weasyprint import HTML
         pdf = HTML(string=html, base_url=request.url_root).write_pdf()

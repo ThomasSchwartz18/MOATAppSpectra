@@ -9,3 +9,4 @@ uvicorn
 pytest
 numpy
 weasyprint
+matplotlib
