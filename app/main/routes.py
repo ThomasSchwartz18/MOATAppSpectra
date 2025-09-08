@@ -16,6 +16,7 @@ import io
 import os
 import re
 from datetime import datetime, date
+from zoneinfo import ZoneInfo
 from openpyxl import load_workbook
 import xlrd
 import base64
@@ -828,8 +829,13 @@ def build_report_payload(start=None, end=None):
 
     combined_ratios = []
     for model, vals in fc_ng_ratio.items():
-        ratio = (vals['fc'] / vals['ng']) if vals['ng'] else 0.0
-        combined_ratios.append({'model': model, 'fc': vals['fc'], 'ng': vals['ng'], 'ratio': ratio})
+        ng_val = vals['ng']
+        if ng_val <= 2:
+            continue
+        ratio = (vals['fc'] / ng_val) if ng_val else 0.0
+        combined_ratios.append(
+            {'model': model, 'fc': vals['fc'], 'ng': ng_val, 'ratio': ratio}
+        )
     combined_ratios.sort(key=lambda x: x['ratio'], reverse=True)
     top_ratios = combined_ratios[:10]
     fc_ng_ratio_data = {
@@ -1098,7 +1104,7 @@ def export_integrated_report():
     report_id = _get('report_id')
     contact = _get('contact', 'tschwartz@4spectra.com')
     confidentiality = _get('confidentiality', 'Spectra-Tech • Confidential')
-    generated_at = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
+    generated_at = datetime.now(ZoneInfo('America/New_York')).strftime('%Y-%m-%d %H:%M:%S %Z')
 
     html = render_template(
         'report/index.html',

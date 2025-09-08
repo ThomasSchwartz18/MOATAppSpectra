@@ -91,7 +91,6 @@ def test_export_integrated_report_respects_date_range(app_instance, monkeypatch)
         assert "2024-08-01" not in html
         assert "Alice" in html
         assert "Bob" not in html
-        assert "M1" in html
         assert "M2" not in html
         # PDF export should succeed as well
         resp_pdf = client.get(

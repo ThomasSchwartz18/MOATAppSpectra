@@ -3,10 +3,10 @@
     <div class="chart-block">
         <img src="{{ modelFalseCallsImg }}" alt="False Calls by Model">
         <div class="chart-summary">
-            <p>Date range: {{ start }} - {{ end }}
-Average false calls/board: {{ modelSummary.avgFalseCalls|round(2) }}
-Line chart shows mean and ±3σ control limits; models outside may need review.
-Problem assemblies (>20 false calls/board): {{ modelSummary.over20|join(', ') if modelSummary.over20 else 'None' }}</p>
+            <p><strong>Date range:</strong> {{ start }} - {{ end }}<br>
+<strong>Average false calls/board:</strong> {{ modelSummary.avgFalseCalls|round(2) }}<br>
+Line chart shows mean and ±3σ control limits; models outside may need review.<br>
+<strong>Problem assemblies (>20 false calls/board):</strong> {{ modelSummary.over20|join(', ') if modelSummary.over20 else 'None' }}</p>
             <table id="problem-assemblies" class="data-table">
                 <thead><tr><th>Model</th><th>False Calls</th></tr></thead>
                 <tbody>
