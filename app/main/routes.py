@@ -668,10 +668,10 @@ def _generate_report_charts(payload):
 
 
 def build_report_payload(start=None, end=None):
-    """Aggregate yield, operator and false-call stats for the integrated report.
+    """Aggregate yield, operator and false-call stats for the AOI integrated report.
 
     This function now merges AOI report rows that have not yet been
-    incorporated into ``combined_reports`` so the Integrated Report can
+    incorporated into ``combined_reports`` so the AOI Integrated Report can
     surface newly uploaded AOI data without waiting for the combined table
     to refresh.
     """
@@ -1048,7 +1048,7 @@ def build_report_payload(start=None, end=None):
 
 @main_bp.route('/api/reports/integrated', methods=['GET'])
 def api_integrated_report():
-    """Aggregate yield, operator and false-call stats for the integrated report."""
+    """Aggregate yield, operator and false-call stats for the AOI integrated report."""
     if 'username' not in session:
         return redirect(url_for('auth.login'))
 
@@ -1061,7 +1061,7 @@ def api_integrated_report():
 
 @main_bp.route('/reports/integrated', methods=['GET'])
 def integrated_report():
-    """Render the Integrated Report page."""
+    """Render the AOI Integrated Report page."""
     if 'username' not in session:
         return redirect(url_for('auth.login'))
     return render_template('integrated_report.html', username=session.get('username'))
