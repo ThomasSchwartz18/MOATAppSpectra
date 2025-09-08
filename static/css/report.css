@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Source+Code+Pro:wght@400;700&family=Source+Serif+4:wght@400;700&display=swap');
+
 @page {
     margin: 10px;
     background: var(--surface-alt);
@@ -24,9 +26,18 @@
 }
 
 body {
-    font-family: Arial, sans-serif;
+    font-family: "Source Serif 4", serif;
     margin: 0;
     padding: 0;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-family: "Inter", sans-serif;
 }
 
 header {
@@ -114,6 +125,14 @@ header img {
     border: 1px solid var(--border);
     padding: 4px;
     font-size: 12px;
+}
+
+.data-table td,
+.data-table th,
+code,
+pre,
+.mono {
+    font-family: "Source Code Pro", monospace;
 }
 
 .data-table th {
