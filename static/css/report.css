@@ -20,8 +20,8 @@
     --border-muted: #ddd;
     --border-light: #eee;
     --border-hover: #cecece;
-    --border-thin: 1px;
-    --border-thick: 2px;
+    --border-thin: 2px;
+    --border-thick: 4px;
     --hover-bg: #e3e3e3;
     --danger: red;
     --nav-height: 56px;
