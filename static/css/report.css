@@ -175,6 +175,15 @@ pre,
     width: 480px;
 }
 
+.combined-section {
+    page-break-after: auto;
+    margin-bottom: 20px;
+}
+
+.combined-section.last {
+    page-break-after: always;
+}
+
 @media print {
     .report-section {
         page-break-after: always;
@@ -192,6 +201,14 @@ pre,
     }
 
     .summary-page {
+        page-break-after: always;
+    }
+
+    .combined-section {
+        page-break-after: auto;
+    }
+
+    .combined-section.last {
         page-break-after: always;
     }
 }
