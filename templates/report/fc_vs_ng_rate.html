@@ -1,0 +1,18 @@
+<section class="report-section">
+    <div class="chart-block">
+        <img src="{{ fcVsNgRateImg }}" alt="FC vs NG Rate">
+        <div class="chart-summary">
+            <p>Date range: {{ start }} - {{ end }}
+Correlation (FC vs NG): {{ fcVsNgSummary.correlation|round(2) }}
+False call rate has {{ fcVsNgSummary.fcTrend }} over period</p>
+            <table id="fcVsNgRateTable" class="data-table">
+                <thead><tr><th>Date</th><th>NG PPM</th><th>FalseCall PPM</th></tr></thead>
+                <tbody>
+                {% for d, ng, fc in fc_vs_ng_pairs %}
+                    <tr><td>{{ d }}</td><td>{{ '%.1f'|format(ng) }}</td><td>{{ '%.1f'|format(fc) }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>

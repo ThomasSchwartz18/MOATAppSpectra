@@ -1,0 +1,27 @@
+<section class="report-section">
+    <div class="chart-block">
+        <img src="{{ operatorRejectImg }}" alt="Operator Reject">
+        <div class="chart-summary">
+            <p>Date range: {{ start }} - {{ end }}
+Total boards: {{ operatorSummary.totalBoards }}
+Average reject rate: {{ operatorSummary.avgRate|round(2) }}%
+Min reject rate: {{ operatorSummary.min.name or 'N/A' }} ({{ operatorSummary.min.rate|round(2) }}%)
+Max reject rate: {{ operatorSummary.max.name or 'N/A' }} ({{ operatorSummary.max.rate|round(2) }}%)</p>
+            <table class="data-table">
+                <thead>
+                    <tr><th>Operator</th><th>Inspected</th><th>Rejected</th><th>Reject %</th></tr>
+                </thead>
+                <tbody>
+                {% for op in operators %}
+                    <tr>
+                        <td>{{ op.name }}</td>
+                        <td>{{ op.inspected }}</td>
+                        <td>{{ op.rejected }}</td>
+                        <td>{{ '%.2f'|format(op.rate) }}%</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>

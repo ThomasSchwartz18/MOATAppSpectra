@@ -40,6 +40,15 @@ header img {
     margin-right: 10px;
 }
 
+
+.report-section {
+    page-break-after: always;
+}
+
+.report-section:last-child {
+    page-break-after: auto;
+}
+
 .section-card {
     border: 2px solid var(--border);
     background: var(--surface);

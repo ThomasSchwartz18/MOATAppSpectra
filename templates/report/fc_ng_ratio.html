@@ -1,0 +1,17 @@
+<section class="report-section">
+    <div class="chart-block">
+        <img src="{{ fcNgRatioImg }}" alt="FC/NG Ratio">
+        <div class="chart-summary">
+            <p>Date range: {{ start }} - {{ end }}
+Top ratios: {% if fcNgRatioSummary.top %}{% for t in fcNgRatioSummary.top %}{{ t.name }} ({{ '%.2f'|format(t.ratio) }}){% if not loop.last %}, {% endif %}{% endfor %}{% else %}None{% endif %}</p>
+            <table id="fcNgRatioTable" class="data-table">
+                <thead><tr><th>Model</th><th>FalseCall Parts</th><th>NG Parts</th><th>FC/NG Ratio</th></tr></thead>
+                <tbody>
+                {% for m, fc, ng, r in fc_ng_ratio_pairs %}
+                    <tr><td>{{ m }}</td><td>{{ '%.1f'|format(fc) }}</td><td>{{ '%.1f'|format(ng) }}</td><td>{{ '%.2f'|format(r) }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>

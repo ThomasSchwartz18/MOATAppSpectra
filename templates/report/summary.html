@@ -1,0 +1,7 @@
+<section class="report-section section-card">
+    <h2>Summary</h2>
+    <p>Date range: {{ start }} - {{ end }}</p>
+    <p>Average yield: {{ yieldSummary.avg|round(1) }}%</p>
+    <p>Total boards: {{ operatorSummary.totalBoards }}</p>
+    <p>Average false calls/board: {{ modelSummary.avgFalseCalls|round(2) }}</p>
+</section>

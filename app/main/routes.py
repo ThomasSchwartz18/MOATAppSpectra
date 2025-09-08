@@ -993,7 +993,15 @@ def export_integrated_report():
     payload['start'] = start.isoformat() if start else ''
     payload['end'] = end.isoformat() if end else ''
     charts = _generate_report_charts(payload)
-    html = render_template('report.html', **payload, **charts)
+    show_cover = request.args.get('show_cover', '1') != '0'
+    show_summary = request.args.get('show_summary', '1') != '0'
+    html = render_template(
+        'report/index.html',
+        show_cover=show_cover,
+        show_summary=show_summary,
+        **payload,
+        **charts,
+    )
     fmt = request.args.get('format')
     if fmt == 'pdf':
         from weasyprint import HTML
