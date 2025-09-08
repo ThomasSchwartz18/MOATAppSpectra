@@ -41,6 +41,12 @@ header img {
     margin-right: 10px;
 }
 
+.company-logo-pdf {
+    height: 60px;
+    vertical-align: middle;
+    margin-right: 10px;
+}
+
 .report-details {
     margin-top: 10px;
     font-size: 14px;
