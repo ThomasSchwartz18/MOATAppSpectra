@@ -10,7 +10,7 @@
                 <thead><tr><th>Date</th><th>NG PPM</th><th>FalseCall PPM</th></tr></thead>
                 <tbody>
                 {% for d, ng, fc in fc_vs_ng_pairs %}
-                    <tr><td>{{ d }}</td><td>{{ '%.1f'|format(ng) }}</td><td>{{ '%.1f'|format(fc) }}</td></tr>
+                    <tr><td>{{ d }}</td><td>{{ '%.2f'|format(ng) }}</td><td>{{ '%.2f'|format(fc) }}</td></tr>
                 {% endfor %}
                 </tbody>
             </table>
