@@ -1104,7 +1104,7 @@ def export_integrated_report():
     report_id = _get('report_id')
     contact = _get('contact', 'tschwartz@4spectra.com')
     confidentiality = _get('confidentiality', 'Spectra-Tech • Confidential')
-    generated_at = datetime.now(ZoneInfo('America/New_York')).strftime('%Y-%m-%d %H:%M:%S %Z')
+    generated_at = datetime.now(ZoneInfo('EST')).strftime('%Y-%m-%d %H:%M:%S %Z')
 
     html = render_template(
         'report/index.html',

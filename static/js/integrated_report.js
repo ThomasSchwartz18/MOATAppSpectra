@@ -40,6 +40,12 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Email sent (placeholder).');
   });
 
+  function setDesc(id, lines) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = lines.map((line) => `<span>${line}</span>`).join('');
+  }
+
   function computeSummary(data) {
     const yields = data.yieldData.yields || [];
     const dates = data.yieldData.dates || [];
@@ -188,16 +194,16 @@ document.addEventListener('DOMContentLoaded', () => {
       },
     });
     const yd = yieldSummary || {};
-    const yDesc = document.getElementById('yieldTrendDesc');
-    yDesc.innerHTML =
-      `<strong>Date range:</strong> ${start} - ${end}<br>` +
-      `<strong>Average yield:</strong> ${yd.avg?.toFixed(2) ?? '0.00'}%<br>` +
+    setDesc('yieldTrendDesc', [
+      `<strong>Date range:</strong> ${start} - ${end}`,
+      `<strong>Average yield:</strong> ${yd.avg?.toFixed(2) ?? '0.00'}%`,
       `<strong>Lowest yield date:</strong> ${
         yd.worstDay?.date || 'N/A'
-      } (${yd.worstDay?.yield?.toFixed(2) ?? '0.00'}%)<br>` +
+      } (${yd.worstDay?.yield?.toFixed(2) ?? '0.00'}%)`,
       `<strong>Worst assembly:</strong> ${
         yd.worstAssembly?.assembly || 'N/A'
-      } (${yd.worstAssembly?.yield?.toFixed(2) ?? '0.00'}%)`;
+      } (${yd.worstAssembly?.yield?.toFixed(2) ?? '0.00'}%)`,
+    ]);
 
     const yTable = document.getElementById('yieldTrendTable');
     const yTbody = yTable.querySelector('tbody');
@@ -237,19 +243,19 @@ document.addEventListener('DOMContentLoaded', () => {
       },
     });
     const os = operatorSummary || {};
-    const oDesc = document.getElementById('operatorRejectDesc');
-    oDesc.innerHTML =
-      `<strong>Date range:</strong> ${start} - ${end}<br>` +
-      `<strong>Total boards:</strong> ${os.totalBoards ?? 0}<br>` +
+    setDesc('operatorRejectDesc', [
+      `<strong>Date range:</strong> ${start} - ${end}`,
+      `<strong>Total boards:</strong> ${os.totalBoards ?? 0}`,
       `<strong>Average reject rate:</strong> ${
         os.avgRate?.toFixed(2) ?? '0.00'
-      }%<br>` +
+      }%`,
       `<strong>Min reject rate:</strong> ${
         os.min?.name || 'N/A'
-        } (${os.min?.rate?.toFixed(2) ?? '0.00'}%)<br>` +
+      } (${os.min?.rate?.toFixed(2) ?? '0.00'}%)`,
       `<strong>Max reject rate:</strong> ${
         os.max?.name || 'N/A'
-        } (${os.max?.rate?.toFixed(2) ?? '0.00'}%)`;
+      } (${os.max?.rate?.toFixed(2) ?? '0.00'}%)`,
+    ]);
 
     const oTable = document.getElementById('operatorRejectTable');
     const oTbody = oTable.querySelector('tbody');
@@ -337,16 +343,16 @@ document.addEventListener('DOMContentLoaded', () => {
       },
     });
     const ms = modelSummary || {};
-    const mDesc = document.getElementById('modelFalseCallsDesc');
-    mDesc.innerHTML =
-      `<strong>Date range:</strong> ${start} - ${end}<br>` +
+    setDesc('modelFalseCallsDesc', [
+      `<strong>Date range:</strong> ${start} - ${end}`,
       `<strong>Average false calls/board:</strong> ${
         ms.avgFalseCalls?.toFixed(2) ?? '0.00'
-      }<br>` +
-      'Line chart shows mean and ±3σ control limits; models outside may need review.<br>' +
+      }`,
+      'Line chart shows mean and ±3σ control limits; models outside may need review.',
       `<strong>Problem assemblies (>20 false calls/board):</strong> ${
         ms.over20?.join(', ') || 'None'
-      }`;
+      }`,
+    ]);
 
     const table = document.getElementById('problem-assemblies');
     const tbody = table.querySelector('tbody');
@@ -388,13 +394,13 @@ document.addEventListener('DOMContentLoaded', () => {
       },
     });
     const fr = fcVsNgSummary || {};
-    const fcDesc = document.getElementById('fcVsNgDesc');
-    fcDesc.innerHTML =
-      `<strong>Date range:</strong> ${start} - ${end}<br>` +
+    setDesc('fcVsNgDesc', [
+      `<strong>Date range:</strong> ${start} - ${end}`,
       `<strong>Correlation (FC vs NG):</strong> ${
         fr.correlation?.toFixed(2) ?? '0.00'
-      }<br>` +
-      `<strong>False call rate has</strong> ${fr.fcTrend} over period`;
+      }`,
+      `<strong>False call rate has</strong> ${fr.fcTrend} over period`,
+    ]);
 
     const fcTable = document.getElementById('fcVsNgRateTable');
     const fcTbody = fcTable.querySelector('tbody');
@@ -432,12 +438,12 @@ document.addEventListener('DOMContentLoaded', () => {
       },
     });
     const nr = fcNgRatioSummary || {};
-    const ratioDesc = document.getElementById('fcNgRatioDesc');
-    ratioDesc.innerHTML =
-      `<strong>Date range:</strong> ${start} - ${end}<br>` +
+    setDesc('fcNgRatioDesc', [
+      `<strong>Date range:</strong> ${start} - ${end}`,
       `<strong>Top ratios:</strong> ${(nr.top || [])
         .map((m) => `${m.name} (${m.ratio.toFixed(2)})`)
-        .join(', ') || 'None'}`;
+        .join(', ') || 'None'}`,
+    ]);
 
     const ratioTable = document.getElementById('fcNgRatioTable');
     const ratioTbody = ratioTable.querySelector('tbody');

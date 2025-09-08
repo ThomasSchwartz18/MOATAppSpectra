@@ -261,7 +261,19 @@ h2 {
 
 .chart-summary p {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  margin: 0;
+}
+
+.chart-summary p span {
+  display: block;
+  line-height: 1.2;
+  padding: 2px 4px;
+}
+
+.chart-summary p span:nth-child(even) {
+  background: var(--muted);
 }
 
 .section-title {
