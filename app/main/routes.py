@@ -962,11 +962,6 @@ def build_report_payload(start=None, end=None):
         for m in problem_assemblies
     ]
 
-    program_queue = [
-        {'label': m['name'], 'value': m['falseCalls']}
-        for m in problem_assemblies
-    ]
-
     top_risks = [
         _kpi(asm, assembly_yields[asm], 'avg_yield')
         for asm, _ in sorted(assembly_yields.items(), key=lambda x: x[1])[:3]
@@ -980,7 +975,6 @@ def build_report_payload(start=None, end=None):
     executive_summary = {
         'kpis': summary_kpis,
         'actions': summary_actions,
-        'programQueue': program_queue,
         'topRisks': top_risks,
         'charts': summary_charts,
     }
@@ -1034,7 +1028,6 @@ def build_report_payload(start=None, end=None):
         'problemAssemblies': problem_assemblies,
         'summary_kpis': summary_kpis,
         'summary_actions': summary_actions,
-        'program_queue': program_queue,
         'top_risks': top_risks,
         'summary_charts': summary_charts,
         'executive_summary': executive_summary,
