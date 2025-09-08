@@ -8,6 +8,7 @@ from flask import (
     request,
     jsonify,
     current_app,
+    send_file,
 )
 from functools import wraps
 import csv
@@ -556,15 +557,8 @@ def ppm_saved_queries():
     return jsonify(data), status
 
 
-@main_bp.route('/api/reports/integrated', methods=['GET'])
-def api_integrated_report():
+def build_report_payload(start=None, end=None):
     """Aggregate yield, operator and false-call stats for the integrated report."""
-    if 'username' not in session:
-        return redirect(url_for('auth.login'))
-
-    start = _parse_date(request.args.get('start_date'))
-    end = _parse_date(request.args.get('end_date'))
-
     combined, error = fetch_combined_reports()
     if error:
         abort(500, description=error)
@@ -772,32 +766,43 @@ def api_integrated_report():
         'over20': [m['name'] for m in problem_assemblies],
     }
 
-    return jsonify(
-        {
-            'yieldData': {
-                'dates': [d.isoformat() for d in dates],
-                'yields': yields,
-                'assemblyYields': assembly_yields,
-            },
-            'operators': ops,
-            'models': model_rows,
-            'fcVsNgRate': {
-                'dates': [d.isoformat() for d in fc_vs_ng_dates],
-                'ngPpm': ng_ppm_series,
-                'fcPpm': fc_ppm_series,
-            },
-            'fcNgRatio': {
-                'models': fc_ng_models,
-                'fcParts': fc_ng_fc_parts,
-                'ngParts': fc_ng_ng_parts,
-                'ratios': fc_ng_ratios,
-            },
-            'yieldSummary': yield_summary,
-            'operatorSummary': operator_summary,
-            'modelSummary': model_summary,
-            'problemAssemblies': problem_assemblies,
-        }
-    )
+    return {
+        'yieldData': {
+            'dates': [d.isoformat() for d in dates],
+            'yields': yields,
+            'assemblyYields': assembly_yields,
+        },
+        'operators': ops,
+        'models': model_rows,
+        'fcVsNgRate': {
+            'dates': [d.isoformat() for d in fc_vs_ng_dates],
+            'ngPpm': ng_ppm_series,
+            'fcPpm': fc_ppm_series,
+        },
+        'fcNgRatio': {
+            'models': fc_ng_models,
+            'fcParts': fc_ng_fc_parts,
+            'ngParts': fc_ng_ng_parts,
+            'ratios': fc_ng_ratios,
+        },
+        'yieldSummary': yield_summary,
+        'operatorSummary': operator_summary,
+        'modelSummary': model_summary,
+        'problemAssemblies': problem_assemblies,
+    }
+
+
+@main_bp.route('/api/reports/integrated', methods=['GET'])
+def api_integrated_report():
+    """Aggregate yield, operator and false-call stats for the integrated report."""
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+
+    start = _parse_date(request.args.get('start_date'))
+    end = _parse_date(request.args.get('end_date'))
+
+    payload = build_report_payload(start, end)
+    return jsonify(payload)
 
 
 @main_bp.route('/reports/integrated', methods=['GET'])
@@ -806,6 +811,21 @@ def integrated_report():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
     return render_template('integrated_report.html', username=session.get('username'))
+
+
+@main_bp.route('/reports/integrated/export')
+def export_integrated_report():
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    start = _parse_date(request.args.get('start_date'))
+    end = _parse_date(request.args.get('end_date'))
+    payload = build_report_payload(start, end)
+    html = render_template('report.html', **payload)
+    if request.args.get('format') == 'pdf':
+        from weasyprint import HTML
+        pdf = HTML(string=html, base_url=request.url_root).write_pdf()
+        return send_file(io.BytesIO(pdf), mimetype='application/pdf', download_name='report.pdf')
+    return html
 
 
 @main_bp.route('/analysis/aoi/grades', methods=['GET'])
