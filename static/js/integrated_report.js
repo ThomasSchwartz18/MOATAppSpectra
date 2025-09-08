@@ -177,15 +177,24 @@ document.addEventListener('DOMContentLoaded', () => {
         const imgHeight = imgWidth / 3;
         doc.addImage(img, 'PNG', 10, 30, imgWidth, imgHeight);
 
+        const padding = 4;
+        const boxHeight = cfg.lines.length * 5 + padding;
         let y = 35 + imgHeight;
+        doc.setFillColor(245, 245, 245);
+        doc.rect(10, y, pageWidth - 20, boxHeight, 'F');
+        doc.setDrawColor(39, 83, 23);
+        doc.setLineWidth(0.5);
+        doc.line(10, y, pageWidth - 10, y);
+
+        let textY = y + padding;
         doc.setFontSize(10);
         cfg.lines.forEach((line) => {
-          doc.text(line, 10, y);
-          y += 5;
+          doc.text(line, 12, textY);
+          textY += 5;
         });
 
         if (cfg.table) {
-          doc.autoTable({ startY: y + 2, head: cfg.table.head, body: cfg.table.body });
+          doc.autoTable({ startY: y + boxHeight + padding, head: cfg.table.head, body: cfg.table.body });
         }
       });
 
