@@ -1102,6 +1102,10 @@ def export_integrated_report():
     author = _get('author')
     logo_url = _get('logo_url')
     footer_left = _get('footer_left')
+    report_id = _get('report_id')
+    contact = _get('contact', 'tschwartz@4spectra.com')
+    confidentiality = _get('confidentiality', 'Spectra-Tech • Confidential')
+    generated_at = datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')
 
     html = render_template(
         'report/index.html',
@@ -1114,6 +1118,10 @@ def export_integrated_report():
         author=author,
         logo_url=logo_url,
         footer_left=footer_left,
+        report_id=report_id,
+        contact=contact,
+        confidentiality=confidentiality,
+        generated_at=generated_at,
         **payload,
         **charts,
     )
