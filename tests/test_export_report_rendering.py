@@ -33,8 +33,11 @@ def _mock_report(monkeypatch):
 
     def fake_render(template, **context):
         tpl = (
-            "{% if show_cover %}<div class='cover-page'>cover</div>{% endif %}"
+            "{% if show_cover %}<div class='cover-page'>cover"
             "{% if show_summary %}<section class='summary'>"
+            "{% for k in summary_kpis %}<div class='kpi'>{{ k.label }}</div>{% endfor %}"
+            "</section>{% endif %}</div>{% elif show_summary %}"
+            "<section class='summary'>"
             "{% for k in summary_kpis %}<div class='kpi'>{{ k.label }}</div>{% endfor %}"
             "</section>{% endif %}"
             "{% for job in jobs %}<div class='job'>{{ job.label }}</div>{% endfor %}"
@@ -50,13 +53,38 @@ def test_show_cover_false_and_summary_one_page(app_instance, monkeypatch):
     with app_instance.app_context():
         with client.session_transaction() as sess:
             sess["username"] = "tester"
-        resp = client.get("/reports/integrated/export?format=html", json={"show_cover": False})
+        resp = client.get(
+            "/reports/integrated/export?format=html",
+            json={"show_cover": False, "show_summary": True},
+        )
         assert resp.status_code == 200
         html = resp.data.decode()
         assert "cover-page" not in html
-        assert html.count("<section") == 1
+        assert html.count("<section class='summary'>") == 1
         assert "KPI1" in html
         assert "JobA" in html
+        assert "Program Review Queue" not in html
+
+
+def test_cover_contains_summary_when_enabled(app_instance, monkeypatch):
+    _mock_report(monkeypatch)
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        with client.session_transaction() as sess:
+            sess["username"] = "tester"
+        resp = client.get(
+            "/reports/integrated/export?format=html",
+            json={"show_cover": True, "show_summary": True},
+        )
+        assert resp.status_code == 200
+        html = resp.data.decode()
+        assert "cover-page" in html
+        assert (
+            "<div class='cover-page'>cover<section class='summary'>" in html
+        )
+        assert "KPI1" in html
+        assert "JobA" in html
+        assert "Program Review Queue" not in html
 
 
 def test_data_keys_present_in_pdf(app_instance, monkeypatch):
@@ -65,7 +93,10 @@ def test_data_keys_present_in_pdf(app_instance, monkeypatch):
     with app_instance.app_context():
         with client.session_transaction() as sess:
             sess["username"] = "tester"
-        resp = client.get("/reports/integrated/export?format=pdf", json={"show_cover": False})
+        resp = client.get(
+            "/reports/integrated/export?format=pdf",
+            json={"show_cover": False, "show_summary": True},
+        )
         assert resp.status_code == 200
         pdfminer = pytest.importorskip("pdfminer.high_level")
         from pdfminer.high_level import extract_text
