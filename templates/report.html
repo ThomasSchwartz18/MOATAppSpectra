@@ -18,7 +18,7 @@
                     <p>Date range: {{ start }} - {{ end }}\nAverage yield: {{ yieldSummary.avg|round(1) }}%\nLowest yield date: {{ yieldSummary.worstDay.date or 'N/A' }} ({{ yieldSummary.worstDay.yield|round(1) }}%)\nWorst assembly: {{ yieldSummary.worstAssembly.assembly or 'N/A' }} ({{ yieldSummary.worstAssembly.yield|round(1) }}%)</p>
                     <table class="data-table">
                         <tbody>
-                        {% for d, y in yieldData.dates|zip(yieldData.yields) %}
+                        {% for d, y in yield_pairs %}
                             <tr><td>{{ d }}</td><td>{{ '%.1f'|format(y) }}</td></tr>
                         {% endfor %}
                         </tbody>
@@ -70,7 +70,7 @@
                     <table id="fcVsNgRateTable" class="data-table">
                         <thead><tr><th>Date</th><th>NG PPM</th><th>FalseCall PPM</th></tr></thead>
                         <tbody>
-                        {% for d, ng, fc in fcVsNgRate.dates|zip(fcVsNgRate.ngPpm, fcVsNgRate.fcPpm) %}
+                        {% for d, ng, fc in fc_vs_ng_pairs %}
                             <tr><td>{{ d }}</td><td>{{ '%.1f'|format(ng) }}</td><td>{{ '%.1f'|format(fc) }}</td></tr>
                         {% endfor %}
                         </tbody>
@@ -85,7 +85,7 @@
                     <table id="fcNgRatioTable" class="data-table">
                         <thead><tr><th>Model</th><th>FalseCall Parts</th><th>NG Parts</th><th>FC/NG Ratio</th></tr></thead>
                         <tbody>
-                        {% for m, fc, ng, r in fcNgRatio.models|zip(fcNgRatio.fcParts, fcNgRatio.ngParts, fcNgRatio.ratios) %}
+                        {% for m, fc, ng, r in fc_ng_ratio_pairs %}
                             <tr><td>{{ m }}</td><td>{{ '%.1f'|format(fc) }}</td><td>{{ '%.1f'|format(ng) }}</td><td>{{ '%.2f'|format(r) }}</td></tr>
                         {% endfor %}
                         </tbody>
