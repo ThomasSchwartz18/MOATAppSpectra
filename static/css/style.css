@@ -1,8 +1,28 @@
+/* Color system */
+:root {
+  --ink: #000;
+  --border: #000;
+  --surface: #fff;
+  --surface-alt: #dddddd;
+  --muted: #f2f2f2;
+  --muted-light: #f5f5f5;
+  --muted-dark: #e8e8e8;
+  --accent: #275317;
+  --button-bg: #adadad;
+  --tab-bg: #dfdfdf;
+  --border-muted: #ddd;
+  --border-light: #eee;
+  --border-hover: #cecece;
+  --hover-bg: #e3e3e3;
+  --danger: red;
+  --nav-height: 56px;
+}
+
 body {
   margin: 0;
   font-family: Arial, sans-serif;
   padding: 20px 100px;
-  background: #dddddd;
+  background: var(--surface-alt);
 }
 
 h2 {
@@ -13,7 +33,7 @@ h2 {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  background: #ffffff00;
+  background: transparent;
   padding: 0 20px;
   margin: 0;
 }
@@ -38,7 +58,7 @@ h2 {
   padding: 0;
   margin: 0;
   align-items: center;
-  border: 1px solid #000;
+  border: 1px solid var(--border);
 }
 
 .nav-item {
@@ -49,16 +69,16 @@ h2 {
 .nav-item a {
   display: block;
   padding: 14px 16px;
-  color: #000;
+  color: var(--ink);
   text-decoration: none;
   transition: color 0.3s ease;
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .nav-item:hover > a {
-  color: #275317;
-  background: #dddddd;
-  border: 1px solid #000;
+  color: var(--accent);
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
   border-top: none;
   border-bottom: none;
 }
@@ -70,9 +90,9 @@ h2 {
 .dropdown {
   display: none;
   position: absolute;
-  background: #ffffff;
+  background: var(--surface);
   min-width: 160px;
-  border: 1px solid #000;
+  border: 1px solid var(--border);
   /* border-top: none; */
   z-index: 1;
 }
@@ -81,14 +101,14 @@ h2 {
   padding: 12px 16px;
   text-decoration: none;
   display: block;
-  color: #000;
-  background: #FFFFFF;
+  color: var(--ink);
+  background: var(--surface);
   /* transition: background 0.3s ease, color 0.3s ease; */
 }
 
 .dropdown a:hover {
-  background: #E8E8E8;
-  color: #275317;
+  background: var(--muted-dark);
+  color: var(--accent);
 }
 
 .nav-item:hover .dropdown {
@@ -104,7 +124,7 @@ h2 {
   margin-left: 10px;
   font-size: 0.9em;
   text-decoration: underline;
-  color: #000;
+  color: var(--ink);
   transition: color 0.3s ease;
 }
 
@@ -113,15 +133,15 @@ h2 {
 }
 
 .nav-right a:hover {
-  color: #275317;
+  color: var(--accent);
 }
 
 .login-container {
   max-width: 300px;
   margin: 80px auto;
   padding: 20px;
-  border: 2px solid #000;
-  background: #E8E8E8;
+  border: 2px solid var(--border);
+  background: var(--muted-dark);
 }
 
 .login-container h2 {
@@ -146,13 +166,13 @@ h2 {
 .login-container button {
   margin-top: 20px;
   padding: 10px;
-  border: 2px solid #000;
-  background: #ADADAD;
+  border: 2px solid var(--border);
+  background: var(--button-bg);
   cursor: pointer;
 }
 
 .flash-messages {
-  color: red;
+  color: var(--danger);
   list-style: none;
   padding: 0;
 }
@@ -163,7 +183,7 @@ h2 {
 }
 
 .preview-card {
-  border: 2px solid #000;
+  border: 2px solid var(--border);
   padding: 10px;
   overflow-x: auto;
   overflow-y: hidden;
@@ -220,21 +240,21 @@ h2 {
 }
 
 .section-card {
-  border: 2px solid #000;
-  background: #ffffff;
+  border: 2px solid var(--border);
+  background: var(--surface);
   padding: 10px;
 }
 
 .chart-block {
-  border: 2px solid #000;
-  background: #fff;
+  border: 2px solid var(--border);
+  background: var(--surface);
   padding: 10px;
   margin-bottom: 20px;
 }
 
 .chart-summary {
-  border-top: 2px solid #275317;
-  background: #f5f5f5;
+  border-top: 2px solid var(--accent);
+  background: var(--muted-light);
   padding: 8px;
   margin-top: 8px;
 }
@@ -262,21 +282,21 @@ h2 {
 /* Tab styling for Chart Builder / Upload */
 .tab-bar {
   display: flex;
-  /* border-bottom: 2px solid #000; */
+  /* border-bottom: 2px solid var(--border); */
   margin: -10px -10px 10px -10px;
 }
 
 .tab {
   padding: 6px 12px;
   cursor: pointer;
-  border-bottom: 2px solid #000;
-  border-right: 2px solid #000;
-  border-left: 2px solid #000;
-  background: #dfdfdf;
+  border-bottom: 2px solid var(--border);
+  border-right: 2px solid var(--border);
+  border-left: 2px solid var(--border);
+  background: var(--tab-bg);
 }
 
 .tab.active {
-  background: #f5f5f5;
+  background: var(--muted-light);
   border: 0;
 }
 
@@ -294,8 +314,8 @@ h2 {
 }
 
 .modal {
-  background: #fff;
-  border: 2px solid #000;
+  background: var(--surface);
+  border: 2px solid var(--border);
   width: 96%;
   max-width: 1600px;
   height: 92vh;
@@ -307,26 +327,25 @@ h2 {
 }
 
 .modal-header { display:flex; justify-content: space-between; align-items:center; }
-.modal-close { cursor: pointer; border: 1px solid #000; padding: 4px 8px; background: #E8E8E8; }
+.modal-close { cursor: pointer; border: 1px solid var(--border); padding: 4px 8px; background: var(--muted-dark); }
 
 .data-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-.data-table th, .data-table td { border: 1px solid #000; padding: 4px; font-size: 12px; }
+.data-table th, .data-table td { border: 1px solid var(--border); padding: 4px; font-size: 12px; }
 .data-table th { cursor: pointer; }
 /* Saved Charts: separators instead of bullets */
-#saved-list { list-style: none; padding-left: 0 !important; margin: 0; border: 1px solid #DDD; border-radius: 6px; overflow: hidden; }
-#saved-list li { list-style: none; padding: 8px 10px; border-bottom: 1px solid #EEE; }
-#saved-list li:hover { list-style: none; padding: 8px 10px; border-bottom: 1px solid #cecece; background: #e3e3e3 }
+#saved-list { list-style: none; padding-left: 0 !important; margin: 0; border: 1px solid var(--border-muted); border-radius: 6px; overflow: hidden; }
+#saved-list li { list-style: none; padding: 8px 10px; border-bottom: 1px solid var(--border-light); }
+#saved-list li:hover { list-style: none; padding: 8px 10px; border-bottom: 1px solid var(--border-hover); background: var(--hover-bg) }
 #saved-list li:last-child { border-bottom: none; }
 
 /* Expanded chart area fills modal */
-.modal-chart-box { flex: 1 1 auto; min-height: 60vh; border: 2px solid #000; padding: 8px; margin-top: 6px; overflow: hidden; }
+.modal-chart-box { flex: 1 1 auto; min-height: 60vh; border: 2px solid var(--border); padding: 8px; margin-top: 6px; overflow: hidden; }
 .modal-chart-box canvas { width: 100% !important; height: 100% !important; max-height: none !important; }
 
 /* Make the bottom-right preview fill vertical space */
 .analysis-bottom-right .preview-card { flex: 1 1 auto; min-height: 0; }
 
 /* Navbar should overlay content and auto-hide on scroll */
-:root { --nav-height: 56px; }
 .navbar {
   position: fixed;
   top: 0;

@@ -1,3 +1,23 @@
+/* Color system */
+:root {
+    --ink: #000;
+    --border: #000;
+    --surface: #fff;
+    --surface-alt: #dddddd;
+    --muted: #f2f2f2;
+    --muted-light: #f5f5f5;
+    --muted-dark: #e8e8e8;
+    --accent: #275317;
+    --button-bg: #adadad;
+    --tab-bg: #dfdfdf;
+    --border-muted: #ddd;
+    --border-light: #eee;
+    --border-hover: #cecece;
+    --hover-bg: #e3e3e3;
+    --danger: red;
+    --nav-height: 56px;
+}
+
 body {
     font-family: Arial, sans-serif;
     margin: 0;
@@ -7,7 +27,7 @@ body {
 header {
     display: flex;
     align-items: center;
-    background-color: #f2f2f2;
+    background-color: var(--muted);
     padding: 10px;
 }
 
