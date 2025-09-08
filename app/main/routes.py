@@ -957,7 +957,12 @@ def export_integrated_report():
     if request.args.get('format') == 'pdf':
         from weasyprint import HTML
         pdf = HTML(string=html, base_url=request.url_root).write_pdf()
-        return send_file(io.BytesIO(pdf), mimetype='application/pdf', download_name='report.pdf')
+        return send_file(
+            io.BytesIO(pdf),
+            mimetype='application/pdf',
+            download_name='report.pdf',
+            as_attachment=True,
+        )
     return html
 
 
