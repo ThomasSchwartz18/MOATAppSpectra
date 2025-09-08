@@ -971,13 +971,21 @@ def export_integrated_report():
     payload['end'] = end.isoformat() if end else ''
     charts = _generate_report_charts(payload)
     html = render_template('report.html', **payload, **charts)
-    if request.args.get('format') == 'pdf':
+    fmt = request.args.get('format')
+    if fmt == 'pdf':
         from weasyprint import HTML
         pdf = HTML(string=html, base_url=request.url_root).write_pdf()
         return send_file(
             io.BytesIO(pdf),
             mimetype='application/pdf',
             download_name='report.pdf',
+            as_attachment=True,
+        )
+    if fmt == 'html':
+        return send_file(
+            io.BytesIO(html.encode('utf-8')),
+            mimetype='text/html',
+            download_name='report.html',
             as_attachment=True,
         )
     return html
