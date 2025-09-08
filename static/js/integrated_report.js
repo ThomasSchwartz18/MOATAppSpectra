@@ -28,7 +28,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   downloadBtn?.addEventListener('click', () => {
     const fmt = document.getElementById('file-format').value;
-    window.location = `/reports/integrated/export?format=${fmt}`;
+    const start = document.getElementById('start-date').value;
+    const end = document.getElementById('end-date').value;
+    const params = new URLSearchParams({ format: fmt });
+    if (start) params.append('start_date', start);
+    if (end) params.append('end_date', end);
+    window.location = `/reports/integrated/export?${params.toString()}`;
   });
 
   document.getElementById('email-report')?.addEventListener('click', () => {
