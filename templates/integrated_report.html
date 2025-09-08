@@ -17,63 +17,66 @@
   </div>
 </div>
 
-  <div id="charts" class="section-card">
-    <div class="chart-block">
-      <canvas id="yieldTrendChart"></canvas>
-      <div class="chart-summary">
-        <p id="yieldTrendDesc"></p>
-        <table id="yieldTrendTable" class="data-table"><tbody></tbody></table>
+  <details id="charts" class="section-card">
+    <summary>Preview Charts</summary>
+    <div>
+      <div class="chart-block">
+        <canvas id="yieldTrendChart"></canvas>
+        <div class="chart-summary">
+          <p id="yieldTrendDesc"></p>
+          <table id="yieldTrendTable" class="data-table"><tbody></tbody></table>
+        </div>
+      </div>
+      <div class="chart-block">
+        <canvas id="operatorRejectChart"></canvas>
+        <div class="chart-summary">
+          <p id="operatorRejectDesc"></p>
+          <table id="operatorRejectTable" class="data-table">
+            <thead>
+              <tr>
+                <th>Operator</th>
+                <th>Inspected</th>
+                <th>Rejected</th>
+                <th>Reject %</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="chart-block">
+        <canvas id="modelFalseCallsChart"></canvas>
+        <div class="chart-summary">
+          <p id="modelFalseCallsDesc"></p>
+          <table id="problem-assemblies" class="data-table"><tbody></tbody></table>
+        </div>
+      </div>
+      <div class="chart-block">
+        <canvas id="fcVsNgRateChart"></canvas>
+        <div class="chart-summary">
+          <p id="fcVsNgDesc"></p>
+          <table id="fcVsNgRateTable" class="data-table"><tbody></tbody></table>
+        </div>
+      </div>
+      <div class="chart-block">
+        <canvas id="fcNgRatioChart"></canvas>
+        <div class="chart-summary">
+          <p id="fcNgRatioDesc"></p>
+          <table id="fcNgRatioTable" class="data-table">
+            <thead>
+              <tr>
+                <th>Model</th>
+                <th>FalseCall Parts</th>
+                <th>NG Parts</th>
+                <th>FC/NG Ratio</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
       </div>
     </div>
-    <div class="chart-block">
-      <canvas id="operatorRejectChart"></canvas>
-      <div class="chart-summary">
-        <p id="operatorRejectDesc"></p>
-        <table id="operatorRejectTable" class="data-table">
-          <thead>
-            <tr>
-              <th>Operator</th>
-              <th>Inspected</th>
-              <th>Rejected</th>
-              <th>Reject %</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
-    <div class="chart-block">
-      <canvas id="modelFalseCallsChart"></canvas>
-      <div class="chart-summary">
-        <p id="modelFalseCallsDesc"></p>
-        <table id="problem-assemblies" class="data-table"><tbody></tbody></table>
-      </div>
-    </div>
-    <div class="chart-block">
-      <canvas id="fcVsNgRateChart"></canvas>
-      <div class="chart-summary">
-        <p id="fcVsNgDesc"></p>
-        <table id="fcVsNgRateTable" class="data-table"><tbody></tbody></table>
-      </div>
-    </div>
-    <div class="chart-block">
-      <canvas id="fcNgRatioChart"></canvas>
-      <div class="chart-summary">
-        <p id="fcNgRatioDesc"></p>
-        <table id="fcNgRatioTable" class="data-table">
-          <thead>
-            <tr>
-              <th>Model</th>
-              <th>FalseCall Parts</th>
-              <th>NG Parts</th>
-              <th>FC/NG Ratio</th>
-            </tr>
-          </thead>
-          <tbody></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
+  </details>
 
 <div class="field-row" id="download-controls">
   <div class="field">
