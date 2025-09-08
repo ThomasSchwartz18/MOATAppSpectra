@@ -1,0 +1,18 @@
+<section class="report-section">
+    <div class="chart-block">
+        <img src="{{ yieldTrendImg }}" alt="Yield Trend">
+        <div class="chart-summary">
+            <p>Date range: {{ start }} - {{ end }}
+Average yield: {{ yieldSummary.avg|round(1) }}%
+Lowest yield date: {{ yieldSummary.worstDay.date or 'N/A' }} ({{ yieldSummary.worstDay.yield|round(1) }}%)
+Worst assembly: {{ yieldSummary.worstAssembly.assembly or 'N/A' }} ({{ yieldSummary.worstAssembly.yield|round(1) }}%)</p>
+            <table class="data-table">
+                <tbody>
+                {% for d, y in yield_pairs %}
+                    <tr><td>{{ d }}</td><td>{{ '%.1f'|format(y) }}</td></tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>

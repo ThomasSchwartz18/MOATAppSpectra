@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Integrated Report</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/report.css') }}">
+</head>
+<body>
+    {% if show_cover %}
+        {% include 'report/cover.html' %}
+    {% endif %}
+    {% if show_summary %}
+        {% include 'report/summary.html' %}
+    {% endif %}
+    {% include 'report/yield_trend.html' %}
+    {% include 'report/operator_reject.html' %}
+    {% include 'report/model_false_calls.html' %}
+    {% include 'report/fc_vs_ng_rate.html' %}
+    {% include 'report/fc_ng_ratio.html' %}
+</body>
+</html>
