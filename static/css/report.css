@@ -57,6 +57,11 @@ header img {
     height: auto;
 }
 
+.avoid-break {
+    page-break-inside: avoid;
+    break-inside: avoid;
+}
+
 .chart-summary {
     border-top: 2px solid var(--accent);
     background: var(--muted-light);

@@ -1,0 +1,11 @@
+<section class="report-section section-card avoid-break">
+    <h2>Jobs Drill-Down</h2>
+    <table class="data-table">
+        <thead><tr><th>Job</th><th>Boards</th></tr></thead>
+        <tbody>
+        {% for job in jobs %}
+            <tr><td>{{ job.label }}</td><td>{{ job.value }}</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>

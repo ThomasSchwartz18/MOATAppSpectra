@@ -1,0 +1,16 @@
+<section class="report-section section-card">
+    <h2>Defect Intelligence</h2>
+    <div class="kpi-grid">
+    {% for kpi in kpis %}
+        <div>
+            <strong>{{ kpi.label }}</strong><br>
+            {{ '%.2f'|format(kpi.value) }}{% if kpi.target is defined %} (target {{ kpi.target }}){% endif %}
+        </div>
+    {% endfor %}
+    </div>
+    <ul>
+    {% for item in highlights %}
+        <li>{{ item.label }}: {{ item.value }}</li>
+    {% endfor %}
+    </ul>
+</section>

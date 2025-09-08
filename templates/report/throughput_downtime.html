@@ -1,0 +1,16 @@
+<section class="report-section section-card">
+    <h2>Throughput & Downtime / Cost & Risk</h2>
+    <table class="data-table">
+        <thead><tr><th>Assembly</th><th>Yield %</th><th>Target</th><th>Delta</th></tr></thead>
+        <tbody>
+        {% for item in top_risks %}
+            <tr>
+                <td>{{ item.label }}</td>
+                <td>{{ '%.1f'|format(item.value) }}</td>
+                <td>{{ item.target }}</td>
+                <td>{{ '%.1f'|format(item.delta) }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>

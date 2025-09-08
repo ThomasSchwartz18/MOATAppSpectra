@@ -1,0 +1,11 @@
+<section class="report-section section-card">
+    <h2>CAPA / Action Register</h2>
+    <table class="data-table">
+        <thead><tr><th>Assembly</th><th>Value</th></tr></thead>
+        <tbody>
+        {% for action in summary_actions %}
+            <tr><td>{{ action.label }}</td><td>{{ action.value }}</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
