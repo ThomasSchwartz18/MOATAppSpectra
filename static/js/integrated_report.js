@@ -101,8 +101,8 @@ document.addEventListener('DOMContentLoaded', () => {
           `Date range: ${reportData.start} - ${reportData.end}`,
           `Total boards: ${os.totalBoards ?? 0}`,
           `Avg reject rate: ${os.avgRate?.toFixed(2) ?? '0'}%`,
-          `Best: ${os.min?.name || 'N/A'} (${os.min?.rate?.toFixed(2) ?? '0'}%)`,
-          `Worst: ${os.max?.name || 'N/A'} (${os.max?.rate?.toFixed(2) ?? '0'}%)`,
+          `Lowest: ${os.min?.name || 'N/A'} (${os.min?.rate?.toFixed(2) ?? '0'}%)`,
+          `Highest: ${os.max?.name || 'N/A'} (${os.max?.rate?.toFixed(2) ?? '0'}%)`,
         ];
         const operatorTable = {
           head: [['Operator', 'Inspected', 'Rejected', 'Reject %']],
