@@ -898,22 +898,39 @@ def build_report_payload(start=None, end=None):
         'avgFalseCalls': avg_fc,
         'over20': [m['name'] for m in problem_assemblies],
     }
+    dates_iso = [d.isoformat() for d in dates]
+    yield_pairs = list(zip(dates_iso, yields))
+
+    fc_vs_ng_dates_iso = [d.isoformat() for d in fc_vs_ng_dates]
+    fc_vs_ng_pairs = list(zip(fc_vs_ng_dates_iso, ng_ppm_series, fc_ppm_series))
+
+    fc_ng_ratio_pairs = list(
+        zip(
+            fc_ng_ratio_data['models'],
+            fc_ng_ratio_data['fcParts'],
+            fc_ng_ratio_data['ngParts'],
+            fc_ng_ratio_data['ratios'],
+        )
+    )
 
     return {
         'yieldData': {
-            'dates': [d.isoformat() for d in dates],
+            'dates': dates_iso,
             'yields': yields,
             'assemblyYields': assembly_yields,
         },
+        'yield_pairs': yield_pairs,
         'operators': ops,
         'models': model_rows,
         'fcVsNgRate': {
-            'dates': [d.isoformat() for d in fc_vs_ng_dates],
+            'dates': fc_vs_ng_dates_iso,
             'ngPpm': ng_ppm_series,
             'fcPpm': fc_ppm_series,
         },
+        'fc_vs_ng_pairs': fc_vs_ng_pairs,
         'fcVsNgSummary': fc_vs_ng_summary,
         'fcNgRatio': fc_ng_ratio_data,
+        'fc_ng_ratio_pairs': fc_ng_ratio_pairs,
         'fcNgRatioSummary': fc_ng_ratio_summary,
         'yieldSummary': yield_summary,
         'operatorSummary': operator_summary,
