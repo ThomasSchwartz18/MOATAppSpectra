@@ -1078,12 +1078,42 @@ def export_integrated_report():
     payload['start'] = start.isoformat() if start else ''
     payload['end'] = end.isoformat() if end else ''
     charts = _generate_report_charts(payload)
-    show_cover = request.args.get('show_cover', '1') != '0'
-    show_summary = request.args.get('show_summary', '1') != '0'
+    body = request.get_json(silent=True) or {}
+
+    def _get(name, default=''):
+        return request.args.get(name, body.get(name, default))
+
+    def _get_bool(name, default=True):
+        value = request.args.get(name)
+        if value is None:
+            value = body.get(name)
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        return str(value).lower() not in {'0', 'false', 'no'}
+
+    show_cover = _get_bool('show_cover')
+    show_summary = _get_bool('show_summary')
+    title = _get('title')
+    subtitle = _get('subtitle')
+    report_date = _get('report_date')
+    period = _get('period')
+    author = _get('author')
+    logo_url = _get('logo_url')
+    footer_left = _get('footer_left')
+
     html = render_template(
         'report/index.html',
         show_cover=show_cover,
         show_summary=show_summary,
+        title=title,
+        subtitle=subtitle,
+        report_date=report_date,
+        period=period,
+        author=author,
+        logo_url=logo_url,
+        footer_left=footer_left,
         **payload,
         **charts,
     )
