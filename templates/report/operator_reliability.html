@@ -1,0 +1,19 @@
+<section class="report-section section-card">
+    <h2>Operator Reliability</h2>
+    <table class="data-table">
+        <thead>
+            <tr><th>Operator</th><th>Inspected</th><th>Rejected</th><th>Reject %</th></tr>
+        </thead>
+        <tbody>
+        {% for op in top_tables.operators %}
+            <tr>
+                <td>{{ op.name }}</td>
+                <td>{{ op.inspected }}</td>
+                <td>{{ op.rejected }}</td>
+                <td>{{ '%.2f'|format(op.rate) }}%</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+    <p>Total boards: {{ operatorSummary.totalBoards }} | Average reject rate: {{ operatorSummary.avgRate|round(2) }}%</p>
+</section>
