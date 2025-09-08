@@ -632,7 +632,7 @@ def _generate_report_charts(payload):
         ax.plot(labels, [lower] * len(labels), linestyle='--', color='red', label='-3σ')
         ax.set_ylabel('False Calls/Board')
         ax.set_title('False Calls by Model')
-        ax.tick_params(axis='x', rotation=45)
+        ax.tick_params(axis='x', labelbottom=False)
         ax.legend()
     charts['modelFalseCallsImg'] = _fig_to_data_uri(fig)
 
@@ -660,7 +660,7 @@ def _generate_report_charts(payload):
         ax.bar(models, ratios, color='teal')
         ax.set_ylabel('FC/NG Ratio')
         ax.set_title('FC/NG Ratio by Model')
-        ax.tick_params(axis='x', rotation=45)
+        ax.tick_params(axis='x', labelbottom=False)
     charts['fcNgRatioImg'] = _fig_to_data_uri(fig)
 
     return charts
