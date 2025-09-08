@@ -35,3 +35,50 @@ header img {
     height: 40px;
     margin-right: 10px;
 }
+
+.section-card {
+    border: 2px solid var(--border);
+    background: var(--surface);
+    padding: 10px;
+}
+
+.chart-block {
+    border: 2px solid var(--border);
+    background: var(--surface);
+    padding: 10px;
+    margin-bottom: 20px;
+}
+
+.chart-block img {
+    width: 100%;
+    height: auto;
+}
+
+.chart-summary {
+    border-top: 2px solid var(--accent);
+    background: var(--muted-light);
+    padding: 8px;
+    margin-top: 8px;
+}
+
+.chart-summary p {
+    white-space: pre-line;
+    margin: 0 0 8px 0;
+}
+
+.data-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 10px;
+}
+
+.data-table th,
+.data-table td {
+    border: 1px solid var(--border);
+    padding: 4px;
+    font-size: 12px;
+}
+
+.data-table th {
+    text-align: left;
+}
