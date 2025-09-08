@@ -1,7 +1,8 @@
 <section class="report-section section-card avoid-break">
-    <h2>Jobs Drill-Down</h2>
+    <h2>Operator Production</h2>
+    <p class="section-desc">Inspection volume by operator.</p>
     <table class="data-table">
-        <thead><tr><th>Job</th><th>Boards</th></tr></thead>
+        <thead><tr><th>Operator</th><th>Inspected Quantity</th></tr></thead>
         <tbody>
         {% for job in jobs %}
             <tr><td>{{ job.label }}</td><td>{{ job.value }}</td></tr>
