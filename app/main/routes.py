@@ -667,7 +667,13 @@ def _generate_report_charts(payload):
 
 
 def build_report_payload(start=None, end=None):
-    """Aggregate yield, operator and false-call stats for the integrated report."""
+    """Aggregate yield, operator and false-call stats for the integrated report.
+
+    This function now merges AOI report rows that have not yet been
+    incorporated into ``combined_reports`` so the Integrated Report can
+    surface newly uploaded AOI data without waiting for the combined table
+    to refresh.
+    """
     combined, error = fetch_combined_reports()
     if error:
         abort(500, description=error)
@@ -677,6 +683,8 @@ def build_report_payload(start=None, end=None):
 
     by_date = defaultdict(lambda: {'inspected': 0.0, 'aoi_rej': 0.0, 'fi_rej': 0.0})
     by_assembly = defaultdict(lambda: {'inspected': 0.0, 'aoi_rej': 0.0, 'fi_rej': 0.0})
+    # Track job numbers found in combined data so we can avoid double counting
+    combined_jobs: set[str | None] = set()
 
     for row in combined or []:
         dt = _parse_date(row.get('aoi_Date') or row.get('Date') or row.get('date'))
@@ -698,6 +706,7 @@ def build_report_payload(start=None, end=None):
             fi_rej = parse_fi_rejections(info, phrases)
 
         assembly = row.get('aoi_Assembly') or row.get('Assembly') or 'Unknown'
+        job_number = row.get('aoi_Job Number') or row.get('Job Number')
 
         by_date[dt]['inspected'] += inspected
         by_date[dt]['aoi_rej'] += aoi_rej
@@ -707,7 +716,10 @@ def build_report_payload(start=None, end=None):
         by_assembly[assembly]['aoi_rej'] += aoi_rej
         by_assembly[assembly]['fi_rej'] += fi_rej
 
-    # Operator statistics now come from AOI reports exclusively
+        combined_jobs.add(job_number)
+
+    # Operator statistics now come from AOI reports exclusively, and we also
+    # merge any AOI-only rows into the by_date/by_assembly aggregations above.
     aoi_reports, error = fetch_aoi_reports()
     if error:
         abort(500, description=error)
@@ -725,6 +737,16 @@ def build_report_payload(start=None, end=None):
         operator = row.get('aoi_Operator') or row.get('Operator') or 'Unknown'
         by_operator[operator]['inspected'] += inspected
         by_operator[operator]['rejected'] += rejected
+
+        job_number = row.get('aoi_Job Number') or row.get('Job Number')
+        # Only augment yield statistics if this job was absent from combined_reports
+        if job_number not in combined_jobs:
+            assembly = row.get('aoi_Assembly') or row.get('Assembly') or 'Unknown'
+            by_date[dt]['inspected'] += inspected
+            by_date[dt]['aoi_rej'] += rejected
+            by_assembly[assembly]['inspected'] += inspected
+            by_assembly[assembly]['aoi_rej'] += rejected
+            combined_jobs.add(job_number)
 
     dates = sorted(d for d in by_date.keys() if d)
     yields = []
