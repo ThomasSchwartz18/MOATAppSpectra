@@ -20,6 +20,8 @@
     --border-muted: #ddd;
     --border-light: #eee;
     --border-hover: #cecece;
+    --border-thin: 1px;
+    --border-thick: 2px;
     --hover-bg: #e3e3e3;
     --danger: red;
     --nav-height: 56px;
@@ -68,7 +70,9 @@ header img {
     margin: 0;
 }
 .section-card {
-    border: 2px solid var(--border);
+    border-style: solid;
+    border-color: var(--border);
+    border-width: var(--border-thin) var(--border-thin) var(--border-thick) var(--border-thick);
     background: var(--surface);
     padding: 10px;
 }
@@ -80,7 +84,9 @@ header img {
 }
 
 .chart-block {
-    border: 2px solid var(--border);
+    border-style: solid;
+    border-color: var(--border);
+    border-width: var(--border-thin) var(--border-thin) var(--border-thick) var(--border-thick);
     background: var(--surface);
     padding: 10px;
     margin-bottom: 20px;
@@ -122,7 +128,9 @@ header img {
 
 .data-table th,
 .data-table td {
-    border: 1px solid var(--border);
+    border-style: solid;
+    border-color: var(--border);
+    border-width: var(--border-thin) var(--border-thin) var(--border-thick) var(--border-thick);
     padding: 4px;
     font-size: 12px;
 }
