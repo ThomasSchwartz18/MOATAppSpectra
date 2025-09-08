@@ -1127,7 +1127,10 @@ def export_integrated_report():
     fmt = request.args.get('format')
     if fmt == 'pdf':
         from weasyprint import HTML
-        pdf = HTML(string=html, base_url=request.url_root).write_pdf()
+        from weasyprint.text.fonts import FontConfiguration
+
+        font_config = FontConfiguration()
+        pdf = HTML(string=html, base_url=request.url_root).write_pdf(font_config=font_config)
         return send_file(
             io.BytesIO(pdf),
             mimetype='application/pdf',
