@@ -39,16 +39,6 @@ header img {
     height: 40px;
     margin-right: 10px;
 }
-
-
-.report-section {
-    page-break-after: always;
-}
-
-.report-section:last-child {
-    page-break-after: auto;
-}
-
 .section-card {
     border: 2px solid var(--border);
     background: var(--surface);
@@ -94,4 +84,53 @@ header img {
 
 .data-table th {
     text-align: left;
+}
+
+/* Grid layouts */
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 8px;
+}
+
+.table-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.chart-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px;
+}
+
+.chart-grid .chart-block {
+    width: 480px;
+    height: 320px;
+}
+
+.table-grid .data-table {
+    width: 480px;
+}
+
+@media print {
+    .report-section {
+        page-break-after: always;
+    }
+
+    .report-section:last-child {
+        page-break-after: auto;
+    }
+
+    .chart-grid .chart-block,
+    .table-grid .data-table {
+        page-break-inside: avoid;
+        break-inside: avoid;
+        overflow: hidden;
+    }
+
+    .summary-page {
+        page-break-after: always;
+    }
 }
