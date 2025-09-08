@@ -7,9 +7,9 @@
         {% for item in top_risks %}
             <tr>
                 <td>{{ item.label }}</td>
-                <td>{{ '%.1f'|format(item.value) }}</td>
-                <td>{{ item.target }}</td>
-                <td>{{ '%.1f'|format(item.delta) }}</td>
+                <td>{{ '%.2f'|format(item.value) }}</td>
+                <td>{{ '%.2f'|format(item.target) }}</td>
+                <td>{{ '%.2f'|format(item.delta) }}</td>
             </tr>
         {% endfor %}
         </tbody>

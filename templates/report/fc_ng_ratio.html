@@ -9,7 +9,7 @@
                 <thead><tr><th>Model</th><th>FalseCall Parts</th><th>NG Parts</th><th>FC/NG Ratio</th></tr></thead>
                 <tbody>
                 {% for m, fc, ng, r in fc_ng_ratio_pairs %}
-                    <tr><td>{{ m }}</td><td>{{ '%.1f'|format(fc) }}</td><td>{{ '%.1f'|format(ng) }}</td><td>{{ '%.2f'|format(r) }}</td></tr>
+                    <tr><td>{{ m }}</td><td>{{ '%.2f'|format(fc) }}</td><td>{{ '%.2f'|format(ng) }}</td><td>{{ '%.2f'|format(r) }}</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

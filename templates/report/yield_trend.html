@@ -4,13 +4,13 @@
         <img src="{{ yieldTrendImg }}" alt="Yield Trend">
         <div class="chart-summary">
             <p><strong>Date range:</strong> {{ start }} - {{ end }}<br>
-<strong>Average yield:</strong> {{ yieldSummary.avg|round(1) }}%<br>
-<strong>Lowest yield date:</strong> {{ yieldSummary.worstDay.date or 'N/A' }} ({{ yieldSummary.worstDay.yield|round(1) }}%)<br>
-<strong>Worst assembly:</strong> {{ yieldSummary.worstAssembly.assembly or 'N/A' }} ({{ yieldSummary.worstAssembly.yield|round(1) }}%)</p>
+<strong>Average yield:</strong> {{ yieldSummary.avg|round(2) }}%<br>
+<strong>Lowest yield date:</strong> {{ yieldSummary.worstDay.date or 'N/A' }} ({{ yieldSummary.worstDay.yield|round(2) }}%)<br>
+<strong>Worst assembly:</strong> {{ yieldSummary.worstAssembly.assembly or 'N/A' }} ({{ yieldSummary.worstAssembly.yield|round(2) }}%)</p>
             <table class="data-table">
                 <tbody>
                 {% for d, y in yield_pairs %}
-                    <tr><td>{{ d }}</td><td>{{ '%.1f'|format(y) }}</td></tr>
+                    <tr><td>{{ d }}</td><td>{{ '%.2f'|format(y) }}</td></tr>
                 {% endfor %}
                 </tbody>
             </table>

@@ -191,13 +191,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const yDesc = document.getElementById('yieldTrendDesc');
     yDesc.innerHTML =
       `<strong>Date range:</strong> ${start} - ${end}<br>` +
-      `<strong>Average yield:</strong> ${yd.avg?.toFixed(1) ?? '0'}%<br>` +
+      `<strong>Average yield:</strong> ${yd.avg?.toFixed(2) ?? '0.00'}%<br>` +
       `<strong>Lowest yield date:</strong> ${
         yd.worstDay?.date || 'N/A'
-      } (${yd.worstDay?.yield?.toFixed(1) ?? '0'}%)<br>` +
+      } (${yd.worstDay?.yield?.toFixed(2) ?? '0.00'}%)<br>` +
       `<strong>Worst assembly:</strong> ${
         yd.worstAssembly?.assembly || 'N/A'
-      } (${yd.worstAssembly?.yield?.toFixed(1) ?? '0'}%)`;
+      } (${yd.worstAssembly?.yield?.toFixed(2) ?? '0.00'}%)`;
 
     const yTable = document.getElementById('yieldTrendTable');
     const yTbody = yTable.querySelector('tbody');
@@ -207,7 +207,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const dateTd = document.createElement('td');
       dateTd.textContent = d;
       const yieldTd = document.createElement('td');
-      yieldTd.textContent = (yieldData.yields[i] ?? 0).toFixed(1);
+      yieldTd.textContent = (yieldData.yields[i] ?? 0).toFixed(2);
       tr.appendChild(dateTd);
       tr.appendChild(yieldTd);
       yTbody.appendChild(tr);
@@ -242,14 +242,14 @@ document.addEventListener('DOMContentLoaded', () => {
       `<strong>Date range:</strong> ${start} - ${end}<br>` +
       `<strong>Total boards:</strong> ${os.totalBoards ?? 0}<br>` +
       `<strong>Average reject rate:</strong> ${
-        os.avgRate?.toFixed(2) ?? '0'
+        os.avgRate?.toFixed(2) ?? '0.00'
       }%<br>` +
       `<strong>Min reject rate:</strong> ${
         os.min?.name || 'N/A'
-      } (${os.min?.rate?.toFixed(2) ?? '0'}%)<br>` +
+        } (${os.min?.rate?.toFixed(2) ?? '0.00'}%)<br>` +
       `<strong>Max reject rate:</strong> ${
         os.max?.name || 'N/A'
-      } (${os.max?.rate?.toFixed(2) ?? '0'}%)`;
+        } (${os.max?.rate?.toFixed(2) ?? '0.00'}%)`;
 
     const oTable = document.getElementById('operatorRejectTable');
     const oTbody = oTable.querySelector('tbody');
@@ -341,7 +341,7 @@ document.addEventListener('DOMContentLoaded', () => {
     mDesc.innerHTML =
       `<strong>Date range:</strong> ${start} - ${end}<br>` +
       `<strong>Average false calls/board:</strong> ${
-        ms.avgFalseCalls?.toFixed(2) ?? '0'
+        ms.avgFalseCalls?.toFixed(2) ?? '0.00'
       }<br>` +
       'Line chart shows mean and ±3σ control limits; models outside may need review.<br>' +
       `<strong>Problem assemblies (>20 false calls/board):</strong> ${
@@ -392,7 +392,7 @@ document.addEventListener('DOMContentLoaded', () => {
     fcDesc.innerHTML =
       `<strong>Date range:</strong> ${start} - ${end}<br>` +
       `<strong>Correlation (FC vs NG):</strong> ${
-        fr.correlation?.toFixed(2) ?? '0'
+        fr.correlation?.toFixed(2) ?? '0.00'
       }<br>` +
       `<strong>False call rate has</strong> ${fr.fcTrend} over period`;
 
@@ -404,9 +404,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const dateTd = document.createElement('td');
       dateTd.textContent = d;
       const ngTd = document.createElement('td');
-      ngTd.textContent = (fcVsNgRate?.ngPpm[i] ?? 0).toFixed(1);
+      ngTd.textContent = (fcVsNgRate?.ngPpm[i] ?? 0).toFixed(2);
       const fcTd = document.createElement('td');
-      fcTd.textContent = (fcVsNgRate?.fcPpm[i] ?? 0).toFixed(1);
+      fcTd.textContent = (fcVsNgRate?.fcPpm[i] ?? 0).toFixed(2);
       tr.appendChild(dateTd);
       tr.appendChild(ngTd);
       tr.appendChild(fcTd);
@@ -447,9 +447,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const modelTd = document.createElement('td');
       modelTd.textContent = m;
       const fcTd = document.createElement('td');
-      fcTd.textContent = (fcNgRatio.fcParts?.[i] ?? 0).toFixed(1);
+      fcTd.textContent = (fcNgRatio.fcParts?.[i] ?? 0).toFixed(2);
       const ngTd = document.createElement('td');
-      ngTd.textContent = (fcNgRatio.ngParts?.[i] ?? 0).toFixed(1);
+      ngTd.textContent = (fcNgRatio.ngParts?.[i] ?? 0).toFixed(2);
       const ratioTd = document.createElement('td');
       ratioTd.textContent = (fcNgRatio.ratios?.[i] ?? 0).toFixed(2);
       tr.append(modelTd, fcTd, ngTd, ratioTd);

@@ -5,7 +5,7 @@
     <table class="data-table">
         <tbody>
         {% for d, y in appendix.yield %}
-            <tr><td>{{ d }}</td><td>{{ '%.1f'|format(y) }}</td></tr>
+            <tr><td>{{ d }}</td><td>{{ '%.2f'|format(y) }}</td></tr>
         {% endfor %}
         </tbody>
     </table>
@@ -14,7 +14,7 @@
         <thead><tr><th>Date</th><th>NG PPM</th><th>FC PPM</th></tr></thead>
         <tbody>
         {% for d, ng, fc in appendix.fcVsNg %}
-            <tr><td>{{ d }}</td><td>{{ '%.1f'|format(ng) }}</td><td>{{ '%.1f'|format(fc) }}</td></tr>
+            <tr><td>{{ d }}</td><td>{{ '%.2f'|format(ng) }}</td><td>{{ '%.2f'|format(fc) }}</td></tr>
         {% endfor %}
         </tbody>
     </table>
@@ -23,7 +23,7 @@
         <thead><tr><th>Model</th><th>FC Parts</th><th>NG Parts</th><th>Ratio</th></tr></thead>
         <tbody>
         {% for m, fc, ng, r in appendix.fcNgRatio %}
-            <tr><td>{{ m }}</td><td>{{ '%.1f'|format(fc) }}</td><td>{{ '%.1f'|format(ng) }}</td><td>{{ '%.2f'|format(r) }}</td></tr>
+            <tr><td>{{ m }}</td><td>{{ '%.2f'|format(fc) }}</td><td>{{ '%.2f'|format(ng) }}</td><td>{{ '%.2f'|format(r) }}</td></tr>
         {% endfor %}
         </tbody>
     </table>
