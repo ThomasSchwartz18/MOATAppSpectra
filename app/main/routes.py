@@ -1154,7 +1154,7 @@ def export_integrated_report():
     confidentiality = _get('confidentiality', 'Spectra-Tech • Confidential')
     generated_at = datetime.now(ZoneInfo('EST')).strftime('%Y-%m-%d %H:%M:%S %Z')
 
-    if show_cover and show_summary:
+    if show_summary:
         payload.setdefault(
             'yieldSummary',
             {
@@ -1419,7 +1419,7 @@ def export_operator_report():
     confidentiality = _get('confidentiality', 'Spectra-Tech • Confidential')
     generated_at = datetime.now(ZoneInfo('EST')).strftime('%Y-%m-%d %H:%M:%S %Z')
 
-    if show_cover and show_summary:
+    if show_summary:
         payload.setdefault(
             'yieldSummary',
             {
