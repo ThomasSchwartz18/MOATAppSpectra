@@ -99,3 +99,52 @@ def test_export_integrated_report_respects_date_range(app_instance, monkeypatch)
         assert resp_pdf.status_code == 200
         assert resp_pdf.mimetype == "application/pdf"
         assert len(resp_pdf.data) > 1000
+
+
+def test_export_integrated_report_filename_in_header(app_instance, monkeypatch):
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        combined = [
+            {
+                "Date": "2024-07-01",
+                "Assembly": "ASM1",
+                "Quantity Inspected": 100,
+                "Quantity Rejected": 5,
+            }
+        ]
+        aoi_rows = [
+            {
+                "Date": "2024-07-01",
+                "Operator": "Alice",
+                "Quantity Inspected": 100,
+                "Quantity Rejected": 5,
+            }
+        ]
+        moat_rows = [
+            {
+                "report_date": "2024-07-01",
+                "Model": "M1",
+                "FalseCall Parts": 10,
+                "Total Boards": 1,
+                "Total Parts": 100,
+                "NG Parts": 2,
+            }
+        ]
+        monkeypatch.setattr(routes, "fetch_combined_reports", lambda: (combined, None))
+        monkeypatch.setattr(routes, "fetch_aoi_reports", lambda: (aoi_rows, None))
+        monkeypatch.setattr(routes, "fetch_moat", lambda: (moat_rows, None))
+        monkeypatch.setattr(routes, "_generate_report_charts", lambda payload: {
+            "yieldTrendImg": "",
+            "operatorRejectImg": "",
+            "modelFalseCallsImg": "",
+            "fcVsNgRateImg": "",
+            "fcNgRatioImg": "",
+        })
+        with client.session_transaction() as sess:
+            sess["username"] = "tester"
+        resp_pdf = client.get(
+            "/reports/integrated/export?start_date=2024-07-01&end_date=2024-07-31&format=pdf"
+        )
+        assert resp_pdf.status_code == 200
+        header = resp_pdf.headers.get("Content-Disposition", "")
+        assert "240701_240731_aoiIR.pdf" in header
