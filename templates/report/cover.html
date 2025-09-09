@@ -1,4 +1,4 @@
-<section class="report-section cover-page">
+<section id="cover" class="report-section cover-page">
     <br>
         <h1>
             <img src="{{ url_for('static', filename='images/company-logo.png') }}" alt="Company logo" class="company-logo-pdf"/>
@@ -16,5 +16,7 @@
     </header>
     {% if show_summary %}
         {% include 'report/summary.html' %}
+        <div class="summary-break"></div>
+        {% include 'report/toc.html' %}
     {% endif %}
 </section>
