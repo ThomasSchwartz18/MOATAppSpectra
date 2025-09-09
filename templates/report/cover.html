@@ -2,8 +2,8 @@
     <br>
     <header>
         <h1>
-            <img src="{{ url_for('static', filename='images/company-logo.png') }}" alt="Company logo" class="company-logo-pdf"/>
-            {{ title }}
+            <img src="{{ logo_url or url_for('static', filename='images/company-logo.png') }}" alt="Company logo" class="company-logo-pdf"/>
+            {{ title or 'Operator Report' }}
         </h1>
     </header>
     <br />

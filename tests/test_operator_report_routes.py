@@ -139,3 +139,45 @@ def test_api_operator_report_filters_and_aggregates(app_instance, monkeypatch):
                 "fiRejectRate": 10.0,
             },
         ]
+
+
+def test_operator_cover_page(app_instance, monkeypatch):
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        from app.main import routes
+
+        sample_payload = {
+            "daily": {"dates": ["2024-07-01"], "inspected": [10.0], "rejectRates": [5.0]},
+            "assemblies": [{"assembly": "A1", "inspected": 10.0}],
+            "summary": {
+                "totalBoards": 10.0,
+                "avgPerShift": 10.0,
+                "avgRejectRate": 5.0,
+                "avgBoards": 10.0,
+            },
+        }
+
+        monkeypatch.setattr(
+            routes, "build_operator_report_payload", lambda start, end, operator: sample_payload
+        )
+        monkeypatch.setattr(routes, "_generate_operator_report_charts", lambda payload: {})
+        monkeypatch.setattr(routes, "fetch_combined_reports", lambda: ([], None))
+
+        with client.session_transaction() as sess:
+            sess["username"] = "tester"
+
+        resp = client.get(
+            "/reports/operator/export?format=html&show_cover=true&show_summary=true&operator=Alice"
+        )
+        assert resp.status_code == 200
+        html = resp.data.decode()
+        assert "cover-page" in html
+        assert "/static/images/company-logo.png" in html
+        assert "Alice" in html
+
+        resp = client.get(
+            "/reports/operator/export?format=html&show_cover=false&show_summary=true&operator=Alice"
+        )
+        assert resp.status_code == 200
+        html = resp.data.decode()
+        assert "cover-page" not in html
