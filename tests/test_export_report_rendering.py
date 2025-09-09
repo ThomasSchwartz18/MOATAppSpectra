@@ -27,6 +27,7 @@ def _mock_report(monkeypatch):
     sample_payload = {
         "summary_kpis": [{"label": "KPI1", "value": 1}],
         "jobs": [{"label": "JobA", "value": 10}],
+        "avgBoards": 10,
     }
     monkeypatch.setattr(routes, "build_report_payload", lambda start, end: sample_payload)
     monkeypatch.setattr(routes, "_generate_report_charts", lambda payload: {})

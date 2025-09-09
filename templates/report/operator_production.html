@@ -1,6 +1,9 @@
 <section id="operator-production" class="report-section section-card avoid-break combined-section">
     <h2>Operator Production</h2>
-    <p class="section-desc">Shows inspection volume completed by each operator.</p>
+    <p class="section-desc">
+        Shows inspection volume completed by each operator.
+        <span class="avg-boards">Average: {{ avgBoards|round(2) }}</span>
+    </p>
     <table class="data-table">
         <thead><tr><th>Operator</th><th>Inspected Quantity</th></tr></thead>
         <tbody>

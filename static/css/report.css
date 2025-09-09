@@ -155,6 +155,10 @@ header img {
     margin-bottom: 8px;
 }
 
+.avg-boards {
+    color: #888;
+}
+
 .data-table {
     width: 100%;
     border-collapse: collapse;

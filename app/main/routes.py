@@ -928,6 +928,8 @@ def build_report_payload(start=None, end=None):
 
     total_boards = sum(o['inspected'] for o in operator_rows)
     avg_rate = sum(o['rate'] for o in ops) / len(ops) if ops else 0.0
+    num_ops = len(ops)
+    avg_boards = total_boards / num_ops if num_ops else 0.0
     if ops:
         min_op = min(ops, key=lambda o: o['rate'])
         max_op = max(ops, key=lambda o: o['rate'])
@@ -939,6 +941,7 @@ def build_report_payload(start=None, end=None):
         'avgRate': avg_rate,
         'min': {'name': min_op['name'], 'rate': min_op['rate']},
         'max': {'name': max_op['name'], 'rate': max_op['rate']},
+        'avgBoards': avg_boards,
     }
 
     avg_fc = sum(m['falseCalls'] for m in model_rows) / len(model_rows) if model_rows else 0.0
@@ -1062,6 +1065,7 @@ def build_report_payload(start=None, end=None):
         'charts': charts,
         'top_tables': top_tables,
         'jobs': jobs,
+        'avgBoards': avg_boards,
         'appendix': appendix,
     }
 
@@ -1199,6 +1203,7 @@ def _aggregate_operator_report(start=None, end=None, operator: str | None = None
     assemblies = defaultdict(float)
     total_inspected = 0.0
     total_rejected = 0.0
+    unique_ops: set[str] = set()
 
     for row in rows or []:
         date_val = _parse_date(row.get('Date') or row.get('aoi_Date'))
@@ -1210,6 +1215,8 @@ def _aggregate_operator_report(start=None, end=None, operator: str | None = None
         op_name = (row.get('Operator') or row.get('aoi_Operator') or '').strip()
         if operators and op_name.lower() not in operators:
             continue
+        if op_name:
+            unique_ops.add(op_name)
 
         inspected = float(
             row.get('Quantity Inspected')
@@ -1249,6 +1256,8 @@ def _aggregate_operator_report(start=None, end=None, operator: str | None = None
     avg_reject_rate = (
         (total_rejected / total_inspected) * 100 if total_inspected else 0
     )
+    num_ops = len(unique_ops)
+    avg_boards = total_inspected / num_ops if num_ops else 0
 
     assemblies_list = [
         {'assembly': asm, 'inspected': count}
@@ -1265,6 +1274,7 @@ def _aggregate_operator_report(start=None, end=None, operator: str | None = None
             'totalBoards': total_inspected,
             'avgPerShift': avg_per_shift,
             'avgRejectRate': avg_reject_rate,
+            'avgBoards': avg_boards,
         },
         'assemblies': assemblies_list,
     }
