@@ -1200,7 +1200,7 @@ def _aggregate_operator_report(start=None, end=None, operator: str | None = None
         abort(500, description=error)
 
     daily = defaultdict(lambda: {'inspected': 0.0, 'rejected': 0.0})
-    assemblies = defaultdict(float)
+    assemblies = defaultdict(lambda: {'inspected': 0.0, 'rejected': 0.0})
     total_inspected = 0.0
     total_rejected = 0.0
     unique_ops: set[str] = set()
@@ -1236,7 +1236,8 @@ def _aggregate_operator_report(start=None, end=None, operator: str | None = None
             daily[date_val]['rejected'] += rejected
 
         asm = row.get('Assembly') or row.get('aoi_Assembly') or 'Unknown'
-        assemblies[asm] += inspected
+        assemblies[asm]['inspected'] += inspected
+        assemblies[asm]['rejected'] += rejected
 
         total_inspected += inspected
         total_rejected += rejected
@@ -1259,10 +1260,47 @@ def _aggregate_operator_report(start=None, end=None, operator: str | None = None
     num_ops = len(unique_ops)
     avg_boards = total_inspected / num_ops if num_ops else 0
 
-    assemblies_list = [
-        {'assembly': asm, 'inspected': count}
-        for asm, count in sorted(assemblies.items(), key=lambda x: x[1], reverse=True)
-    ]
+    combined, error = fetch_combined_reports()
+    if error:
+        abort(500, description=error)
+
+    fi_data = defaultdict(lambda: {'fi_rejected': 0.0, 'aoi_inspected': 0.0})
+    for row in combined or []:
+        date_val = _parse_date(row.get('aoi_Date') or row.get('Date'))
+        if start and date_val and date_val < start:
+            continue
+        if end and date_val and date_val > end:
+            continue
+
+        op_name = (row.get('aoi_Operator') or row.get('Operator') or '').strip()
+        if operators and op_name.lower() not in operators:
+            continue
+
+        asm = row.get('aoi_Assembly') or row.get('Assembly') or 'Unknown'
+        fi_data[asm]['fi_rejected'] += float(row.get('fi_Quantity Rejected') or 0)
+        fi_data[asm]['aoi_inspected'] += float(
+            row.get('aoi_Quantity Inspected')
+            or row.get('Quantity Inspected')
+            or 0
+        )
+
+    assemblies_list = []
+    for asm, counts in sorted(
+        assemblies.items(), key=lambda x: x[1]['inspected'], reverse=True
+    ):
+        fi_info = fi_data.get(asm)
+        if fi_info and fi_info['aoi_inspected']:
+            fi_rate = fi_info['fi_rejected'] / fi_info['aoi_inspected'] * 100
+        else:
+            fi_rate = None
+        assemblies_list.append(
+            {
+                'assembly': asm,
+                'inspected': counts['inspected'],
+                'rejected': counts['rejected'],
+                'fiRejectRate': fi_rate,
+            }
+        )
 
     return {
         'daily': {

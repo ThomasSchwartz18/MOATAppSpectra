@@ -37,11 +37,22 @@
         <h2>Assemblies</h2>
         <table class="data-table">
             <thead>
-                <tr><th>Assembly</th><th>Inspected</th></tr>
+                <tr><th>Assembly</th><th>Inspected</th><th>Rejected</th><th>FI Reject %</th></tr>
             </thead>
             <tbody>
                 {% for asm in assemblies %}
-                <tr><td>{{ asm.assembly }}</td><td>{{ asm.inspected }}</td></tr>
+                <tr>
+                    <td>{{ asm.assembly }}</td>
+                    <td>{{ asm.inspected }}</td>
+                    <td>{{ asm.rejected }}</td>
+                    <td>
+                        {% if asm.fiRejectRate is not none %}
+                            {{ asm.fiRejectRate }}
+                        {% else %}
+                            <span class="null-value">null</span>
+                        {% endif %}
+                    </td>
+                </tr>
                 {% endfor %}
             </tbody>
         </table>

@@ -159,6 +159,10 @@ header img {
     color: #888;
 }
 
+.null-value {
+    color: #bbb;
+}
+
 .data-table {
     width: 100%;
     border-collapse: collapse;
