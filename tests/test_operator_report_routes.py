@@ -7,6 +7,38 @@ os.environ.setdefault("ADMIN_PASSWORD", "pw")
 import app as app_module
 from app import create_app
 
+# Sample AOI rows used by multiple tests
+SAMPLE_AOI_ROWS = [
+    {
+        "Date": "2024-07-01",
+        "Operator": "Alice",
+        "Assembly": "A1",
+        "Quantity Inspected": 10,
+        "Quantity Rejected": 1,
+    },
+    {
+        "Date": "2024-07-01",
+        "Operator": "Bob",
+        "Assembly": "A1",
+        "Quantity Inspected": 15,
+        "Quantity Rejected": 2,
+    },
+    {
+        "Date": "2024-07-02",
+        "Operator": "Alice",
+        "Assembly": "A2",
+        "Quantity Inspected": 20,
+        "Quantity Rejected": 2,
+    },
+    {
+        "Date": "2024-07-02",
+        "Operator": "Bob",
+        "Assembly": "A2",
+        "Quantity Inspected": 25,
+        "Quantity Rejected": 3,
+    },
+]
+
 
 @pytest.fixture
 def app_instance(monkeypatch):
@@ -26,31 +58,18 @@ def test_operator_report_page(app_instance):
         resp = client.get("/reports/operator")
         assert resp.status_code == 200
         assert b"Operator Report" in resp.data
+        # Verify the operator dropdown placeholder is rendered
+        assert b"operator-wrapper" in resp.data
 
 
 def test_export_operator_report(app_instance, monkeypatch):
     client = app_instance.test_client()
     with app_instance.app_context():
-        # Sample AOI rows to drive the aggregation
-        aoi_rows = [
-            {
-                "Date": "2024-07-01",
-                "Operator": "Alice",
-                "Assembly": "A1",
-                "Quantity Inspected": 10,
-                "Quantity Rejected": 1,
-            },
-            {
-                "Date": "2024-07-02",
-                "Operator": "Alice",
-                "Assembly": "A2",
-                "Quantity Inspected": 20,
-                "Quantity Rejected": 2,
-            },
-        ]
         from app.main import routes
 
-        monkeypatch.setattr(routes, "fetch_aoi_reports", lambda: (aoi_rows, None))
+        monkeypatch.setattr(
+            routes, "fetch_aoi_reports", lambda: (SAMPLE_AOI_ROWS, None)
+        )
         with client.session_transaction() as sess:
             sess["username"] = "tester"
         resp = client.get(
@@ -59,5 +78,35 @@ def test_export_operator_report(app_instance, monkeypatch):
         assert resp.status_code == 200
         html = resp.data.decode()
         assert "Total Boards" in html
-        assert "A1" in html
+        # Assemblies for Alice are A1 and A2
+        assert "A1" in html and "A2" in html
         assert "2024-07-01" in html
+
+
+def test_api_operator_report_filters_and_aggregates(app_instance, monkeypatch):
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        from app.main import routes
+
+        monkeypatch.setattr(
+            routes, "fetch_aoi_reports", lambda: (SAMPLE_AOI_ROWS, None)
+        )
+        with client.session_transaction() as sess:
+            sess["username"] = "tester"
+        resp = client.get(
+            "/api/reports/operator?start_date=2024-07-01&end_date=2024-07-02&operator=Alice"
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["daily"]["dates"] == ["2024-07-01", "2024-07-02"]
+        assert data["daily"]["inspected"] == [10.0, 20.0]
+        assert data["daily"]["rejectRates"] == [10.0, 10.0]
+        assert data["summary"] == {
+            "totalBoards": 30.0,
+            "avgPerShift": 15.0,
+            "avgRejectRate": 10.0,
+        }
+        assert data["assemblies"] == [
+            {"assembly": "A2", "inspected": 20.0},
+            {"assembly": "A1", "inspected": 10.0},
+        ]
