@@ -1150,19 +1150,13 @@ def export_integrated_report():
     return html
 
 
-@main_bp.route('/api/reports/operator', methods=['GET'])
-def api_operator_report():
-    """Return operator report data filtered by date range and operator."""
-    if 'username' not in session:
-        return redirect(url_for('auth.login'))
+def _aggregate_operator_report(start=None, end=None, operator: str | None = None):
+    """Aggregate AOI report rows for the operator report."""
+    from collections import defaultdict
 
-    start = _parse_date(request.args.get('start_date'))
-    end = _parse_date(request.args.get('end_date'))
-
-    # Allow comma-separated operator names
-    op_param = request.args.get('operator') or ''
+    # Normalize operator filter to a set of lowercase names
     operators = {
-        o.strip().lower() for o in op_param.split(',') if o.strip()
+        o.strip().lower() for o in (operator or '').split(',') if o.strip()
     }
 
     rows, error = fetch_aoi_reports()
@@ -1229,7 +1223,7 @@ def api_operator_report():
         for asm, count in sorted(assemblies.items(), key=lambda x: x[1], reverse=True)
     ]
 
-    payload = {
+    return {
         'daily': {
             'dates': daily_dates,
             'inspected': daily_inspected,
@@ -1243,46 +1237,24 @@ def api_operator_report():
         'assemblies': assemblies_list,
     }
 
+
+@main_bp.route('/api/reports/operator', methods=['GET'])
+def api_operator_report():
+    """Return operator report data filtered by date range and operator."""
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+
+    start = _parse_date(request.args.get('start_date'))
+    end = _parse_date(request.args.get('end_date'))
+    operator = request.args.get('operator') or None
+
+    payload = _aggregate_operator_report(start, end, operator)
     return jsonify(payload)
 
 
-def build_operator_report_payload(start=None, end=None):
-    """Placeholder payload for the operator report."""
-    return {
-        'start': start.isoformat() if start else '',
-        'end': end.isoformat() if end else '',
-        'yieldTrendImg': '',
-        'yieldSummary': {
-            'avg': 0,
-            'worstDay': {'date': None, 'yield': 0},
-            'worstAssembly': {'assembly': None, 'yield': 0},
-        },
-        'yield_pairs': [],
-        'operatorRejectImg': '',
-        'operatorSummary': {
-            'totalBoards': 0,
-            'avgRate': 0,
-            'min': {'name': '', 'rate': 0},
-            'max': {'name': '', 'rate': 0},
-        },
-        'operators': [],
-        'modelFalseCallsImg': '',
-        'modelSummary': {'avgFalseCalls': 0, 'over20': []},
-        'problemAssemblies': [],
-        'fcVsNgRateImg': '',
-        'fcVsNgSummary': {'correlation': 0, 'fcTrend': ''},
-        'fc_vs_ng_pairs': [],
-        'fcNgRatioImg': '',
-        'fcNgRatioSummary': {'top': []},
-        'fc_ng_ratio_pairs': [],
-        'kpis': [{'label': 'Placeholder KPI', 'value': 0}],
-        'highlights': [],
-        'top_tables': {'operators': []},
-        'jobs': [],
-        'top_risks': [],
-        'summary_actions': [],
-        'appendix': {'yield': [], 'fcVsNg': [], 'fcNgRatio': []},
-    }
+def build_operator_report_payload(start=None, end=None, operator: str | None = None):
+    """Build the operator report payload for export."""
+    return _aggregate_operator_report(start, end, operator)
 
 
 @main_bp.route('/reports/operator', methods=['GET'])
@@ -1300,13 +1272,9 @@ def export_operator_report():
         return redirect(url_for('auth.login'))
     start = _parse_date(request.args.get('start_date'))
     end = _parse_date(request.args.get('end_date'))
-    payload = build_operator_report_payload(start, end)
-    return render_template(
-        'report/index.html',
-        show_cover=False,
-        show_summary=False,
-        **payload,
-    )
+    operator = request.args.get('operator')
+    payload = build_operator_report_payload(start, end, operator)
+    return render_template('report/operator.html', **payload)
 
 
 @main_bp.route('/analysis/aoi/grades', methods=['GET'])
