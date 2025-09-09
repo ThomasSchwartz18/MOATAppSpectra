@@ -9,8 +9,8 @@
         {% for op in top_tables.operators %}
             <tr>
                 <td>{{ op.name }}</td>
-                <td>{{ op.inspected }}</td>
-                <td>{{ op.rejected }}</td>
+                <td>{{ '%.2f'|format(op.inspected) }}</td>
+                <td>{{ '%.2f'|format(op.rejected) }}</td>
                 <td>{{ '%.2f'|format(op.rate) }}%</td>
             </tr>
         {% endfor %}
