@@ -83,6 +83,12 @@ header img {
     margin-top: 20px;
 }
 
+.cover-page .toc {
+    border-color: var(--accent);
+    background: var(--muted-light);
+    margin-top: 20px;
+}
+
 .summary-break {
     height: 20px;
 }
@@ -93,9 +99,18 @@ header img {
     margin: 0;
 }
 
+.toc li {
+    padding: 4px 8px;
+}
+
+.toc li:nth-child(even) {
+    background: var(--muted-dark);
+}
+
 .toc a {
-    text-decoration: none;
-    color: inherit;
+    color: #003366;
+    text-decoration: underline;
+    display: block;
 }
 
 .toc a::after {
