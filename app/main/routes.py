@@ -669,12 +669,14 @@ def _generate_report_charts(payload):
 
 def _generate_operator_report_charts(payload):
     if plt is None:
-        return {'dailyImg': ''}
+        return {'dailyImg': '', 'boardsInspectedImg': ''}
     charts: dict[str, str] = {}
 
-    fig, ax = plt.subplots(figsize=(8, 4))
     daily = payload.get('daily', {})
     dates = daily.get('dates', [])
+
+    # Daily reject rate line chart
+    fig, ax = plt.subplots(figsize=(8, 4))
     rates = daily.get('rejectRates', [])
     if dates and rates:
         ax.plot(dates, rates, marker='o')
@@ -683,6 +685,17 @@ def _generate_operator_report_charts(payload):
         ax.set_title('Daily Reject Rate')
         ax.tick_params(axis='x', rotation=45)
     charts['dailyImg'] = _fig_to_data_uri(fig)
+
+    # Boards inspected bar chart
+    fig, ax = plt.subplots(figsize=(8, 4))
+    inspected = daily.get('inspected', [])
+    if dates and inspected:
+        ax.bar(dates, inspected)
+        ax.set_xlabel('Date')
+        ax.set_ylabel('Boards Inspected')
+        ax.set_title('Boards Inspected per Day')
+        ax.tick_params(axis='x', rotation=45)
+    charts['boardsInspectedImg'] = _fig_to_data_uri(fig)
 
     return charts
 
