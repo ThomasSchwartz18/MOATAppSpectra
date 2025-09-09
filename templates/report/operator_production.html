@@ -5,7 +5,7 @@
         <thead><tr><th>Operator</th><th>Inspected Quantity</th></tr></thead>
         <tbody>
         {% for job in jobs %}
-            <tr><td>{{ job.label }}</td><td>{{ job.value }}</td></tr>
+            <tr><td>{{ job.label }}</td><td>{{ '%.2f'|format(job.value) }}</td></tr>
         {% endfor %}
         </tbody>
     </table>
