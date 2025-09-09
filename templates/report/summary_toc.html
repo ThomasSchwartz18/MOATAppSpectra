@@ -1,4 +1,13 @@
-<section class="report-section">
+<section class="report-section summary-page avoid-break">
+    <div class="summary section-card">
+        <h2>Summary</h2>
+        <p class="section-desc">Provides key metrics from the reporting period.</p>
+        <p><strong>Date range:</strong> {{ start }} - {{ end }}</p>
+        <p><strong>Average yield:</strong> {{ yieldSummary.avg|round(2) }}%</p>
+        <p><strong>Total boards:</strong> {{ operatorSummary.totalBoards }}</p>
+        <p><strong>Average false calls/board:</strong> {{ modelSummary.avgFalseCalls|round(2) }}</p>
+    </div>
+    <div class="summary-break"></div>
     <div class="toc section-card">
         <h2>Table of Contents</h2>
         <ol>
@@ -16,4 +25,3 @@
         </ol>
     </div>
 </section>
-
