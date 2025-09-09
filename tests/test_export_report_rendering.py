@@ -35,8 +35,9 @@ def _mock_report(monkeypatch):
         tpl = (
             "{% if show_cover %}<div class='cover-page'>cover"
             "{% if show_summary %}<section class='summary'>"
-            "{% for k in summary_kpis %}<div class='kpi'>{{ k.label }}</div>{% endfor %}"
-            "</section>{% endif %}</div>{% elif show_summary %}"
+            "{% for k in summary_kpis %}<div class='kpi'>{{ k.label }}</div>{% endfor %}</section>"
+            "<div class='summary-break'></div><div class='toc'>Table of Contents</div>"
+            "{% endif %}</div>{% elif show_summary %}"
             "<section class='summary'>"
             "{% for k in summary_kpis %}<div class='kpi'>{{ k.label }}</div>{% endfor %}"
             "</section>{% endif %}"
@@ -85,6 +86,21 @@ def test_cover_contains_summary_when_enabled(app_instance, monkeypatch):
         assert "KPI1" in html
         assert "JobA" in html
         assert "Program Review Queue" not in html
+
+
+def test_cover_contains_toc_when_summary_enabled(app_instance, monkeypatch):
+    _mock_report(monkeypatch)
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        with client.session_transaction() as sess:
+            sess["username"] = "tester"
+        resp = client.get(
+            "/reports/integrated/export?format=html",
+            json={"show_cover": True, "show_summary": True},
+        )
+        assert resp.status_code == 200
+        html = resp.data.decode()
+        assert "Table of Contents" in html
 
 
 def test_data_keys_present_in_pdf(app_instance, monkeypatch):

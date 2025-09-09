@@ -83,6 +83,26 @@ header img {
     margin-top: 20px;
 }
 
+.summary-break {
+    height: 20px;
+}
+
+.toc ol {
+    list-style: none;
+    padding-left: 0;
+    margin: 0;
+}
+
+.toc a {
+    text-decoration: none;
+    color: inherit;
+}
+
+.toc a::after {
+    content: leader('.') target-counter(attr(href), page);
+    float: right;
+}
+
 .chart-block {
     border-style: solid;
     border-color: var(--border);
