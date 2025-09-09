@@ -1,19 +1,20 @@
 <section id="cover" class="report-section cover-page">
     <br>
+    <header>
         <h1>
             <img src="{{ url_for('static', filename='images/company-logo.png') }}" alt="Company logo" class="company-logo-pdf"/>
-            AOI Integrated Report
+            {{ title }}
         </h1>
-        <br />
-        <div class="report-details">
-            <p><b>report_range:</b> {{ start }} - {{ end }}</p>
-            <p><b>generated_at:</b> {{ generated_at }}</p>
-            <p>{{ report_id }}</p>
-            <p><b>report author:</b> Thomas Schwartz</p>
-            <p><b>questions?:</b> &lt;{{ contact }}&gt;</p>
-            <p>{{ confidentiality }}</p>
-        </div>
     </header>
+    <br />
+    <div class="report-details">
+        <p><b>report_range:</b> {{ start }} - {{ end }}</p>
+        <p><b>generated_at:</b> {{ generated_at }}</p>
+        <p>{{ report_id }}</p>
+        <p><b>report author:</b> Thomas Schwartz</p>
+        <p><b>questions?:</b> &lt;{{ contact }}&gt;</p>
+        <p>{{ confidentiality }}</p>
+    </div>
     {% if show_summary %}
         {% include 'report/summary.html' %}
         <div class="summary-break"></div>
