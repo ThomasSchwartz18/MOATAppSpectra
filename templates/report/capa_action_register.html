@@ -5,7 +5,7 @@
         <thead><tr><th>Assembly</th><th>Value</th></tr></thead>
         <tbody>
         {% for action in summary_actions %}
-            <tr><td>{{ action.label }}</td><td>{{ action.value }}</td></tr>
+            <tr><td>{{ action.label }}</td><td>{{ '%.2f'|format(action.value) }}</td></tr>
         {% endfor %}
         </tbody>
     </table>
