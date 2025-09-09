@@ -1,3 +1,50 @@
+let operatorOptions = [];
+
+function uniqueSorted(arr) {
+  const map = new Map();
+  arr.forEach((v) => {
+    if (v != null && v !== '') {
+      const key = String(v).toLowerCase();
+      if (!map.has(key)) map.set(key, v);
+    }
+  });
+  return Array.from(map.values()).sort((a, b) => a.localeCompare(b));
+}
+
+function populateDynamicSelect(wrapperId, className, options, values = []) {
+  const wrapper = document.getElementById(wrapperId);
+  wrapper.innerHTML = '';
+  function addSelect(value = '') {
+    const sel = document.createElement('select');
+    sel.className = className;
+    const blank = document.createElement('option');
+    blank.value = '';
+    blank.textContent = '';
+    sel.appendChild(blank);
+    options.forEach((v) => {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = v;
+      sel.appendChild(opt);
+    });
+    sel.value = value;
+    sel.addEventListener('change', () => {
+      const sels = wrapper.querySelectorAll('select.' + className);
+      const last = sels[sels.length - 1];
+      if (sel === last && sel.value !== '') addSelect('');
+    });
+    wrapper.appendChild(sel);
+  }
+  values.forEach((v) => addSelect(v));
+  addSelect('');
+}
+
+function getDropdownValues(className) {
+  return Array.from(document.querySelectorAll('select.' + className))
+    .map((sel) => sel.value)
+    .filter((v) => v);
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   const runBtn = document.getElementById('run-report');
   const downloadControls = document.getElementById('download-controls');
@@ -7,15 +54,27 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (downloadControls) downloadControls.style.display = 'none';
 
+  fetch('/aoi_reports')
+    .then((r) => r.json())
+    .then((rows) => {
+      if (!Array.isArray(rows)) return;
+      operatorOptions = uniqueSorted(rows.map((r) => r['Operator']));
+      populateDynamicSelect('operator-wrapper', 'filter-operator', operatorOptions);
+    });
+
   runBtn?.addEventListener('click', () => {
     const start = document.getElementById('start-date').value;
     const end = document.getElementById('end-date').value;
+    const operators = getDropdownValues('filter-operator').join(',');
     if (!start || !end) {
       alert('Please select a date range.');
       return;
     }
 
-    fetch(`/api/reports/operator?start_date=${start}&end_date=${end}`)
+    const params = new URLSearchParams({ start_date: start, end_date: end });
+    if (operators) params.append('operators', operators);
+
+    fetch(`/api/reports/operator?${params.toString()}`)
       .then((res) => res.json())
       .then((data) => {
         reportData = { ...data, start, end };
@@ -30,9 +89,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const fmt = document.getElementById('file-format').value;
     const start = document.getElementById('start-date').value;
     const end = document.getElementById('end-date').value;
+    const operators = getDropdownValues('filter-operator').join(',');
     const params = new URLSearchParams({ format: fmt });
     if (start) params.append('start_date', start);
     if (end) params.append('end_date', end);
+    if (operators) params.append('operators', operators);
     window.location = `/reports/operator/export?${params.toString()}`;
   });
 
