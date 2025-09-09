@@ -46,6 +46,19 @@
     </div>
   </div>
 </details>
+
+<div id="download-controls" class="field-row" style="display:none">
+  <div class="field">
+    <label for="file-format">Format</label>
+    <select id="file-format">
+      <option value="pdf">pdf</option>
+      <option value="xlsx">xlsx</option>
+      <option value="html">html</option>
+    </select>
+  </div>
+  <button id="download-report">Download</button>
+  <button id="email-report">Email Report</button>
+</div>
 {% endblock %}
 
 {% block scripts %}

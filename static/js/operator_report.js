@@ -48,7 +48,11 @@ function getDropdownValues(className) {
 
 document.addEventListener('DOMContentLoaded', () => {
   const runBtn = document.getElementById('run-report');
+  const downloadControls = document.getElementById('download-controls');
+  const downloadBtn = document.getElementById('download-report');
   let dailyChart = null;
+
+  if (downloadControls) downloadControls.style.display = 'none';
 
   fetch('/aoi_reports')
     .then((r) => r.json())
@@ -72,8 +76,25 @@ document.addEventListener('DOMContentLoaded', () => {
       .then((res) => res.json())
       .then((data) => {
         renderReport(data);
+        if (downloadControls) downloadControls.style.display = 'flex';
       })
       .catch(() => alert('Failed to run report.'));
+  });
+
+  downloadBtn?.addEventListener('click', () => {
+    const fmt = document.getElementById('file-format').value;
+    const start = document.getElementById('start-date').value;
+    const end = document.getElementById('end-date').value;
+    const operator = getDropdownValues('filter-operator').join(',');
+    const params = new URLSearchParams({ format: fmt });
+    if (start) params.append('start_date', start);
+    if (end) params.append('end_date', end);
+    if (operator) params.append('operator', operator);
+    window.location = `/reports/operator/export?${params.toString()}`;
+  });
+
+  document.getElementById('email-report')?.addEventListener('click', () => {
+    alert('Email sent (placeholder).');
   });
 
   function setDesc(id, lines) {
