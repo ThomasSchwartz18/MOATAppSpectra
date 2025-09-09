@@ -1150,6 +1150,69 @@ def export_integrated_report():
     return html
 
 
+def build_operator_report_payload(start=None, end=None):
+    """Placeholder payload for the operator report."""
+    return {
+        'start': start.isoformat() if start else '',
+        'end': end.isoformat() if end else '',
+        'yieldTrendImg': '',
+        'yieldSummary': {
+            'avg': 0,
+            'worstDay': {'date': None, 'yield': 0},
+            'worstAssembly': {'assembly': None, 'yield': 0},
+        },
+        'yield_pairs': [],
+        'operatorRejectImg': '',
+        'operatorSummary': {
+            'totalBoards': 0,
+            'avgRate': 0,
+            'min': {'name': '', 'rate': 0},
+            'max': {'name': '', 'rate': 0},
+        },
+        'operators': [],
+        'modelFalseCallsImg': '',
+        'modelSummary': {'avgFalseCalls': 0, 'over20': []},
+        'problemAssemblies': [],
+        'fcVsNgRateImg': '',
+        'fcVsNgSummary': {'correlation': 0, 'fcTrend': ''},
+        'fc_vs_ng_pairs': [],
+        'fcNgRatioImg': '',
+        'fcNgRatioSummary': {'top': []},
+        'fc_ng_ratio_pairs': [],
+        'kpis': [{'label': 'Placeholder KPI', 'value': 0}],
+        'highlights': [],
+        'top_tables': {'operators': []},
+        'jobs': [],
+        'top_risks': [],
+        'summary_actions': [],
+        'appendix': {'yield': [], 'fcVsNg': [], 'fcNgRatio': []},
+    }
+
+
+@main_bp.route('/reports/operator', methods=['GET'])
+def operator_report():
+    """Render the Operator Report page."""
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    return render_template('operator_report.html', username=session.get('username'))
+
+
+@main_bp.route('/reports/operator/export')
+def export_operator_report():
+    """Export the operator report as styled HTML."""
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    start = _parse_date(request.args.get('start_date'))
+    end = _parse_date(request.args.get('end_date'))
+    payload = build_operator_report_payload(start, end)
+    return render_template(
+        'report/index.html',
+        show_cover=False,
+        show_summary=False,
+        **payload,
+    )
+
+
 @main_bp.route('/analysis/aoi/grades', methods=['GET'])
 def aoi_grades():
     """Return AOI grades computed from combined reports.
