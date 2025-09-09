@@ -668,34 +668,43 @@ def _generate_report_charts(payload):
 
 
 def _generate_operator_report_charts(payload):
+    """Generate charts for the operator report.
+
+    This now produces a single chart with boards inspected as bars and
+    reject rates as a line on a secondary y-axis.
+    """
     if plt is None:
-        return {'dailyImg': '', 'boardsInspectedImg': ''}
+        return {"dailyImg": ""}
+
     charts: dict[str, str] = {}
 
-    daily = payload.get('daily', {})
-    dates = daily.get('dates', [])
+    daily = payload.get("daily", {})
+    dates = daily.get("dates", [])
+    inspected = daily.get("inspected", [])
+    rates = daily.get("rejectRates", [])
 
-    # Daily reject rate line chart
     fig, ax = plt.subplots(figsize=(8, 4))
-    rates = daily.get('rejectRates', [])
-    if dates and rates:
-        ax.plot(dates, rates, marker='o')
-        ax.set_xlabel('Date')
-        ax.set_ylabel('Reject %')
-        ax.set_title('Daily Reject Rate')
-        ax.tick_params(axis='x', rotation=45)
-    charts['dailyImg'] = _fig_to_data_uri(fig)
+    ax2 = ax.twinx()
 
-    # Boards inspected bar chart
-    fig, ax = plt.subplots(figsize=(8, 4))
-    inspected = daily.get('inspected', [])
     if dates and inspected:
-        ax.bar(dates, inspected)
-        ax.set_xlabel('Date')
-        ax.set_ylabel('Boards Inspected')
-        ax.set_title('Boards Inspected per Day')
-        ax.tick_params(axis='x', rotation=45)
-    charts['boardsInspectedImg'] = _fig_to_data_uri(fig)
+        ax.bar(dates, inspected, color="steelblue", label="Boards Inspected")
+        ax.set_ylabel("Boards Inspected")
+    if dates and rates:
+        ax2.plot(dates, rates, marker="o", color="crimson", label="Reject %")
+        ax2.set_ylabel("Reject %")
+
+    ax.set_xlabel("Date")
+    ax.set_title("Daily Reject Rate and Boards Inspected")
+    ax.tick_params(axis="x", rotation=45)
+
+    lines, labels = [], []
+    for a in (ax, ax2):
+        l, lab = a.get_legend_handles_labels()
+        lines.extend(l)
+        labels.extend(lab)
+    ax.legend(lines, labels, loc="best")
+
+    charts["dailyImg"] = _fig_to_data_uri(fig)
 
     return charts
 
@@ -1379,6 +1388,7 @@ def export_operator_report():
         current_app.logger.error("Combined report fetch failed: %s", error)
 
     charts = _generate_operator_report_charts(payload)
+    payload.update(charts)
 
     body = request.get_json(silent=True) or {}
 
@@ -1438,7 +1448,6 @@ def export_operator_report():
         generated_at=generated_at,
         operator=operator,
         **payload,
-        **charts,
     )
 
     fmt = request.args.get('format')

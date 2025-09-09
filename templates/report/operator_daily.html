@@ -1,11 +1,8 @@
 <section id="operator-daily" class="report-section">
-    <p class="section-desc">Daily reject rates and boards inspected for the selected operator.</p>
+    <p class="section-desc">Daily reject rates overlaid with boards inspected for the selected operator.</p>
     <div class="chart-block">
         {% if dailyImg %}
-        <img src="{{ dailyImg }}" alt="Daily Reject Rate">
-        {% endif %}
-        {% if boardsInspectedImg %}
-        <img src="{{ boardsInspectedImg }}" alt="Boards Inspected">
+        <img src="{{ dailyImg }}" alt="Daily Reject Rate and Boards Inspected">
         {% endif %}
         <div class="chart-summary">
             <table class="data-table">

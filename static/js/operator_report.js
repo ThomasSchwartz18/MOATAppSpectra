@@ -119,11 +119,43 @@ document.addEventListener('DOMContentLoaded', () => {
           labels: daily.dates,
           datasets: [
             {
+              type: 'bar',
               label: 'Boards Inspected',
               data: daily.inspected,
               backgroundColor: 'steelblue',
+              yAxisID: 'y',
+            },
+            {
+              type: 'line',
+              label: 'Reject %',
+              data: daily.rejectRates,
+              yAxisID: 'y1',
+              borderColor: 'crimson',
+              backgroundColor: 'crimson',
+              tension: 0.1,
+              pointRadius: 3,
             },
           ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          scales: {
+            y: {
+              beginAtZero: true,
+              title: { display: true, text: 'Boards Inspected' },
+            },
+            y1: {
+              beginAtZero: true,
+              max: 100,
+              position: 'right',
+              grid: { drawOnChartArea: false },
+              ticks: { callback: (v) => `${v}%` },
+              title: { display: true, text: 'Reject %' },
+            },
+          },
+          plugins: { legend: { display: true } },
         },
       });
       setDesc('dailyDesc', [
