@@ -1167,7 +1167,7 @@ def export_integrated_report():
         payload.setdefault('modelSummary', {'avgFalseCalls': 0.0})
 
     html = render_template(
-        'report/index.html',
+        'report/integrated/index.html',
         show_cover=show_cover,
         show_summary=show_summary,
         title=title,
@@ -1432,7 +1432,7 @@ def export_operator_report():
         payload.setdefault('modelSummary', {'avgFalseCalls': 0.0})
 
     html = render_template(
-        'report/operator_index.html',
+        'report/operator/index.html',
         show_cover=show_cover,
         show_summary=show_summary,
         title=title,
