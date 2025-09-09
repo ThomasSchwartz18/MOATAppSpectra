@@ -667,6 +667,26 @@ def _generate_report_charts(payload):
     return charts
 
 
+def _generate_operator_report_charts(payload):
+    if plt is None:
+        return {'dailyImg': ''}
+    charts: dict[str, str] = {}
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    daily = payload.get('daily', {})
+    dates = daily.get('dates', [])
+    rates = daily.get('rejectRates', [])
+    if dates and rates:
+        ax.plot(dates, rates, marker='o')
+        ax.set_xlabel('Date')
+        ax.set_ylabel('Reject %')
+        ax.set_title('Daily Reject Rate')
+        ax.tick_params(axis='x', rotation=45)
+    charts['dailyImg'] = _fig_to_data_uri(fig)
+
+    return charts
+
+
 def build_report_payload(start=None, end=None):
     """Aggregate yield, operator and false-call stats for the AOI integrated report.
 
@@ -677,7 +697,7 @@ def build_report_payload(start=None, end=None):
     """
     combined, error = fetch_combined_reports()
     if error:
-        abort(500, description=error)
+        current_app.logger.error("Combined report fetch failed: %s", error)
 
     phrases = current_app.config.get('NON_AOI_PHRASES', [])
     from collections import defaultdict
@@ -1094,7 +1114,7 @@ def export_integrated_report():
             return value
         return str(value).lower() not in {'0', 'false', 'no'}
 
-    show_cover = _get_bool('show_cover')
+    show_cover = _get_bool('show_cover', False)
     show_summary = _get_bool('show_summary')
     title = _get('title')
     subtitle = _get('subtitle')
@@ -1107,6 +1127,18 @@ def export_integrated_report():
     contact = _get('contact', 'tschwartz@4spectra.com')
     confidentiality = _get('confidentiality', 'Spectra-Tech • Confidential')
     generated_at = datetime.now(ZoneInfo('EST')).strftime('%Y-%m-%d %H:%M:%S %Z')
+
+    if show_cover and show_summary:
+        payload.setdefault(
+            'yieldSummary',
+            {
+                'avg': 0.0,
+                'worstDay': {'date': None, 'yield': 0.0},
+                'worstAssembly': {'assembly': None, 'yield': 0.0},
+            },
+        )
+        payload.setdefault('operatorSummary', payload.get('summary', {}))
+        payload.setdefault('modelSummary', {'avgFalseCalls': 0.0})
 
     html = render_template(
         'report/index.html',
@@ -1267,14 +1299,111 @@ def operator_report():
 
 @main_bp.route('/reports/operator/export')
 def export_operator_report():
-    """Export the operator report as styled HTML."""
     if 'username' not in session:
         return redirect(url_for('auth.login'))
+
     start = _parse_date(request.args.get('start_date'))
     end = _parse_date(request.args.get('end_date'))
-    operator = request.args.get('operator')
+    operator = request.args.get('operator') or None
+
+    start_str = start.strftime('%y%m%d') if start else ''
+    end_str = end.strftime('%y%m%d') if end else ''
+
     payload = build_operator_report_payload(start, end, operator)
-    return render_template('report/operator.html', **payload)
+    payload['start'] = start.isoformat() if start else ''
+    payload['end'] = end.isoformat() if end else ''
+
+    combined, error = fetch_combined_reports()
+    if error:
+        current_app.logger.error("Combined report fetch failed: %s", error)
+
+    charts = _generate_operator_report_charts(payload)
+
+    body = request.get_json(silent=True) or {}
+
+    def _get(name, default=''):
+        return request.args.get(name, body.get(name, default))
+
+    def _get_bool(name, default=True):
+        value = request.args.get(name)
+        if value is None:
+            value = body.get(name)
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        return str(value).lower() not in {'0', 'false', 'no'}
+
+    show_cover = _get_bool('show_cover', False)
+    show_summary = _get_bool('show_summary')
+    title = _get('title')
+    subtitle = _get('subtitle')
+    report_date = _get('report_date')
+    period = _get('period')
+    author = _get('author')
+    logo_url = _get('logo_url')
+    footer_left = _get('footer_left')
+    report_id = _get('report_id')
+    contact = _get('contact', 'tschwartz@4spectra.com')
+    confidentiality = _get('confidentiality', 'Spectra-Tech • Confidential')
+    generated_at = datetime.now(ZoneInfo('EST')).strftime('%Y-%m-%d %H:%M:%S %Z')
+
+    if show_cover and show_summary:
+        payload.setdefault(
+            'yieldSummary',
+            {
+                'avg': 0.0,
+                'worstDay': {'date': None, 'yield': 0.0},
+                'worstAssembly': {'assembly': None, 'yield': 0.0},
+            },
+        )
+        payload.setdefault('operatorSummary', payload.get('summary', {}))
+        payload.setdefault('modelSummary', {'avgFalseCalls': 0.0})
+
+    html = render_template(
+        'report/operator_index.html',
+        show_cover=show_cover,
+        show_summary=show_summary,
+        title=title,
+        subtitle=subtitle,
+        report_date=report_date,
+        period=period,
+        author=author,
+        logo_url=logo_url,
+        footer_left=footer_left,
+        report_id=report_id,
+        contact=contact,
+        confidentiality=confidentiality,
+        generated_at=generated_at,
+        operator=operator,
+        **payload,
+        **charts,
+    )
+
+    fmt = request.args.get('format')
+    if fmt == 'pdf':
+        from weasyprint import HTML
+        from weasyprint.text.fonts import FontConfiguration
+
+        font_config = FontConfiguration()
+        pdf = HTML(string=html, base_url=request.url_root).write_pdf(
+            font_config=font_config
+        )
+        filename = f"{start_str}_{end_str}_operator_report.pdf"
+        return send_file(
+            io.BytesIO(pdf),
+            mimetype='application/pdf',
+            download_name=filename,
+            as_attachment=True,
+        )
+    if fmt == 'html':
+        return send_file(
+            io.BytesIO(html.encode('utf-8')),
+            mimetype='text/html',
+            download_name='report.html',
+            as_attachment=True,
+        )
+    return html
 
 
 @main_bp.route('/analysis/aoi/grades', methods=['GET'])

@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Operator Report</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/report.css') }}">
+</head>
+<body>
+    {% if show_cover %}
+        {% include 'report/cover.html' %}
+    {% elif show_summary %}
+        {% include 'report/operator_summary.html' %}
+    {% endif %}
+    {% include 'report/operator_toc.html' %}
+    {% include 'report/operator_daily.html' %}
+    {% include 'report/operator_assemblies.html' %}
+</body>
+</html>
