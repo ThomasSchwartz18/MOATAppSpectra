@@ -70,6 +70,7 @@ def test_export_operator_report(app_instance, monkeypatch):
         monkeypatch.setattr(
             routes, "fetch_aoi_reports", lambda: (SAMPLE_AOI_ROWS, None)
         )
+        monkeypatch.setattr(routes, "fetch_combined_reports", lambda: ([], None))
         with client.session_transaction() as sess:
             sess["username"] = "tester"
         resp = client.get(
@@ -91,6 +92,23 @@ def test_api_operator_report_filters_and_aggregates(app_instance, monkeypatch):
         monkeypatch.setattr(
             routes, "fetch_aoi_reports", lambda: (SAMPLE_AOI_ROWS, None)
         )
+        combined_rows = [
+            {
+                "aoi_Date": "2024-07-01",
+                "aoi_Operator": "Alice",
+                "aoi_Assembly": "A1",
+                "aoi_Quantity Inspected": 10,
+                "fi_Quantity Rejected": 1,
+            },
+            {
+                "aoi_Date": "2024-07-02",
+                "aoi_Operator": "Alice",
+                "aoi_Assembly": "A2",
+                "aoi_Quantity Inspected": 20,
+                "fi_Quantity Rejected": 2,
+            },
+        ]
+        monkeypatch.setattr(routes, "fetch_combined_reports", lambda: (combined_rows, None))
         with client.session_transaction() as sess:
             sess["username"] = "tester"
         resp = client.get(
@@ -108,6 +126,16 @@ def test_api_operator_report_filters_and_aggregates(app_instance, monkeypatch):
             "avgBoards": 30.0,
         }
         assert data["assemblies"] == [
-            {"assembly": "A2", "inspected": 20.0},
-            {"assembly": "A1", "inspected": 10.0},
+            {
+                "assembly": "A2",
+                "inspected": 20.0,
+                "rejected": 2.0,
+                "fiRejectRate": 10.0,
+            },
+            {
+                "assembly": "A1",
+                "inspected": 10.0,
+                "rejected": 1.0,
+                "fiRejectRate": 10.0,
+            },
         ]

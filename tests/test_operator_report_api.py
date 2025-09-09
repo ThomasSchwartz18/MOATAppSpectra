@@ -52,7 +52,24 @@ def test_operator_report_api(app_instance, monkeypatch):
                 "Quantity Rejected": 4,
             },
         ]
+        combined_rows = [
+            {
+                "aoi_Date": "2024-07-01",
+                "aoi_Operator": "Alice",
+                "aoi_Assembly": "A1",
+                "aoi_Quantity Inspected": 10,
+                "fi_Quantity Rejected": 1,
+            },
+            {
+                "aoi_Date": "2024-07-02",
+                "aoi_Operator": "Alice",
+                "aoi_Assembly": "A1",
+                "aoi_Quantity Inspected": 30,
+                "fi_Quantity Rejected": 2,
+            },
+        ]
         monkeypatch.setattr(routes, "fetch_aoi_reports", lambda: (aoi_rows, None))
+        monkeypatch.setattr(routes, "fetch_combined_reports", lambda: (combined_rows, None))
         with client.session_transaction() as sess:
             sess["username"] = "tester"
         resp = client.get(
@@ -70,6 +87,16 @@ def test_operator_report_api(app_instance, monkeypatch):
             "avgBoards": 60.0,
         }
         assert data["assemblies"] == [
-            {"assembly": "A1", "inspected": 40.0},
-            {"assembly": "A2", "inspected": 20.0},
+            {
+                "assembly": "A1",
+                "inspected": 40.0,
+                "rejected": 4.0,
+                "fiRejectRate": 7.5,
+            },
+            {
+                "assembly": "A2",
+                "inspected": 20.0,
+                "rejected": 2.0,
+                "fiRejectRate": None,
+            },
         ]
