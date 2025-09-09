@@ -1,0 +1,11 @@
+<section id="operator-assemblies" class="report-section">
+    <p class="section-desc">Assemblies inspected by the operator.</p>
+    <table class="data-table">
+        <thead><tr><th>Assembly</th><th>Inspected</th></tr></thead>
+        <tbody>
+        {% for asm in assemblies %}
+            <tr><td>{{ asm.assembly }}</td><td>{{ '%.2f'|format(asm.inspected) }}</td></tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</section>
