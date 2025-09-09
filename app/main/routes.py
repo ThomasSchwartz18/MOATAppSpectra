@@ -1150,6 +1150,102 @@ def export_integrated_report():
     return html
 
 
+@main_bp.route('/api/reports/operator', methods=['GET'])
+def api_operator_report():
+    """Return operator report data filtered by date range and operator."""
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+
+    start = _parse_date(request.args.get('start_date'))
+    end = _parse_date(request.args.get('end_date'))
+
+    # Allow comma-separated operator names
+    op_param = request.args.get('operator') or ''
+    operators = {
+        o.strip().lower() for o in op_param.split(',') if o.strip()
+    }
+
+    rows, error = fetch_aoi_reports()
+    if error:
+        abort(500, description=error)
+
+    daily = defaultdict(lambda: {'inspected': 0.0, 'rejected': 0.0})
+    assemblies = defaultdict(float)
+    total_inspected = 0.0
+    total_rejected = 0.0
+
+    for row in rows or []:
+        date_val = _parse_date(row.get('Date') or row.get('aoi_Date'))
+        if start and date_val and date_val < start:
+            continue
+        if end and date_val and date_val > end:
+            continue
+
+        op_name = (row.get('Operator') or row.get('aoi_Operator') or '').strip()
+        if operators and op_name.lower() not in operators:
+            continue
+
+        inspected = float(
+            row.get('Quantity Inspected')
+            or row.get('quantity_inspected')
+            or row.get('aoi_Quantity Inspected')
+            or 0
+        )
+        rejected = float(
+            row.get('Quantity Rejected')
+            or row.get('quantity_rejected')
+            or row.get('aoi_Quantity Rejected')
+            or 0
+        )
+
+        if date_val:
+            daily[date_val]['inspected'] += inspected
+            daily[date_val]['rejected'] += rejected
+
+        asm = row.get('Assembly') or row.get('aoi_Assembly') or 'Unknown'
+        assemblies[asm] += inspected
+
+        total_inspected += inspected
+        total_rejected += rejected
+
+    dates_sorted = sorted(daily.keys())
+    daily_dates = [d.isoformat() for d in dates_sorted]
+    daily_inspected = [daily[d]['inspected'] for d in dates_sorted]
+    daily_reject_rates = [
+        (daily[d]['rejected'] / daily[d]['inspected'] * 100)
+        if daily[d]['inspected']
+        else 0
+        for d in dates_sorted
+    ]
+
+    num_days = len(dates_sorted)
+    avg_per_shift = total_inspected / num_days if num_days else 0
+    avg_reject_rate = (
+        (total_rejected / total_inspected) * 100 if total_inspected else 0
+    )
+
+    assemblies_list = [
+        {'assembly': asm, 'inspected': count}
+        for asm, count in sorted(assemblies.items(), key=lambda x: x[1], reverse=True)
+    ]
+
+    payload = {
+        'daily': {
+            'dates': daily_dates,
+            'inspected': daily_inspected,
+            'rejectRates': daily_reject_rates,
+        },
+        'summary': {
+            'totalBoards': total_inspected,
+            'avgPerShift': avg_per_shift,
+            'avgRejectRate': avg_reject_rate,
+        },
+        'assemblies': assemblies_list,
+    }
+
+    return jsonify(payload)
+
+
 def build_operator_report_payload(start=None, end=None):
     """Placeholder payload for the operator report."""
     return {
