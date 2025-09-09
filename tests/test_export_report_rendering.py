@@ -34,14 +34,13 @@ def _mock_report(monkeypatch):
 
     def fake_render(template, **context):
         tpl = (
-            "{% if show_cover %}<div class='cover-page'>cover"
-            "{% if show_summary %}<section class='summary'>"
-            "{% for k in summary_kpis %}<div class='kpi'>{{ k.label }}</div>{% endfor %}</section>"
-            "<div class='summary-break'></div><div class='toc'>Table of Contents</div>"
-            "{% endif %}</div>{% elif show_summary %}"
-            "<section class='summary'>"
+            "{% if show_cover %}<section class='report-section cover-page'>cover</section>{% endif %}"
+            "{% if show_summary %}"
+            "<section class='report-section'><div class='summary'>"
             "{% for k in summary_kpis %}<div class='kpi'>{{ k.label }}</div>{% endfor %}"
-            "</section>{% endif %}"
+            "</div></section>"
+            "<section class='report-section'><div class='toc'>Table of Contents</div></section>"
+            "{% endif %}"
             "{% for job in jobs %}<div class='job'>{{ job.label }}</div>{% endfor %}"
         )
         return render_template_string(tpl, **context)
@@ -62,7 +61,8 @@ def test_show_cover_false_and_summary_one_page(app_instance, monkeypatch):
         assert resp.status_code == 200
         html = resp.data.decode()
         assert "cover-page" not in html
-        assert html.count("<section class='summary'>") == 1
+        assert html.count("<div class='summary'>") == 1
+        assert "Table of Contents" in html
         assert "KPI1" in html
         assert "JobA" in html
         assert "Program Review Queue" not in html
@@ -81,9 +81,7 @@ def test_cover_contains_summary_when_enabled(app_instance, monkeypatch):
         assert resp.status_code == 200
         html = resp.data.decode()
         assert "cover-page" in html
-        assert (
-            "<div class='cover-page'>cover<section class='summary'>" in html
-        )
+        assert html.index("cover-page") < html.index("<div class='summary'>")
         assert "KPI1" in html
         assert "JobA" in html
         assert "Program Review Queue" not in html
@@ -102,6 +100,7 @@ def test_cover_contains_toc_when_summary_enabled(app_instance, monkeypatch):
         assert resp.status_code == 200
         html = resp.data.decode()
         assert "Table of Contents" in html
+        assert html.index("<div class='summary'>") < html.index("Table of Contents")
 
 
 def test_data_keys_present_in_pdf(app_instance, monkeypatch):

@@ -1,8 +1,10 @@
-<div class="summary section-card">
-    <h2>Summary</h2>
-    <p class="section-desc">Overview of operator performance.</p>
-    <p><strong>Date range:</strong> {{ start }} - {{ end }}</p>
-    <p><strong>Total Boards:</strong> {{ summary.totalBoards }}</p>
-    <p><strong>Average per shift:</strong> {{ summary.avgPerShift|round(2) }}</p>
-    <p><strong>Average reject rate:</strong> {{ summary.avgRejectRate|round(2) }}%</p>
-</div>
+<section class="report-section">
+    <div class="summary section-card">
+        <h2>Summary</h2>
+        <p class="section-desc">Overview of operator performance.</p>
+        <p><strong>Date range:</strong> {{ start }} - {{ end }}</p>
+        <p><strong>Total Boards:</strong> {{ summary.totalBoards }}</p>
+        <p><strong>Average per shift:</strong> {{ summary.avgPerShift|round(2) }}</p>
+        <p><strong>Average reject rate:</strong> {{ summary.avgRejectRate|round(2) }}%</p>
+    </div>
+</section>
