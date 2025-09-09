@@ -11,7 +11,7 @@ Line chart shows mean and ±3σ control limits; models outside may need review.<
                 <thead><tr><th>Model</th><th>False Calls</th></tr></thead>
                 <tbody>
                 {% for m in problemAssemblies %}
-                    <tr><td>{{ m.name }}</td><td>{{ m.falseCalls }}</td></tr>
+                    <tr><td>{{ m.name }}</td><td>{{ '%.2f'|format(m.falseCalls) }}</td></tr>
                 {% endfor %}
                 </tbody>
             </table>
