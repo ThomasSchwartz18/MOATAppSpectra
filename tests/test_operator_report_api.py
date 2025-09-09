@@ -67,6 +67,7 @@ def test_operator_report_api(app_instance, monkeypatch):
             "totalBoards": 60.0,
             "avgPerShift": 30.0,
             "avgRejectRate": 10.0,
+            "avgBoards": 60.0,
         }
         assert data["assemblies"] == [
             {"assembly": "A1", "inspected": 40.0},
