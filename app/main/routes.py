@@ -1073,6 +1073,8 @@ def export_integrated_report():
         return redirect(url_for('auth.login'))
     start = _parse_date(request.args.get('start_date'))
     end = _parse_date(request.args.get('end_date'))
+    start_str = start.strftime('%y%m%d') if start else ''
+    end_str = end.strftime('%y%m%d') if end else ''
     payload = build_report_payload(start, end)
     payload['start'] = start.isoformat() if start else ''
     payload['end'] = end.isoformat() if end else ''
@@ -1131,10 +1133,11 @@ def export_integrated_report():
 
         font_config = FontConfiguration()
         pdf = HTML(string=html, base_url=request.url_root).write_pdf(font_config=font_config)
+        filename = f"{start_str}_{end_str}_aoiIR.pdf"
         return send_file(
             io.BytesIO(pdf),
             mimetype='application/pdf',
-            download_name='report.pdf',
+            download_name=filename,
             as_attachment=True,
         )
     if fmt == 'html':
