@@ -1251,13 +1251,24 @@ def export_aoi_daily_report():
     operator = request.args.get('operator') or None
     assembly = request.args.get('assembly') or None
 
+    start = end = day.isoformat()
+    generated_at = datetime.now(ZoneInfo('EST')).strftime('%Y-%m-%d %H:%M:%S %Z')
+    contact = request.args.get('contact', 'tschawtz@4spectra.com')
+
     payload = build_aoi_daily_report_payload(day, operator, assembly)
     charts = _generate_aoi_daily_report_charts(payload)
     payload.update(charts)
 
     show_cover = str(request.args.get('show_cover', 'false')).lower() not in {'0', 'false', 'no'}
     html = render_template(
-        'report/aoi_daily/index.html', day=day.isoformat(), show_cover=show_cover, **payload
+        'report/aoi_daily/index.html',
+        day=day.isoformat(),
+        show_cover=show_cover,
+        start=start,
+        end=end,
+        generated_at=generated_at,
+        contact=contact,
+        **payload,
     )
 
     fmt = request.args.get('format')
