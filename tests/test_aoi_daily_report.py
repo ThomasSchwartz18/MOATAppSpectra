@@ -41,6 +41,7 @@ def _mock_payload(monkeypatch):
                 "currentRejects": 0,
                 "pastRejectsAvg": 1,
                 "fiTypicalRejects": 2,
+                "overlayChart": "img",
             }
         ],
         "shift1": [
@@ -319,5 +320,8 @@ def test_smt_th_control_charts_render(app_instance, monkeypatch):
         resp = client.get("/reports/aoi_daily/export?date=2024-06-01")
         assert resp.status_code == 200
         html = resp.data.decode()
-        assert "SMT Control Chart" in html
-        assert "TH Control Chart" in html
+        chart_section = re.search(
+            r'<div class="moat-charts">.*?</div>\s*</div>', html, re.DOTALL
+        ).group(0)
+        assert chart_section.count("<img") == 1
+        assert "SMT" in chart_section and "TH" in chart_section
