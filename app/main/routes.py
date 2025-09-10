@@ -1527,7 +1527,7 @@ def build_aoi_daily_report_payload(
         rej = vals["rejected"]
         today_yield = ((ins - rej) / ins * 100) if ins else 0
 
-        # Past 3 job average yield
+        # Past 4 job average yield
         past_rows = [
             r
             for r in rows or []
@@ -1547,7 +1547,7 @@ def build_aoi_daily_report_payload(
 
         jobs = sorted(job_groups.values(), key=lambda g: g.get("date") or date.min, reverse=True)
         yields = []
-        for g in jobs[:3]:
+        for g in jobs[:4]:
             i = g["inspected"]
             rj = g["rejected"]
             if i:
@@ -1558,7 +1558,7 @@ def build_aoi_daily_report_payload(
         else:
             past_avg = "first run"
 
-        assembly_info.append({"assembly": asm, "yield": today_yield, "past3Avg": past_avg})
+        assembly_info.append({"assembly": asm, "yield": today_yield, "past4Avg": past_avg})
 
     return {
         "date": day.isoformat(),
