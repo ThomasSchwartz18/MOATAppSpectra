@@ -1255,7 +1255,10 @@ def export_aoi_daily_report():
     charts = _generate_aoi_daily_report_charts(payload)
     payload.update(charts)
 
-    html = render_template('report/aoi_daily/index.html', day=day.isoformat(), **payload)
+    show_cover = str(request.args.get('show_cover', 'false')).lower() not in {'0', 'false', 'no'}
+    html = render_template(
+        'report/aoi_daily/index.html', day=day.isoformat(), show_cover=show_cover, **payload
+    )
 
     fmt = request.args.get('format')
     if fmt == 'pdf':
