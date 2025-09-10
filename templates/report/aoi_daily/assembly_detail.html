@@ -1,0 +1,23 @@
+<section class="report-section section-card">
+    <h2>{{ asm.assembly }}</h2>
+    <p><strong>Operators:</strong> {{ asm.operators|default([])|join(', ') }}</p>
+    <p><strong>Boards Processed:</strong> {{ asm.boards|default(0) }}</p>
+    <table class="data-table">
+        <thead>
+            <tr><th>Metric</th><th>Value</th></tr>
+        </thead>
+        <tbody>
+            <tr><td>Current Yield %</td><td>{{ '%.2f'|format(asm.yield|default(0)) }}</td></tr>
+            <tr><td>Historical Yield %</td><td>
+                {% if asm.past4Avg is string %}
+                    {{ asm.past4Avg }}
+                {% else %}
+                    {{ '%.2f'|format(asm.past4Avg|default(0)) }}
+                {% endif %}
+            </td></tr>
+            <tr><td>Current AOI Rejects</td><td>{{ asm.currentRejects|default(0) }}</td></tr>
+            <tr><td>Past AOI Rejects (Avg)</td><td>{{ asm.pastRejectsAvg|default(0)|round(2) }}</td></tr>
+            <tr><td>Typical FI Rejects</td><td>{{ asm.fiTypicalRejects|default(0)|round(2) }}</td></tr>
+        </tbody>
+    </table>
+</section>

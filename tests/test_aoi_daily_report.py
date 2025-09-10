@@ -31,7 +31,18 @@ def _mock_payload(monkeypatch):
         "shift2_reject_pct": 2,
         "shift_total_diff": 10,
         "shift_reject_pct_diff": 1,
-        "assemblies": [{"assembly": "Asm1", "yield": 95.0, "past4Avg": 96.0}],
+        "assemblies": [
+            {
+                "assembly": "Asm1",
+                "yield": 95.0,
+                "past4Avg": 96.0,
+                "operators": ["Op1"],
+                "boards": 5,
+                "currentRejects": 0,
+                "pastRejectsAvg": 1,
+                "fiTypicalRejects": 2,
+            }
+        ],
         "shift1": [
             {
                 "operator": "Op1",
@@ -138,3 +149,46 @@ def test_shift_chart_description_rendered(app_instance, monkeypatch):
             "2nd shift inspected 10 more boards than 1st shift." in html
             and "chart-desc" in html
         )
+
+
+def test_assembly_detail_rendered(app_instance, monkeypatch):
+    sample_payload = {
+        "assemblies": [
+            {
+                "assembly": "Asm1",
+                "yield": 90.0,
+                "past4Avg": 95.0,
+                "operators": ["Op1", "Op2"],
+                "boards": 20,
+                "currentRejects": 2,
+                "pastRejectsAvg": 1.5,
+                "fiTypicalRejects": 1,
+            }
+        ],
+        "shift1": [],
+        "shift2": [],
+        "shiftTotals": {
+            "shift1": {"inspected": 0, "rejected": 0},
+            "shift2": {"inspected": 0, "rejected": 0},
+        },
+    }
+    monkeypatch.setattr(
+        routes, "build_aoi_daily_report_payload", lambda day, operator, assembly: sample_payload
+    )
+    monkeypatch.setattr(routes, "_generate_aoi_daily_report_charts", lambda payload: {})
+
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        with client.session_transaction() as sess:
+            sess["username"] = "tester"
+        resp = client.get("/reports/aoi_daily/export?date=2024-06-01")
+        assert resp.status_code == 200
+        html = resp.data.decode()
+        assert "Asm1" in html
+        assert "Operators:</strong> Op1, Op2" in html
+        assert "Boards Processed:</strong> 20" in html
+        assert "Current Yield %</td><td>90.00" in html
+        assert re.search(r"Historical Yield %</td><td>\s*95.00", html)
+        assert "Current AOI Rejects</td><td>2" in html
+        assert re.search(r"Past AOI Rejects \(Avg\)</td><td>\s*1.5", html)
+        assert "Typical FI Rejects</td><td>1" in html
