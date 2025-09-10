@@ -170,6 +170,7 @@ def test_assembly_detail_rendered(app_instance, monkeypatch):
                 "currentRejects": 2,
                 "pastRejectsAvg": 1.5,
                 "fiTypicalRejects": 1,
+                "metricsChart": "img",
             }
         ],
         "shift1": [],
@@ -193,12 +194,13 @@ def test_assembly_detail_rendered(app_instance, monkeypatch):
         html = resp.data.decode()
         assert "Asm1" in html
         assert "Operators:</strong> Op1, Op2" in html
-        assert "Boards Processed:</strong> 20" in html
-        assert "Current Yield %</td><td>90.00" in html
-        assert re.search(r"Historical Yield %</td><td>\s*95.00", html)
-        assert "Current AOI Rejects</td><td>2" in html
-        assert re.search(r"Past AOI Rejects \(Avg\)</td><td>\s*1.5", html)
-        assert "Typical FI Rejects</td><td>1" in html
+        assert "Boards Processed:</strong> 20 boards" in html
+        assert "Current Yield %</td><td>90.00%" in html
+        assert re.search(r"Historical Yield %</td><td>\s*95.00%", html)
+        assert "Current AOI Rejects</td><td>2 rejects" in html
+        assert re.search(r"Past AOI Rejects \(Avg\)</td><td>\s*1.50 rejects", html)
+        assert "Typical FI Rejects</td><td>1.00 rejects" in html
+        assert '<img src="img" alt="Metrics Chart">' in html
 
 
 def test_toc_on_cover_before_shift_summary(app_instance, monkeypatch):
