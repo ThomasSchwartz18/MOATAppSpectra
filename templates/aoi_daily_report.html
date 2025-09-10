@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>AOI Daily Report</h2>
+
+<div class="section-card">
+  <div class="field-row">
+    <div class="field">
+      <label for="report-date">Date</label>
+      <input type="date" id="report-date" />
+    </div>
+    <div class="field">
+      <label>Operator</label>
+      <div id="operator-wrapper"></div>
+    </div>
+    <div class="field">
+      <label>Assembly</label>
+      <div id="assembly-wrapper"></div>
+    </div>
+    <button type="button" id="run-report">Run</button>
+  </div>
+</div>
+
+<details id="preview" class="section-card">
+  <summary>Preview</summary>
+  <pre id="preview-data"></pre>
+</details>
+
+<div id="download-controls" class="field-row" style="display:none">
+  <div class="field">
+    <label for="file-format">Format</label>
+    <select id="file-format">
+      <option value="pdf">pdf</option>
+      <option value="html">html</option>
+    </select>
+  </div>
+  <div class="field">
+    <label for="include-cover">Cover Page</label>
+    <input type="checkbox" id="include-cover" checked />
+  </div>
+  <button id="download-report">Download</button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/aoi_daily_report.js') }}"></script>
+{% endblock %}

@@ -1231,6 +1231,14 @@ def export_integrated_report():
     return html
 
 
+@main_bp.route('/reports/aoi_daily', methods=['GET'])
+def aoi_daily_report_page():
+    """Render the AOI Daily Report page."""
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    return render_template('aoi_daily_report.html', username=session.get('username'))
+
+
 @main_bp.route('/reports/aoi_daily/export')
 def export_aoi_daily_report():
     if 'username' not in session:
