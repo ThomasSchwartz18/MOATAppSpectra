@@ -87,6 +87,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const end = document.getElementById('end-date').value;
     const operator = getDropdownValues('filter-operator').join(',');
     const params = new URLSearchParams({ format: fmt });
+    const includeCover = document.getElementById('include-cover')?.checked;
+    params.append('show_cover', includeCover ? 'true' : 'false');
     if (start) params.append('start_date', start);
     if (end) params.append('end_date', end);
     if (operator) params.append('operator', operator);
