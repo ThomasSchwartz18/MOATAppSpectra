@@ -579,6 +579,33 @@ def _fig_to_data_uri(fig):
     return f"data:image/png;base64,{b64}"
 
 
+def _build_metrics_chart(info: dict) -> str:
+    """Return a bar chart image for key assembly metrics as a data URI."""
+    if plt is None:
+        return ""
+    labels = [
+        "Yield",
+        "Hist Yield",
+        "AOI Rejects",
+        "Past Rejects",
+        "FI Rejects",
+    ]
+    values = [
+        info.get("yield") or 0,
+        info.get("past4Avg") if isinstance(info.get("past4Avg"), (int, float)) else 0,
+        info.get("currentRejects") or 0,
+        info.get("pastRejectsAvg") or 0,
+        info.get("fiTypicalRejects") or 0,
+    ]
+    fig, ax = plt.subplots(figsize=(3, 2))
+    ax.bar(range(len(values)), values, color="steelblue")
+    ax.set_xticks(range(len(labels)))
+    ax.set_xticklabels(labels, rotation=45, ha="right", fontsize=6)
+    ax.set_ylabel("Value")
+    fig.tight_layout()
+    return _fig_to_data_uri(fig)
+
+
 def _compute_control_limits(values: list[float]) -> tuple[float, float, float]:
     """Return mean, UCL and LCL for ``values`` using ±3σ limits."""
     if not values:
@@ -1746,18 +1773,18 @@ def build_aoi_daily_report_payload(
         fi_vals = fi_assembly.get(asm, [])
         fi_typical = sum(fi_vals) / len(fi_vals) if fi_vals else 0
 
-        assembly_info.append(
-            {
-                "assembly": asm,
-                "operators": sorted(vals.get("operators", set())),
-                "boards": ins,
-                "yield": today_yield,
-                "past4Avg": past_avg,
-                "currentRejects": rej,
-                "pastRejectsAvg": past_rej_avg,
-                "fiTypicalRejects": fi_typical,
-            }
-        )
+        info = {
+            "assembly": asm,
+            "operators": sorted(vals.get("operators", set())),
+            "boards": ins,
+            "yield": today_yield,
+            "past4Avg": past_avg,
+            "currentRejects": rej,
+            "pastRejectsAvg": past_rej_avg,
+            "fiTypicalRejects": fi_typical,
+        }
+        info["metricsChart"] = _build_metrics_chart(info)
+        assembly_info.append(info)
     moat_rows, moat_error = fetch_moat()
     if moat_error:
         current_app.logger.error("Failed to fetch MOAT data: %s", moat_error)
