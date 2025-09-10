@@ -192,3 +192,83 @@ def test_assembly_detail_rendered(app_instance, monkeypatch):
         assert "Current AOI Rejects</td><td>2" in html
         assert re.search(r"Past AOI Rejects \(Avg\)</td><td>\s*1.5", html)
         assert "Typical FI Rejects</td><td>1" in html
+
+
+def test_toc_after_shift_summary(app_instance, monkeypatch):
+    _mock_payload(monkeypatch)
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        with client.session_transaction() as sess:
+            sess["username"] = "tester"
+        resp = client.get("/reports/aoi_daily/export?date=2024-06-01")
+        assert resp.status_code == 200
+        html = resp.data.decode()
+        shift_idx = html.index("Shift Comparison")
+        toc_idx = html.index("Table of Contents")
+        assert shift_idx < toc_idx
+
+
+def test_historical_yield_uses_four_jobs(app_instance, monkeypatch):
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        rows = [
+            {
+                "Date": "2024-06-05",
+                "Operator": "Op",
+                "Assembly": "Asm1",
+                "Job Number": "J6",
+                "Quantity Inspected": 100,
+                "Quantity Rejected": 0,
+                "Shift": "1",
+            },
+            {
+                "Date": "2024-06-04",
+                "Operator": "Op",
+                "Assembly": "Asm1",
+                "Job Number": "J5",
+                "Quantity Inspected": 100,
+                "Quantity Rejected": 10,
+            },
+            {
+                "Date": "2024-06-03",
+                "Operator": "Op",
+                "Assembly": "Asm1",
+                "Job Number": "J4",
+                "Quantity Inspected": 100,
+                "Quantity Rejected": 20,
+            },
+            {
+                "Date": "2024-06-02",
+                "Operator": "Op",
+                "Assembly": "Asm1",
+                "Job Number": "J3",
+                "Quantity Inspected": 100,
+                "Quantity Rejected": 30,
+            },
+            {
+                "Date": "2024-06-01",
+                "Operator": "Op",
+                "Assembly": "Asm1",
+                "Job Number": "J2",
+                "Quantity Inspected": 100,
+                "Quantity Rejected": 40,
+            },
+            {
+                "Date": "2024-05-31",
+                "Operator": "Op",
+                "Assembly": "Asm1",
+                "Job Number": "J1",
+                "Quantity Inspected": 100,
+                "Quantity Rejected": 50,
+            },
+        ]
+        monkeypatch.setattr(routes, "fetch_aoi_reports", lambda: (rows, None))
+        monkeypatch.setattr(routes, "fetch_fi_reports", lambda: ([], None))
+        with client.session_transaction() as sess:
+            sess["username"] = "tester"
+        resp = client.get("/api/reports/aoi_daily?date=2024-06-05")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        asm = data["assemblies"][0]
+        assert asm["past4Avg"] == pytest.approx(75.0)
+        assert asm["pastRejectsAvg"] == pytest.approx(25.0)
