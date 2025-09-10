@@ -34,12 +34,22 @@ def _mock_report(monkeypatch):
 
     def fake_render(template, **context):
         tpl = (
-            "{% if show_cover %}<section class='report-section cover-page'>cover</section>{% endif %}"
+            "{% if show_cover %}"
+            "<section class='report-section cover-page'>cover"
             "{% if show_summary %}"
-            "<section class='report-section'><div class='summary'>"
+            "<div class='summary'>"
             "{% for k in summary_kpis %}<div class='kpi'>{{ k.label }}</div>{% endfor %}"
-            "</div></section>"
-            "<section class='report-section'><div class='toc'>Table of Contents</div></section>"
+            "</div>"
+            "<div class='toc'>Table of Contents</div>"
+            "{% endif %}"
+            "</section>"
+            "{% elif show_summary %}"
+            "<section class='report-section summary-page'>"
+            "<div class='summary'>"
+            "{% for k in summary_kpis %}<div class='kpi'>{{ k.label }}</div>{% endfor %}"
+            "</div>"
+            "<div class='toc'>Table of Contents</div>"
+            "</section>"
             "{% endif %}"
             "{% for job in jobs %}<div class='job'>{{ job.label }}</div>{% endfor %}"
         )
@@ -81,7 +91,10 @@ def test_cover_contains_summary_when_enabled(app_instance, monkeypatch):
         assert resp.status_code == 200
         html = resp.data.decode()
         assert "cover-page" in html
-        assert html.index("cover-page") < html.index("<div class='summary'>")
+        start = html.index("cover-page")
+        end = html.index("</section>", start)
+        cover_content = html[start:end]
+        assert "<div class='summary'>" in cover_content
         assert "KPI1" in html
         assert "JobA" in html
         assert "Program Review Queue" not in html
@@ -99,8 +112,11 @@ def test_cover_contains_toc_when_summary_enabled(app_instance, monkeypatch):
         )
         assert resp.status_code == 200
         html = resp.data.decode()
-        assert "Table of Contents" in html
-        assert html.index("<div class='summary'>") < html.index("Table of Contents")
+        start = html.index("cover-page")
+        end = html.index("</section>", start)
+        cover_content = html[start:end]
+        assert "Table of Contents" in cover_content
+        assert cover_content.index("<div class='summary'>") < cover_content.index("Table of Contents")
 
 
 def test_data_keys_present_in_pdf(app_instance, monkeypatch):

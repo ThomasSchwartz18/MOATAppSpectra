@@ -8,8 +8,7 @@
 <body>
     {% if show_cover %}
         {% include 'report/integrated/cover.html' %}
-    {% endif %}
-    {% if show_summary %}
+    {% elif show_summary %}
         {% include 'report/summary_toc.html' %}
     {% endif %}
     {% include 'report/integrated/yield_trend.html' %}

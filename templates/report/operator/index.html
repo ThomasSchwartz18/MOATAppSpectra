@@ -8,8 +8,7 @@
 <body>
     {% if show_cover %}
         {% include 'report/operator/cover.html' %}
-    {% endif %}
-    {% if show_summary %}
+    {% elif show_summary %}
         {% include 'report/operator_summary_toc.html' %}
     {% endif %}
     {% include 'report/operator/operator_daily.html' %}
