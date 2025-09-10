@@ -15,4 +15,22 @@
         <p><b>questions?:</b> &lt;{{ contact }}&gt;</p>
         <p>{{ confidentiality }}</p>
     </div>
+    {% if show_summary %}
+    <div class="summary section-card">
+        <h2>Summary</h2>
+        <p class="section-desc">Overview of operator performance.</p>
+        <p><strong>Date range:</strong> {{ start }} - {{ end }}</p>
+        <p><strong>Total Boards:</strong> {{ summary.totalBoards }}</p>
+        <p><strong>Average per shift:</strong> {{ summary.avgPerShift|round(2) }}</p>
+        <p><strong>Average reject rate:</strong> {{ summary.avgRejectRate|round(2) }}%</p>
+    </div>
+    <div class="summary-break"></div>
+    <div class="toc section-card">
+        <h2>Table of Contents</h2>
+        <ol>
+            <li><a href="#operator-daily">Daily Reject Rates</a></li>
+            <li><a href="#operator-assemblies">Assemblies</a></li>
+        </ol>
+    </div>
+    {% endif %}
 </section>
