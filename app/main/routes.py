@@ -1478,6 +1478,9 @@ def build_aoi_daily_report_payload(
     rows, error = fetch_aoi_reports()
     if error:
         abort(500, description=error)
+    fi_rows, fi_error = fetch_fi_reports()
+    if fi_error:
+        abort(500, description=fi_error)
 
     op_filter = (
         {o.strip().lower() for o in operator.split(',') if o.strip()}
@@ -1495,7 +1498,7 @@ def build_aoi_daily_report_payload(
         "shift1": {"inspected": 0, "rejected": 0},
         "shift2": {"inspected": 0, "rejected": 0},
     }
-    assemblies: dict[str, dict[str, int]] = {}
+    assemblies: dict[str, dict[str, int | set]] = {}
 
     for row in rows or []:
         dt = _parse_date(row.get("Date") or row.get("date"))
@@ -1531,14 +1534,35 @@ def build_aoi_daily_report_payload(
         shift_totals[shift_key]["inspected"] += inspected
         shift_totals[shift_key]["rejected"] += rejected
 
-        assemblies.setdefault(asm_name, {"inspected": 0, "rejected": 0})
+        assemblies.setdefault(
+            asm_name,
+            {"inspected": 0, "rejected": 0, "operators": set()},
+        )
         assemblies[asm_name]["inspected"] += inspected
         assemblies[asm_name]["rejected"] += rejected
+        assemblies[asm_name]["operators"].add(op_name)
 
     for info in shift_totals.values():
         ins = info["inspected"]
         rej = info["rejected"]
         info["rejectRate"] = (rej / ins * 100) if ins else 0
+
+    # Aggregate FI typical rejects per assembly from historical FI data
+    phrases = current_app.config.get("NON_AOI_PHRASES", [])
+    fi_assembly: dict[str, list[int]] = defaultdict(list)
+    for row in fi_rows or []:
+        dt = _parse_date(row.get("Date") or row.get("date"))
+        if not dt or dt >= day:
+            continue
+        asm = row.get("Assembly") or "Unknown"
+        try:
+            fi_rej = int(row.get("Quantity Rejected") or 0)
+        except (TypeError, ValueError):
+            fi_rej = 0
+        if fi_rej == 0:
+            info = row.get("Additional Information") or row.get("Add Info") or ""
+            fi_rej = parse_fi_rejections(info, phrases)
+        fi_assembly[asm].append(fi_rej)
 
     assembly_info = []
     for asm, vals in assemblies.items():
@@ -1546,7 +1570,7 @@ def build_aoi_daily_report_payload(
         rej = vals["rejected"]
         today_yield = ((ins - rej) / ins * 100) if ins else 0
 
-        # Past 4 job average yield
+        # Past 4 job average yield and reject count
         past_rows = [
             r
             for r in rows or []
@@ -1558,17 +1582,23 @@ def build_aoi_daily_report_payload(
         for r in past_rows:
             job = r.get("Job Number") or ""
             d = _parse_date(r.get("Date") or r.get("date"))
-            g = job_groups.setdefault(job, {"inspected": 0, "rejected": 0, "date": d})
+            g = job_groups.setdefault(
+                job, {"inspected": 0, "rejected": 0, "date": d}
+            )
             g["inspected"] += int(r.get("Quantity Inspected") or 0)
             g["rejected"] += int(r.get("Quantity Rejected") or 0)
             if d and (g["date"] is None or d > g["date"]):
                 g["date"] = d
 
-        jobs = sorted(job_groups.values(), key=lambda g: g.get("date") or date.min, reverse=True)
-        yields = []
+        jobs = sorted(
+            job_groups.values(), key=lambda g: g.get("date") or date.min, reverse=True
+        )
+        yields: list[float] = []
+        rejects: list[int] = []
         for g in jobs[:4]:
             i = g["inspected"]
             rj = g["rejected"]
+            rejects.append(rj)
             if i:
                 yields.append((i - rj) / i * 100)
         past_avg: float | str
@@ -1576,8 +1606,23 @@ def build_aoi_daily_report_payload(
             past_avg = sum(yields) / len(yields)
         else:
             past_avg = "first run"
+        past_rej_avg = sum(rejects) / len(rejects) if rejects else 0
 
-        assembly_info.append({"assembly": asm, "yield": today_yield, "past4Avg": past_avg})
+        fi_vals = fi_assembly.get(asm, [])
+        fi_typical = sum(fi_vals) / len(fi_vals) if fi_vals else 0
+
+        assembly_info.append(
+            {
+                "assembly": asm,
+                "operators": sorted(vals.get("operators", set())),
+                "boards": ins,
+                "yield": today_yield,
+                "past4Avg": past_avg,
+                "currentRejects": rej,
+                "pastRejectsAvg": past_rej_avg,
+                "fiTypicalRejects": fi_typical,
+            }
+        )
 
     return {
         "date": day.isoformat(),
