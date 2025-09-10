@@ -194,18 +194,19 @@ def test_assembly_detail_rendered(app_instance, monkeypatch):
         assert "Typical FI Rejects</td><td>1" in html
 
 
-def test_toc_after_shift_summary(app_instance, monkeypatch):
+def test_toc_on_cover_before_shift_summary(app_instance, monkeypatch):
     _mock_payload(monkeypatch)
     client = app_instance.test_client()
     with app_instance.app_context():
         with client.session_transaction() as sess:
             sess["username"] = "tester"
-        resp = client.get("/reports/aoi_daily/export?date=2024-06-01")
+        resp = client.get("/reports/aoi_daily/export?date=2024-06-01&show_cover=1")
         assert resp.status_code == 200
         html = resp.data.decode()
-        shift_idx = html.index("Shift Comparison")
+        cover_idx = html.index('id="cover"')
         toc_idx = html.index("Table of Contents")
-        assert shift_idx < toc_idx
+        shift_idx = html.index("Shift Comparison")
+        assert cover_idx < toc_idx < shift_idx
 
 
 def test_historical_yield_uses_four_jobs(app_instance, monkeypatch):
