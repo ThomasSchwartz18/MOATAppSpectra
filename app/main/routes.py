@@ -592,13 +592,13 @@ def _compute_control_limits(values: list[float]) -> tuple[float, float, float]:
 
 
 def _build_assembly_moat_charts(assembly: str, moat_rows: list[dict]) -> dict[str, str]:
-    """Build SMT and TH false-call control charts for ``assembly``.
+    """Build an overlay control chart for SMT and TH false-call data.
 
-    Returns a dictionary with keys ``smtChart`` and ``thChart`` containing
-    data URIs for the generated charts (or empty strings if unavailable).
+    Returns a dictionary with a single key ``overlayChart`` containing a
+    data URI for the generated chart (or an empty string if unavailable).
     """
     if plt is None:
-        return {"smtChart": "", "thChart": ""}
+        return {"overlayChart": ""}
 
     records: list[dict[str, str | float]] = []
     asm_lower = assembly.lower()
@@ -630,33 +630,45 @@ def _build_assembly_moat_charts(assembly: str, moat_rows: list[dict]) -> dict[st
             }
         )
 
-    def build_chart(data: list[dict[str, str | float]], title: str) -> str:
+    smt_data = [r for r in records if r["group"] == "smt"]
+    th_data = [r for r in records if r["group"] == "th"]
+    if not (smt_data or th_data):
+        return {"overlayChart": ""}
+
+    fig, ax = plt.subplots(figsize=(6, 3))
+    groups = {
+        "smt": {
+            "data": smt_data,
+            "color": "tab:blue",
+            "label": "SMT",
+        },
+        "th": {
+            "data": th_data,
+            "color": "tab:orange",
+            "label": "TH",
+        },
+    }
+    for key, info in groups.items():
+        data = info["data"]
         if not data:
-            return ""
+            continue
         data.sort(key=lambda d: d.get("date", ""))
         dates = [d["date"] for d in data]
         vals = [d["val"] for d in data]
         mean, ucl, lcl = _compute_control_limits(vals)
-        fig, ax = plt.subplots(figsize=(6, 3))
-        ax.plot(dates, vals, marker="o", label="False Calls/Board")
-        ax.axhline(mean, linestyle="--", color="blue", label="Mean")
-        ax.axhline(ucl, linestyle="--", color="red", label="+3σ")
-        ax.axhline(lcl, linestyle="--", color="green", label="-3σ")
-        ax.set_ylabel("False Calls/Board")
-        ax.set_title(title)
-        ax.tick_params(axis="x", rotation=45)
-        ax.legend()
-        return _fig_to_data_uri(fig)
+        color = info["color"]
+        label = info["label"]
+        ax.plot(dates, vals, marker="o", color=color, label=f"{label} False Calls/Board")
+        ax.axhline(mean, linestyle="--", color=color, label=f"{label} Mean")
+        ax.axhline(ucl, linestyle="--", color=color, label=f"{label} +3σ")
+        ax.axhline(lcl, linestyle="--", color=color, label=f"{label} -3σ")
 
-    smt_chart = build_chart(
-        [r for r in records if r["group"] == "smt"],
-        "SMT False Calls per Board",
-    )
-    th_chart = build_chart(
-        [r for r in records if r["group"] == "th"],
-        "TH False Calls per Board",
-    )
-    return {"smtChart": smt_chart, "thChart": th_chart}
+    ax.set_ylabel("False Calls/Board")
+    ax.set_title("SMT vs TH False Calls Control Chart")
+    ax.tick_params(axis="x", rotation=45)
+    ax.legend()
+
+    return {"overlayChart": _fig_to_data_uri(fig)}
 
 
 def _generate_report_charts(payload):
@@ -1736,7 +1748,9 @@ def build_aoi_daily_report_payload(
         current_app.logger.error("Failed to fetch MOAT data: %s", moat_error)
         moat_rows = []
     for asm in assembly_info:
-        asm.update(_build_assembly_moat_charts(asm["assembly"], moat_rows))
+        asm["overlayChart"] = _build_assembly_moat_charts(
+            asm["assembly"], moat_rows
+        ).get("overlayChart", "")
 
     # Compute overall shift summary statistics for template consumption
     s1_total = shift_totals["shift1"].get("inspected", 0)
