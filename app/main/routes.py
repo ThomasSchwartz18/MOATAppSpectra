@@ -715,12 +715,19 @@ def _generate_aoi_daily_report_charts(payload):
     Creates a simple bar chart showing the total quantity inspected for
     1st and 2nd shift.
     """
-    if plt is None:
-        return {"shiftImg": ""}
-
     totals = payload.get("shiftTotals", {})
     s1 = totals.get("shift1", {}).get("inspected", 0)
     s2 = totals.get("shift2", {}).get("inspected", 0)
+
+    if s1 > s2:
+        desc = f"1st shift inspected {s1 - s2} more boards than 2nd shift."
+    elif s2 > s1:
+        desc = f"2nd shift inspected {s2 - s1} more boards than 1st shift."
+    else:
+        desc = "Both shifts inspected the same number of boards."
+
+    if plt is None:
+        return {"shiftImg": "", "shiftImgDesc": desc}
 
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.bar(["1st", "2nd"], [s1, s2], color="steelblue")
@@ -729,6 +736,7 @@ def _generate_aoi_daily_report_charts(payload):
 
     charts: dict[str, str] = {}
     charts["shiftImg"] = _fig_to_data_uri(fig)
+    charts["shiftImgDesc"] = desc
     return charts
 
 
