@@ -630,8 +630,23 @@ def _build_assembly_moat_charts(assembly: str, moat_rows: list[dict]) -> dict[st
             }
         )
 
-    smt_data = [r for r in records if r["group"] == "smt"]
-    th_data = [r for r in records if r["group"] == "th"]
+    # average values per day for each group
+    grouped: dict[tuple[str, str], dict[str, float]] = defaultdict(lambda: {"sum": 0.0, "count": 0})
+    for rec in records:
+        key = (rec["group"], rec["date"])
+        grouped[key]["sum"] += rec["val"]
+        grouped[key]["count"] += 1
+    averaged_records = [
+        {
+            "group": g,
+            "date": d,
+            "val": info["sum"] / info["count"] if info["count"] else 0.0,
+        }
+        for (g, d), info in grouped.items()
+    ]
+
+    smt_data = [r for r in averaged_records if r["group"] == "smt"]
+    th_data = [r for r in averaged_records if r["group"] == "th"]
     if not (smt_data or th_data):
         return {"overlayChart": ""}
 
@@ -666,7 +681,7 @@ def _build_assembly_moat_charts(assembly: str, moat_rows: list[dict]) -> dict[st
     ax.set_ylabel("False Calls/Board")
     ax.set_title("SMT vs TH False Calls Control Chart")
     ax.tick_params(axis="x", rotation=45)
-    ax.legend()
+    ax.legend(loc="center left", bbox_to_anchor=(1, 0.5))
 
     return {"overlayChart": _fig_to_data_uri(fig)}
 
