@@ -75,8 +75,8 @@ def test_export_aoi_daily_report(app_instance, monkeypatch):
         monkeypatch.setattr(routes, "fetch_aoi_reports", lambda: (SAMPLE_AOI_ROWS, None))
         original_build = routes.build_aoi_daily_report_payload
 
-        def fake_build(day):
-            data = original_build(day)
+        def fake_build(day, operator=None, assembly=None):
+            data = original_build(day, operator, assembly)
             data["show_cover"] = True
             return data
 
@@ -116,3 +116,18 @@ def test_aoi_daily_preview_api_shift_view(app_instance, monkeypatch):
         assert data["shift2"]["rejected"] == [2]
         assert math.isclose(data["shift1"]["avg_reject_rate"], 10.0, rel_tol=1e-9)
         assert math.isclose(data["shift2"]["avg_reject_rate"], 5.0, rel_tol=1e-9)
+
+
+def test_api_aoi_daily_report(app_instance, monkeypatch):
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        from app.main import routes
+
+        monkeypatch.setattr(routes, "fetch_aoi_reports", lambda: (SAMPLE_AOI_ROWS, None))
+        with client.session_transaction() as sess:
+            sess["username"] = "tester"
+        resp = client.get("/api/reports/aoi_daily?date=2024-07-01")
+        assert resp.status_code == 200
+        data = resp.get_json()
+        assert data["shiftTotals"]["shift1"]["inspected"] == 50
+        assert data["shiftTotals"]["shift2"]["rejected"] == 2

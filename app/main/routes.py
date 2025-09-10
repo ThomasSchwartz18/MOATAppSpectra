@@ -1248,7 +1248,10 @@ def export_aoi_daily_report():
     if not day:
         abort(400, description='Invalid date')
 
-    payload = build_aoi_daily_report_payload(day)
+    operator = request.args.get('operator') or None
+    assembly = request.args.get('assembly') or None
+
+    payload = build_aoi_daily_report_payload(day, operator, assembly)
     charts = _generate_aoi_daily_report_charts(payload)
     payload.update(charts)
 
@@ -1429,11 +1432,41 @@ def build_operator_report_payload(start=None, end=None, operator: str | None = N
     return _aggregate_operator_report(start, end, operator)
 
 
-def build_aoi_daily_report_payload(day: date):
+@main_bp.route('/api/reports/aoi_daily', methods=['GET'])
+def api_aoi_daily_report():
+    """Return AOI daily report data for preview."""
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+
+    day = _parse_date(request.args.get('date'))
+    if not day:
+        abort(400, description='Invalid date')
+
+    operator = request.args.get('operator') or None
+    assembly = request.args.get('assembly') or None
+
+    payload = build_aoi_daily_report_payload(day, operator, assembly)
+    return jsonify(payload)
+
+
+def build_aoi_daily_report_payload(
+    day: date, operator: str | None = None, assembly: str | None = None
+):
     """Build the AOI daily report payload for a specific day."""
     rows, error = fetch_aoi_reports()
     if error:
         abort(500, description=error)
+
+    op_filter = (
+        {o.strip().lower() for o in operator.split(',') if o.strip()}
+        if operator
+        else None
+    )
+    asm_filter = (
+        {a.strip().lower() for a in assembly.split(',') if a.strip()}
+        if assembly
+        else None
+    )
 
     shift_rows = {"shift1": [], "shift2": []}
     shift_totals = {
@@ -1455,12 +1488,19 @@ def build_aoi_daily_report_payload(day: date):
         else:
             continue
 
+        op_name = row.get("Operator") or "Unknown"
+        asm_name = row.get("Assembly") or "Unknown"
+        if op_filter and op_name.lower() not in op_filter:
+            continue
+        if asm_filter and asm_name.lower() not in asm_filter:
+            continue
+
         inspected = int(row.get("Quantity Inspected") or 0)
         rejected = int(row.get("Quantity Rejected") or 0)
 
         entry = {
-            "operator": row.get("Operator") or "Unknown",
-            "assembly": row.get("Assembly") or "Unknown",
+            "operator": op_name,
+            "assembly": asm_name,
             "job": row.get("Job Number") or "",
             "inspected": inspected,
             "rejected": rejected,
@@ -1469,10 +1509,9 @@ def build_aoi_daily_report_payload(day: date):
         shift_totals[shift_key]["inspected"] += inspected
         shift_totals[shift_key]["rejected"] += rejected
 
-        asm = entry["assembly"]
-        assemblies.setdefault(asm, {"inspected": 0, "rejected": 0})
-        assemblies[asm]["inspected"] += inspected
-        assemblies[asm]["rejected"] += rejected
+        assemblies.setdefault(asm_name, {"inspected": 0, "rejected": 0})
+        assemblies[asm_name]["inspected"] += inspected
+        assemblies[asm_name]["rejected"] += rejected
 
     for info in shift_totals.values():
         ins = info["inspected"]
