@@ -709,6 +709,29 @@ def _generate_operator_report_charts(payload):
     return charts
 
 
+def _generate_aoi_daily_report_charts(payload):
+    """Generate charts for the AOI daily report.
+
+    Creates a simple bar chart showing the total quantity inspected for
+    1st and 2nd shift.
+    """
+    if plt is None:
+        return {"shiftImg": ""}
+
+    totals = payload.get("shiftTotals", {})
+    s1 = totals.get("shift1", {}).get("inspected", 0)
+    s2 = totals.get("shift2", {}).get("inspected", 0)
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.bar(["1st", "2nd"], [s1, s2], color="steelblue")
+    ax.set_ylabel("Boards Inspected")
+    ax.set_title("Boards Inspected by Shift")
+
+    charts: dict[str, str] = {}
+    charts["shiftImg"] = _fig_to_data_uri(fig)
+    return charts
+
+
 def build_report_payload(start=None, end=None):
     """Aggregate yield, operator and false-call stats for the AOI integrated report.
 
@@ -1208,6 +1231,45 @@ def export_integrated_report():
     return html
 
 
+@main_bp.route('/reports/aoi_daily/export')
+def export_aoi_daily_report():
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+
+    day = _parse_date(request.args.get('date'))
+    if not day:
+        abort(400, description='Invalid date')
+
+    payload = build_aoi_daily_report_payload(day)
+    charts = _generate_aoi_daily_report_charts(payload)
+    payload.update(charts)
+
+    html = render_template('report/aoi_daily/index.html', day=day.isoformat(), **payload)
+
+    fmt = request.args.get('format')
+    if fmt == 'pdf':
+        from weasyprint import HTML
+        from weasyprint.text.fonts import FontConfiguration
+
+        font_config = FontConfiguration()
+        pdf = HTML(string=html, base_url=request.url_root).write_pdf(font_config=font_config)
+        filename = f"{day.strftime('%y%m%d')}_aoi_daily_report.pdf"
+        return send_file(
+            io.BytesIO(pdf),
+            mimetype='application/pdf',
+            download_name=filename,
+            as_attachment=True,
+        )
+    if fmt == 'html':
+        return send_file(
+            io.BytesIO(html.encode('utf-8')),
+            mimetype='text/html',
+            download_name='report.html',
+            as_attachment=True,
+        )
+    return html
+
+
 def _aggregate_operator_report(start=None, end=None, operator: str | None = None):
     """Aggregate AOI report rows for the operator report."""
     from collections import defaultdict
@@ -1357,6 +1419,104 @@ def api_operator_report():
 def build_operator_report_payload(start=None, end=None, operator: str | None = None):
     """Build the operator report payload for export."""
     return _aggregate_operator_report(start, end, operator)
+
+
+def build_aoi_daily_report_payload(day: date):
+    """Build the AOI daily report payload for a specific day."""
+    rows, error = fetch_aoi_reports()
+    if error:
+        abort(500, description=error)
+
+    shift_rows = {"shift1": [], "shift2": []}
+    shift_totals = {
+        "shift1": {"inspected": 0, "rejected": 0},
+        "shift2": {"inspected": 0, "rejected": 0},
+    }
+    assemblies: dict[str, dict[str, int]] = {}
+
+    for row in rows or []:
+        dt = _parse_date(row.get("Date") or row.get("date"))
+        if not dt or dt != day:
+            continue
+
+        raw_shift = str(row.get("Shift") or "").lower()
+        if raw_shift in {"1", "1st", "first", "shift 1", "shift1", "1st shift"}:
+            shift_key = "shift1"
+        elif raw_shift in {"2", "2nd", "second", "shift 2", "shift2", "2nd shift"}:
+            shift_key = "shift2"
+        else:
+            continue
+
+        inspected = int(row.get("Quantity Inspected") or 0)
+        rejected = int(row.get("Quantity Rejected") or 0)
+
+        entry = {
+            "operator": row.get("Operator") or "Unknown",
+            "assembly": row.get("Assembly") or "Unknown",
+            "job": row.get("Job Number") or "",
+            "inspected": inspected,
+            "rejected": rejected,
+        }
+        shift_rows[shift_key].append(entry)
+        shift_totals[shift_key]["inspected"] += inspected
+        shift_totals[shift_key]["rejected"] += rejected
+
+        asm = entry["assembly"]
+        assemblies.setdefault(asm, {"inspected": 0, "rejected": 0})
+        assemblies[asm]["inspected"] += inspected
+        assemblies[asm]["rejected"] += rejected
+
+    for info in shift_totals.values():
+        ins = info["inspected"]
+        rej = info["rejected"]
+        info["rejectRate"] = (rej / ins * 100) if ins else 0
+
+    assembly_info = []
+    for asm, vals in assemblies.items():
+        ins = vals["inspected"]
+        rej = vals["rejected"]
+        today_yield = ((ins - rej) / ins * 100) if ins else 0
+
+        # Past 3 job average yield
+        past_rows = [
+            r
+            for r in rows or []
+            if (r.get("Assembly") or "Unknown") == asm
+            and (d := _parse_date(r.get("Date") or r.get("date")))
+            and d < day
+        ]
+        job_groups: dict[str, dict[str, int | date | None]] = {}
+        for r in past_rows:
+            job = r.get("Job Number") or ""
+            d = _parse_date(r.get("Date") or r.get("date"))
+            g = job_groups.setdefault(job, {"inspected": 0, "rejected": 0, "date": d})
+            g["inspected"] += int(r.get("Quantity Inspected") or 0)
+            g["rejected"] += int(r.get("Quantity Rejected") or 0)
+            if d and (g["date"] is None or d > g["date"]):
+                g["date"] = d
+
+        jobs = sorted(job_groups.values(), key=lambda g: g.get("date") or date.min, reverse=True)
+        yields = []
+        for g in jobs[:3]:
+            i = g["inspected"]
+            rj = g["rejected"]
+            if i:
+                yields.append((i - rj) / i * 100)
+        past_avg: float | str
+        if yields:
+            past_avg = sum(yields) / len(yields)
+        else:
+            past_avg = "first run"
+
+        assembly_info.append({"assembly": asm, "yield": today_yield, "past3Avg": past_avg})
+
+    return {
+        "date": day.isoformat(),
+        "shift1": shift_rows["shift1"],
+        "shift2": shift_rows["shift2"],
+        "shiftTotals": shift_totals,
+        "assemblies": assembly_info,
+    }
 
 
 @main_bp.route('/reports/operator', methods=['GET'])
