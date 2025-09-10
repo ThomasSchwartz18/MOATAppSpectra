@@ -325,3 +325,90 @@ def test_smt_th_control_charts_render(app_instance, monkeypatch):
         ).group(0)
         assert chart_section.count("<img") == 1
         assert "SMT" in chart_section and "TH" in chart_section
+
+
+def test_moat_chart_averages_duplicates_and_legend(monkeypatch):
+    moat_rows = [
+        {
+            "Report Date": "2024-05-30",
+            "Model Name": "Asm1 SMT",
+            "FalseCall Parts": 2,
+            "Total Boards": 100,
+        },
+        {
+            "Report Date": "2024-05-30",
+            "Model Name": "Asm1 SMT",
+            "FalseCall Parts": 8,
+            "Total Boards": 100,
+        },
+        {
+            "Report Date": "2024-05-31",
+            "Model Name": "Asm1 SMT",
+            "FalseCall Parts": 4,
+            "Total Boards": 200,
+        },
+        {
+            "Report Date": "2024-05-30",
+            "Model Name": "Asm1 TH",
+            "FalseCall Parts": 1,
+            "Total Boards": 50,
+        },
+        {
+            "Report Date": "2024-05-30",
+            "Model Name": "Asm1 TH",
+            "FalseCall Parts": 3,
+            "Total Boards": 150,
+        },
+    ]
+
+    class FakeAx:
+        def __init__(self):
+            self.plot_calls = []
+            self.legend_kwargs = None
+
+        def plot(self, dates, vals, **kwargs):
+            self.plot_calls.append({"dates": dates, "vals": vals, "kwargs": kwargs})
+
+        def axhline(self, *args, **kwargs):
+            pass
+
+        def set_ylabel(self, *args, **kwargs):
+            pass
+
+        def set_title(self, *args, **kwargs):
+            pass
+
+        def tick_params(self, *args, **kwargs):
+            pass
+
+        def legend(self, *args, **kwargs):
+            self.legend_kwargs = kwargs
+
+    fake_ax = FakeAx()
+
+    class FakePlt:
+        def subplots(self, *args, **kwargs):
+            return object(), fake_ax
+
+    monkeypatch.setattr(routes, "plt", FakePlt())
+    monkeypatch.setattr(routes, "_fig_to_data_uri", lambda fig: "img")
+
+    captured_vals = []
+
+    def fake_limits(vals):
+        captured_vals.append(list(vals))
+        return 0.0, 0.0, 0.0
+
+    monkeypatch.setattr(routes, "_compute_control_limits", fake_limits)
+
+    result = routes._build_assembly_moat_charts("Asm1", moat_rows)
+    assert result["overlayChart"] == "img"
+
+    smt_call, th_call = fake_ax.plot_calls
+    assert smt_call["dates"] == ["2024-05-30", "2024-05-31"]
+    assert smt_call["vals"] == [pytest.approx(0.05), pytest.approx(0.02)]
+    assert th_call["dates"] == ["2024-05-30"]
+    assert th_call["vals"] == [pytest.approx(0.02)]
+    assert captured_vals[0] == smt_call["vals"]
+    assert captured_vals[1] == th_call["vals"]
+    assert fake_ax.legend_kwargs == {"loc": "center left", "bbox_to_anchor": (1, 0.5)}
