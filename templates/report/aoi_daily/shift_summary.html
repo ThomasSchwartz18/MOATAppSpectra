@@ -1,0 +1,18 @@
+<section id="shift-summary" class="report-section section-card">
+    <h2>Shift Comparison</h2>
+    <p class="section-desc">Comparison of inspection totals and reject rates by shift.</p>
+    <div class="chart-block">
+        <img src="{{ shiftImg }}" alt="Boards inspected by shift">
+        <div class="chart-summary">
+            <p>
+                <strong>1st Shift Total:</strong> {{ shift1_total }}<br>
+                <strong>1st Shift Reject %:</strong> {{ shift1_reject_pct }}%<br>
+                <strong>2nd Shift Total:</strong> {{ shift2_total }}<br>
+                <strong>2nd Shift Reject %:</strong> {{ shift2_reject_pct }}%<br>
+                <strong>Total Difference:</strong> {{ shift_total_diff }}<br>
+                <strong>Reject % Difference:</strong> {{ shift_reject_pct_diff }}%
+            </p>
+        </div>
+    </div>
+</section>
+

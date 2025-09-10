@@ -6,55 +6,14 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/report.css') }}">
 </head>
 <body>
-    <h1>AOI Daily Report - {{ day }}</h1>
-    {% if shiftImg %}
-    <img src="{{ shiftImg }}" alt="Boards inspected by shift" />
+    {% if show_cover %}
+        {% include 'report/aoi_daily/cover.html' %}
+    {% elif show_summary %}
+        {% include 'report/summary_toc.html' %}
     {% endif %}
 
-    <h2>1st Shift</h2>
-    <table>
-        <tr><th>Operator</th><th>Assembly</th><th>Job</th><th>Inspected</th><th>Rejected</th></tr>
-        {% for row in shift1 %}
-        <tr>
-            <td>{{ row.operator }}</td>
-            <td>{{ row.assembly }}</td>
-            <td>{{ row.job }}</td>
-            <td>{{ row.inspected }}</td>
-            <td>{{ row.rejected }}</td>
-        </tr>
-        {% endfor %}
-    </table>
-
-    <h2>2nd Shift</h2>
-    <table>
-        <tr><th>Operator</th><th>Assembly</th><th>Job</th><th>Inspected</th><th>Rejected</th></tr>
-        {% for row in shift2 %}
-        <tr>
-            <td>{{ row.operator }}</td>
-            <td>{{ row.assembly }}</td>
-            <td>{{ row.job }}</td>
-            <td>{{ row.inspected }}</td>
-            <td>{{ row.rejected }}</td>
-        </tr>
-        {% endfor %}
-    </table>
-
-    <h2>Assemblies</h2>
-    <table>
-        <tr><th>Assembly</th><th>Yield</th><th>Past 3 Job Avg</th></tr>
-        {% for asm in assemblies %}
-        <tr>
-            <td>{{ asm.assembly }}</td>
-            <td>{{ '%.2f'|format(asm.yield) if asm.yield is not string else asm.yield }}</td>
-            <td>
-                {% if asm.past3Avg is string %}
-                    {{ asm.past3Avg }}
-                {% else %}
-                    {{ '%.2f'|format(asm.past3Avg) }}
-                {% endif %}
-            </td>
-        </tr>
-        {% endfor %}
-    </table>
+    {% include 'report/aoi_daily/shift_summary.html' %}
+    {% include 'report/aoi_daily/assembly_history.html' %}
 </body>
 </html>
+
