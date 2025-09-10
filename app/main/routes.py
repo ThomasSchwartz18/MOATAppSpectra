@@ -715,16 +715,44 @@ def _generate_aoi_daily_report_charts(payload):
     Creates a simple bar chart showing the total quantity inspected for
     1st and 2nd shift.
     """
-    totals = payload.get("shiftTotals", {})
-    s1 = totals.get("shift1", {}).get("inspected", 0)
-    s2 = totals.get("shift2", {}).get("inspected", 0)
+    s1 = payload.get("shift1_total")
+    s2 = payload.get("shift2_total")
+    s1 = s1 if s1 is not None else payload.get("shiftTotals", {}).get("shift1", {}).get("inspected", 0)
+    s2 = s2 if s2 is not None else payload.get("shiftTotals", {}).get("shift2", {}).get("inspected", 0)
+    s1_pct = payload.get("shift1_reject_pct")
+    s2_pct = payload.get("shift2_reject_pct")
+    s1_pct = s1_pct if s1_pct is not None else payload.get("shiftTotals", {}).get("shift1", {}).get("rejectRate", 0)
+    s2_pct = s2_pct if s2_pct is not None else payload.get("shiftTotals", {}).get("shift2", {}).get("rejectRate", 0)
 
     if s1 > s2:
-        desc = f"1st shift inspected {s1 - s2} more boards than 2nd shift."
+        diff = s1 - s2
+        desc = f"1st shift inspected {diff} more boards than 2nd shift"
+        pct_diff = s1_pct - s2_pct
+        if pct_diff > 0:
+            desc += f" and had a reject rate {pct_diff:.2f} percentage points higher."
+        elif pct_diff < 0:
+            desc += f" and had a reject rate {abs(pct_diff):.2f} percentage points lower."
+        else:
+            desc += " and had the same reject rate."
     elif s2 > s1:
-        desc = f"2nd shift inspected {s2 - s1} more boards than 1st shift."
+        diff = s2 - s1
+        desc = f"2nd shift inspected {diff} more boards than 1st shift"
+        pct_diff = s2_pct - s1_pct
+        if pct_diff > 0:
+            desc += f" and had a reject rate {pct_diff:.2f} percentage points higher."
+        elif pct_diff < 0:
+            desc += f" and had a reject rate {abs(pct_diff):.2f} percentage points lower."
+        else:
+            desc += " and had the same reject rate."
     else:
-        desc = "Both shifts inspected the same number of boards."
+        desc = "Both shifts inspected the same number of boards"
+        pct_diff = s1_pct - s2_pct
+        if pct_diff > 0:
+            desc += f", but 1st shift's reject rate was {pct_diff:.2f} percentage points higher."
+        elif pct_diff < 0:
+            desc += f", but 2nd shift's reject rate was {abs(pct_diff):.2f} percentage points higher."
+        else:
+            desc += " and had the same reject rate."
 
     if plt is None:
         return {"shiftImg": "", "shiftImgDesc": desc}
@@ -1623,12 +1651,25 @@ def build_aoi_daily_report_payload(
                 "fiTypicalRejects": fi_typical,
             }
         )
+    # Compute overall shift summary statistics for template consumption
+    s1_total = shift_totals["shift1"].get("inspected", 0)
+    s2_total = shift_totals["shift2"].get("inspected", 0)
+    s1_reject_pct = round(shift_totals["shift1"].get("rejectRate", 0), 2)
+    s2_reject_pct = round(shift_totals["shift2"].get("rejectRate", 0), 2)
+    shift_total_diff = abs(s1_total - s2_total)
+    shift_reject_pct_diff = round(abs(s1_reject_pct - s2_reject_pct), 2)
 
     return {
         "date": day.isoformat(),
         "shift1": shift_rows["shift1"],
         "shift2": shift_rows["shift2"],
         "shiftTotals": shift_totals,
+        "shift1_total": s1_total,
+        "shift2_total": s2_total,
+        "shift1_reject_pct": s1_reject_pct,
+        "shift2_reject_pct": s2_reject_pct,
+        "shift_total_diff": shift_total_diff,
+        "shift_reject_pct_diff": shift_reject_pct_diff,
         "assemblies": assembly_info,
     }
 

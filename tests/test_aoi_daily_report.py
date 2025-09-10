@@ -146,9 +146,15 @@ def test_shift_chart_description_rendered(app_instance, monkeypatch):
         assert resp.status_code == 200
         html = resp.data.decode()
         assert (
-            "2nd shift inspected 10 more boards than 1st shift." in html
+            "2nd shift inspected 10 more boards than 1st shift and had a reject rate 1.00 percentage points higher." in html
             and "chart-desc" in html
         )
+        assert "1st Shift Total:</strong> 10" in html
+        assert "1st Shift Reject %:</strong> 1%" in html
+        assert "2nd Shift Total:</strong> 20" in html
+        assert "2nd Shift Reject %:</strong> 2%" in html
+        assert "Total Difference:</strong> 10" in html
+        assert "Reject % Difference:</strong> 1%" in html
 
 
 def test_assembly_detail_rendered(app_instance, monkeypatch):
