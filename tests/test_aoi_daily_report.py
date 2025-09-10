@@ -279,3 +279,45 @@ def test_historical_yield_uses_four_jobs(app_instance, monkeypatch):
         asm = data["assemblies"][0]
         assert asm["past4Avg"] == pytest.approx(75.0)
         assert asm["pastRejectsAvg"] == pytest.approx(25.0)
+
+
+def test_smt_th_control_charts_render(app_instance, monkeypatch):
+    aoi_rows = [
+        {
+            "Date": "2024-06-01",
+            "Shift": "1",
+            "Operator": "Op1",
+            "Assembly": "Asm1",
+            "Quantity Inspected": 10,
+            "Quantity Rejected": 1,
+        }
+    ]
+    moat_rows = [
+        {
+            "Report Date": "2024-05-30",
+            "Model Name": "Asm1 SMT",
+            "FalseCall Parts": 2,
+            "Total Boards": 100,
+        },
+        {
+            "Report Date": "2024-05-31",
+            "Model Name": "Asm1 TH",
+            "FalseCall Parts": 1,
+            "Total Boards": 50,
+        },
+    ]
+    monkeypatch.setattr(routes, "fetch_aoi_reports", lambda: (aoi_rows, None))
+    monkeypatch.setattr(routes, "fetch_fi_reports", lambda: ([], None))
+    monkeypatch.setattr(routes, "fetch_moat", lambda: (moat_rows, None))
+    monkeypatch.setattr(routes, "_generate_aoi_daily_report_charts", lambda payload: {})
+    monkeypatch.setattr(routes, "_fig_to_data_uri", lambda fig: "img")
+
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        with client.session_transaction() as sess:
+            sess["username"] = "tester"
+        resp = client.get("/reports/aoi_daily/export?date=2024-06-01")
+        assert resp.status_code == 200
+        html = resp.data.decode()
+        assert "SMT Control Chart" in html
+        assert "TH Control Chart" in html

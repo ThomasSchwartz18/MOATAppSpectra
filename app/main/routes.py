@@ -579,6 +579,86 @@ def _fig_to_data_uri(fig):
     return f"data:image/png;base64,{b64}"
 
 
+def _compute_control_limits(values: list[float]) -> tuple[float, float, float]:
+    """Return mean, UCL and LCL for ``values`` using ±3σ limits."""
+    if not values:
+        return 0.0, 0.0, 0.0
+    mean = sum(values) / len(values)
+    variance = sum((v - mean) ** 2 for v in values) / len(values)
+    stdev = math.sqrt(variance)
+    ucl = mean + 3 * stdev
+    lcl = max(0.0, mean - 3 * stdev)
+    return mean, ucl, lcl
+
+
+def _build_assembly_moat_charts(assembly: str, moat_rows: list[dict]) -> dict[str, str]:
+    """Build SMT and TH false-call control charts for ``assembly``.
+
+    Returns a dictionary with keys ``smtChart`` and ``thChart`` containing
+    data URIs for the generated charts (or empty strings if unavailable).
+    """
+    if plt is None:
+        return {"smtChart": "", "thChart": ""}
+
+    records: list[dict[str, str | float]] = []
+    asm_lower = assembly.lower()
+    for row in moat_rows or []:
+        model = (
+            row.get("Model Name")
+            or row.get("model_name")
+            or row.get("Model")
+            or ""
+        )
+        model_lower = str(model).lower()
+        if asm_lower not in model_lower:
+            continue
+        try:
+            fc = float(row.get("FalseCall Parts") or row.get("falsecall_parts") or 0)
+            boards = float(row.get("Total Boards") or row.get("total_boards") or 0)
+        except (TypeError, ValueError):
+            continue
+        if boards == 0:
+            continue
+        group = "th" if "th" in model_lower else "smt" if "smt" in model_lower else None
+        if group is None:
+            continue
+        records.append(
+            {
+                "group": group,
+                "date": row.get("Report Date") or row.get("report_date") or "",
+                "val": fc / boards,
+            }
+        )
+
+    def build_chart(data: list[dict[str, str | float]], title: str) -> str:
+        if not data:
+            return ""
+        data.sort(key=lambda d: d.get("date", ""))
+        dates = [d["date"] for d in data]
+        vals = [d["val"] for d in data]
+        mean, ucl, lcl = _compute_control_limits(vals)
+        fig, ax = plt.subplots(figsize=(6, 3))
+        ax.plot(dates, vals, marker="o", label="False Calls/Board")
+        ax.axhline(mean, linestyle="--", color="blue", label="Mean")
+        ax.axhline(ucl, linestyle="--", color="red", label="+3σ")
+        ax.axhline(lcl, linestyle="--", color="green", label="-3σ")
+        ax.set_ylabel("False Calls/Board")
+        ax.set_title(title)
+        ax.tick_params(axis="x", rotation=45)
+        ax.legend()
+        return _fig_to_data_uri(fig)
+
+    smt_chart = build_chart(
+        [r for r in records if r["group"] == "smt"],
+        "SMT False Calls per Board",
+    )
+    th_chart = build_chart(
+        [r for r in records if r["group"] == "th"],
+        "TH False Calls per Board",
+    )
+    return {"smtChart": smt_chart, "thChart": th_chart}
+
+
 def _generate_report_charts(payload):
     if plt is None:
         return {
@@ -1651,6 +1731,13 @@ def build_aoi_daily_report_payload(
                 "fiTypicalRejects": fi_typical,
             }
         )
+    moat_rows, moat_error = fetch_moat()
+    if moat_error:
+        current_app.logger.error("Failed to fetch MOAT data: %s", moat_error)
+        moat_rows = []
+    for asm in assembly_info:
+        asm.update(_build_assembly_moat_charts(asm["assembly"], moat_rows))
+
     # Compute overall shift summary statistics for template consumption
     s1_total = shift_totals["shift1"].get("inspected", 0)
     s2_total = shift_totals["shift2"].get("inspected", 0)

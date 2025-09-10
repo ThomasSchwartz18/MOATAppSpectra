@@ -20,4 +20,20 @@
             <tr><td>Typical FI Rejects</td><td>{{ asm.fiTypicalRejects|default(0)|round(2) }}</td></tr>
         </tbody>
     </table>
+    {% if asm.smtChart or asm.thChart %}
+    <div class="moat-charts">
+        {% if asm.smtChart %}
+        <div class="chart">
+            <h3>SMT False Calls Control Chart</h3>
+            <img src="{{ asm.smtChart }}" alt="SMT Control Chart">
+        </div>
+        {% endif %}
+        {% if asm.thChart %}
+        <div class="chart">
+            <h3>TH False Calls Control Chart</h3>
+            <img src="{{ asm.thChart }}" alt="TH Control Chart">
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
 </section>
