@@ -1,9 +1,9 @@
 <section id="assembly-history" class="report-section section-card last">
     <h2>Assembly Historical Yield</h2>
-    <p class="section-desc">Yield performance and four-job average for recent runs.</p>
+    <p class="section-desc">Yield performance and historical average for all past jobs.</p>
     <table class="data-table">
         <thead>
-            <tr><th>Assembly</th><th>Yield %</th><th>Historical Yield (Past 4 Job Avg)</th></tr>
+            <tr><th>Assembly</th><th>Yield %</th><th>Historical Yield (Avg of All Past Jobs)</th></tr>
         </thead>
         <tbody>
         {% for asm in assemblies %}
@@ -11,10 +11,10 @@
                 <td>{{ asm.assembly }}</td>
                 <td>{{ asm.yield if asm.yield is string else '%.2f'|format(asm.yield) }}</td>
                 <td>
-                    {% if asm.past4Avg is string %}
-                        {{ asm.past4Avg }}
+                    {% if asm.pastAvg is string %}
+                        {{ asm.pastAvg }}
                     {% else %}
-                        {{ '%.2f'|format(asm.past4Avg) }}
+                        {{ '%.2f'|format(asm.pastAvg) }}
                     {% endif %}
                 </td>
             </tr>

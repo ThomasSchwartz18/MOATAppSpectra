@@ -35,7 +35,7 @@ def _mock_payload(monkeypatch):
             {
                 "assembly": "Asm1",
                 "yield": 95.0,
-                "past4Avg": 96.0,
+                "pastAvg": 96.0,
                 "operators": ["Op1"],
                 "boards": 5,
                 "currentRejects": 0,
@@ -114,7 +114,7 @@ def test_shift_chart_description_rendered(app_instance, monkeypatch):
             "shift1": {"inspected": 10},
             "shift2": {"inspected": 20},
         },
-        "assemblies": [{"assembly": "Asm1", "yield": 95.0, "past4Avg": 96.0}],
+        "assemblies": [{"assembly": "Asm1", "yield": 95.0, "pastAvg": 96.0}],
         "shift1": [
             {
                 "operator": "Op1",
@@ -164,7 +164,7 @@ def test_assembly_detail_rendered(app_instance, monkeypatch):
             {
                 "assembly": "Asm1",
                 "yield": 90.0,
-                "past4Avg": 95.0,
+                "pastAvg": 95.0,
                 "operators": ["Op1", "Op2"],
                 "boards": 20,
                 "currentRejects": 2,
@@ -196,7 +196,7 @@ def test_assembly_detail_rendered(app_instance, monkeypatch):
         assert "Operators:</strong> Op1, Op2" in html
         assert "Boards Processed:</strong> 20 boards" in html
         assert "Current Yield %</td><td>90.00%" in html
-        assert re.search(r"Historical Yield %</td><td>\s*95.00%", html)
+        assert re.search(r"Historical Yield \(Avg of All Past Jobs\)</td><td>\s*95.00%", html)
         assert "Current AOI Rejects</td><td>2 rejects" in html
         assert re.search(r"Past AOI Rejects \(Avg\)</td><td>\s*1.50 rejects", html)
         assert "Typical FI Rejects</td><td>1.00 rejects" in html
@@ -218,7 +218,7 @@ def test_toc_on_cover_before_shift_summary(app_instance, monkeypatch):
         assert cover_idx < toc_idx < shift_idx
 
 
-def test_historical_yield_uses_four_jobs(app_instance, monkeypatch):
+def test_historical_yield_uses_all_jobs(app_instance, monkeypatch):
     client = app_instance.test_client()
     with app_instance.app_context():
         rows = [
@@ -280,8 +280,8 @@ def test_historical_yield_uses_four_jobs(app_instance, monkeypatch):
         assert resp.status_code == 200
         data = resp.get_json()
         asm = data["assemblies"][0]
-        assert asm["past4Avg"] == pytest.approx(75.0)
-        assert asm["pastRejectsAvg"] == pytest.approx(25.0)
+        assert asm["pastAvg"] == pytest.approx(70.0)
+        assert asm["pastRejectsAvg"] == pytest.approx(30.0)
 
 
 def test_smt_th_control_charts_render(app_instance, monkeypatch):
