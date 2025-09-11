@@ -227,6 +227,11 @@ pre,
     page-break-after: always;
 }
 
+.metrics-chart {
+    width: 100%;
+    height: auto;
+}
+
 @media print {
     .report-section {
         page-break-after: always;
