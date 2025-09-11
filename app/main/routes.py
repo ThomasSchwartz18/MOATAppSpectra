@@ -592,7 +592,7 @@ def _build_metrics_chart(info: dict) -> str:
     ]
     values = [
         info.get("yield") or 0,
-        info.get("past4Avg") if isinstance(info.get("past4Avg"), (int, float)) else 0,
+        info.get("pastAvg") if isinstance(info.get("pastAvg"), (int, float)) else 0,
         info.get("currentRejects") or 0,
         info.get("pastRejectsAvg") or 0,
         info.get("fiTypicalRejects") or 0,
@@ -1757,7 +1757,7 @@ def build_aoi_daily_report_payload(
         )
         yields: list[float] = []
         rejects: list[int] = []
-        for g in jobs[:4]:
+        for g in jobs:
             i = g["inspected"]
             rj = g["rejected"]
             rejects.append(rj)
@@ -1778,7 +1778,7 @@ def build_aoi_daily_report_payload(
             "operators": sorted(vals.get("operators", set())),
             "boards": ins,
             "yield": today_yield,
-            "past4Avg": past_avg,
+            "pastAvg": past_avg,
             "currentRejects": rej,
             "pastRejectsAvg": past_rej_avg,
             "fiTypicalRejects": fi_typical,

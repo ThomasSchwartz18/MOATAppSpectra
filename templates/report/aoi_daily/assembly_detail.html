@@ -8,11 +8,11 @@
         </thead>
         <tbody>
             <tr><td>Current Yield %</td><td>{{ '%.2f%%'|format(asm.yield|default(0)) }}</td></tr>
-            <tr><td>Historical Yield %</td><td>
-                {% if asm.past4Avg is string %}
-                    {{ asm.past4Avg }}
+            <tr><td>Historical Yield (Avg of All Past Jobs)</td><td>
+                {% if asm.pastAvg is string %}
+                    {{ asm.pastAvg }}
                 {% else %}
-                    {{ '%.2f%%'|format(asm.past4Avg|default(0)) }}
+                    {{ '%.2f%%'|format(asm.pastAvg|default(0)) }}
                 {% endif %}
             </td></tr>
             <tr><td>Current AOI Rejects</td><td>{{ asm.currentRejects|default(0) }} rejects</td></tr>
