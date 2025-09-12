@@ -149,6 +149,7 @@ def upload_aoi_reports():
         'Shift',
         'Operator',
         'Customer',
+        'Program',
         'Assembly',
         'Rev',
         'Job Number',
@@ -161,6 +162,7 @@ def upload_aoi_reports():
 
     rows = []
     for row in reader:
+        # Copy required columns (including 'Program') for each record
         current = {col: row.get(col, '') for col in required_columns}
         date_str = current.get('Date')
         if date_str:
