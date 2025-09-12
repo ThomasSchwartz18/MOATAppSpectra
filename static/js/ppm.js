@@ -1,3 +1,5 @@
+import { showSpinner, hideSpinner } from './utils.js';
+
 let ppmChartInstance = null;
 let ppmChartExpandedInstance = null;
 let currentData = { labels: [], values: [], datasets: [] };
@@ -1199,74 +1201,79 @@ function downloadTableCSV() {
 }
 
 async function downloadPDF() {
-  const meta = window.currentChartMeta;
-  if (!meta) return;
+  showSpinner('download-pdf');
+  try {
+    const meta = window.currentChartMeta;
+    if (!meta) return;
 
-  const off = document.createElement('canvas');
-  off.width = 1000;
-  off.height = 650;
-  const ctx = off.getContext('2d');
-  const plugins = (meta.options && meta.options.controlLimits) ? [controlLinesPlugin] : [];
-  // eslint-disable-next-line no-undef
-  const tmpChart = new Chart(ctx, {
-    type: meta.type,
-    data: { labels: meta.labels, datasets: meta.datasets },
-    options: { ...meta.options, responsive: false, maintainAspectRatio: false, animation: false },
-    plugins,
-  });
+    const off = document.createElement('canvas');
+    off.width = 1000;
+    off.height = 650;
+    const ctx = off.getContext('2d');
+    const plugins = (meta.options && meta.options.controlLimits) ? [controlLinesPlugin] : [];
+    // eslint-disable-next-line no-undef
+    const tmpChart = new Chart(ctx, {
+      type: meta.type,
+      data: { labels: meta.labels, datasets: meta.datasets },
+      options: { ...meta.options, responsive: false, maintainAspectRatio: false, animation: false },
+      plugins,
+    });
 
-  const imgData = off.toDataURL('image/png');
+    const imgData = off.toDataURL('image/png');
 
-  // eslint-disable-next-line no-undef
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'letter' });
+    // eslint-disable-next-line no-undef
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: 'l', unit: 'pt', format: 'letter' });
 
-  const title = document.getElementById('chart-title').value || 'Report';
-  const start = document.getElementById('start-date').value || '';
-  const end = document.getElementById('end-date').value || '';
-  const range = start || end ? `${start} to ${end}` : '';
+    const title = document.getElementById('chart-title').value || 'Report';
+    const start = document.getElementById('start-date').value || '';
+    const end = document.getElementById('end-date').value || '';
+    const range = start || end ? `${start} to ${end}` : '';
 
-  const logo = new Image();
-  logo.src = '/static/images/company-logo.png';
-  await logo.decode();
-  const pageW = doc.internal.pageSize.getWidth();
-  doc.addImage(logo, 'PNG', (pageW - 40) / 2, 20, 40, 40);
-  doc.setFontSize(18);
-  doc.text(title, pageW / 2, 70, { align: 'center' });
-  if (range) {
-    doc.setFontSize(12);
-    doc.text(range, pageW / 2, 80, { align: 'center' });
+    const logo = new Image();
+    logo.src = '/static/images/company-logo.png';
+    await logo.decode();
+    const pageW = doc.internal.pageSize.getWidth();
+    doc.addImage(logo, 'PNG', (pageW - 40) / 2, 20, 40, 40);
+    doc.setFontSize(18);
+    doc.text(title, pageW / 2, 70, { align: 'center' });
+    if (range) {
+      doc.setFontSize(12);
+      doc.text(range, pageW / 2, 80, { align: 'center' });
+    }
+
+    doc.addPage();
+    const pageH = doc.internal.pageSize.getHeight();
+    const margin = 36;
+    const usableW = pageW - margin * 2;
+    const usableH = pageH - margin * 2;
+    const scale = Math.min(usableW / off.width, usableH / off.height);
+    const renderW = off.width * scale;
+    const renderH = off.height * scale;
+    const x = (pageW - renderW) / 2;
+    const y = (pageH - renderH) / 2;
+    doc.addImage(imgData, 'PNG', x, y, renderW, renderH, undefined, 'FAST');
+
+    doc.addPage();
+    const labels = meta.labels || currentData.labels;
+    const dataset = meta.datasets && meta.datasets[0] && Array.isArray(meta.datasets[0].data)
+      ? meta.datasets[0].data
+      : currentData.values || [];
+    const body = [];
+    (labels || []).forEach((lab, i) => {
+      const val = dataset[i];
+      body.push([lab, val?.toFixed ? val.toFixed(4) : val]);
+    });
+    // eslint-disable-next-line no-undef
+    doc.autoTable({ head: [['Label', 'Value']], body });
+
+    doc.save(`${title}.pdf`);
+
+    tmpChart.destroy();
+    off.remove();
+  } finally {
+    hideSpinner('download-pdf');
   }
-
-  doc.addPage();
-  const pageH = doc.internal.pageSize.getHeight();
-  const margin = 36;
-  const usableW = pageW - margin * 2;
-  const usableH = pageH - margin * 2;
-  const scale = Math.min(usableW / off.width, usableH / off.height);
-  const renderW = off.width * scale;
-  const renderH = off.height * scale;
-  const x = (pageW - renderW) / 2;
-  const y = (pageH - renderH) / 2;
-  doc.addImage(imgData, 'PNG', x, y, renderW, renderH, undefined, 'FAST');
-
-  doc.addPage();
-  const labels = meta.labels || currentData.labels;
-  const dataset = meta.datasets && meta.datasets[0] && Array.isArray(meta.datasets[0].data)
-    ? meta.datasets[0].data
-    : currentData.values || [];
-  const body = [];
-  (labels || []).forEach((lab, i) => {
-    const val = dataset[i];
-    body.push([lab, val?.toFixed ? val.toFixed(4) : val]);
-  });
-  // eslint-disable-next-line no-undef
-  doc.autoTable({ head: [['Label', 'Value']], body });
-
-  doc.save(`${title}.pdf`);
-
-  tmpChart.destroy();
-  off.remove();
 }
 
 document.addEventListener('DOMContentLoaded', () => {

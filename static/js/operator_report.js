@@ -46,6 +46,8 @@ function getDropdownValues(className) {
     .filter((v) => v);
 }
 
+import { showSpinner, hideSpinner } from './utils.js';
+
 document.addEventListener('DOMContentLoaded', () => {
   const runBtn = document.getElementById('run-report');
   const downloadControls = document.getElementById('download-controls');
@@ -92,7 +94,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (start) params.append('start_date', start);
     if (end) params.append('end_date', end);
     if (operator) params.append('operator', operator);
+    showSpinner('download-report');
     window.location = `/reports/operator/export?${params.toString()}`;
+    setTimeout(() => hideSpinner('download-report'), 3000);
   });
 
   document.getElementById('email-report')?.addEventListener('click', () => {

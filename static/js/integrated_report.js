@@ -1,3 +1,5 @@
+import { showSpinner, hideSpinner } from './utils.js';
+
 document.addEventListener('DOMContentLoaded', () => {
   const runBtn = document.getElementById('run-report');
   const downloadControls = document.getElementById('download-controls');
@@ -35,7 +37,9 @@ document.addEventListener('DOMContentLoaded', () => {
     params.append('show_cover', includeCover ? 'true' : 'false');
     if (start) params.append('start_date', start);
     if (end) params.append('end_date', end);
+    showSpinner('download-report');
     window.location = `/reports/integrated/export?${params.toString()}`;
+    setTimeout(() => hideSpinner('download-report'), 3000);
   });
 
   document.getElementById('email-report')?.addEventListener('click', () => {

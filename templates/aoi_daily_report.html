@@ -27,9 +27,10 @@
     </select>
   </div>
   <button id="download-report">Download</button>
+  <span class="spinner" id="download-spinner" hidden></span>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/aoi_daily_report.js') }}"></script>
+<script type="module" src="{{ url_for('static', filename='js/aoi_daily_report.js') }}"></script>
 {% endblock %}

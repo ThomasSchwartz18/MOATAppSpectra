@@ -20,19 +20,19 @@
             <tr><td>Typical FI Rejects</td><td>{{ '%.2f'|format(asm.fiTypicalRejects|default(0)) }} rejects</td></tr>
         </tbody>
     </table>
-    {% if asm.metricsChart %}
-    <div class="moat-charts">
-        <div class="chart metrics-chart">
-            <h3>AOI Metrics Over Time</h3>
-            <img src="{{ asm.metricsChart }}" alt="Metrics Chart">
-        </div>
-    </div>
-    {% endif %}
     {% if asm.overlayChart %}
     <div class="moat-charts">
         <div class="chart">
             <h3>SMT vs TH False Calls Control Chart</h3>
             <img src="{{ asm.overlayChart }}" alt="SMT vs TH Control Chart">
+        </div>
+    </div>
+    {% endif %}
+    {% if asm.metricsChart %}
+    <div class="moat-charts">
+        <div class="chart metrics-chart">
+            <h3>AOI Metrics Over Time</h3>
+            <img src="{{ asm.metricsChart }}" alt="Metrics Chart">
         </div>
     </div>
     {% endif %}

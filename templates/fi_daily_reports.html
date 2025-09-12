@@ -109,6 +109,7 @@
       <div class="field-row" style="margin-bottom:6px;">
         <button type="button" id="expand-chart">Expand</button>
         <button type="button" id="download-pdf">Download PDF</button>
+        <span class="spinner" id="download-spinner" hidden></span>
         <button type="button" id="copy-image">Copy Image</button>
       </div>
       <div class="preview-card" style="height: 300px; overflow:auto;">
@@ -133,7 +134,7 @@
     <div class="field-row" style="margin-top:10px;">
       <button type="button" id="modal-download-chart">Download Chart</button>
       <button type="button" id="modal-download-csv">Download CSV</button>
-    </div>
+      </div>
     <div style="margin-top:10px;" class="section-title">Data</div>
     <table id="modal-data-table" class="data-table">
       <thead><tr><th>Operator</th><th>Accepted</th><th>Rejected</th><th>Accepted %</th><th>Rejected %</th></tr></thead>
@@ -147,6 +148,6 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.28/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="{{ url_for('static', filename='js/fi.js') }}"></script>
+<script type="module" src="{{ url_for('static', filename='js/fi.js') }}"></script>
 {% endblock %}
 

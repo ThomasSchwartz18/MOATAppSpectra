@@ -1,3 +1,5 @@
+import { showSpinner, hideSpinner } from './utils.js';
+
 document.addEventListener('DOMContentLoaded', () => {
   const runBtn = document.getElementById('run-report');
   const downloadBtn = document.getElementById('download-report');
@@ -30,6 +32,8 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     const params = new URLSearchParams({ format: fmt, date, show_cover: 'true' });
+    showSpinner('download-report');
     window.location = `/reports/aoi_daily/export?${params.toString()}`;
+    setTimeout(() => hideSpinner('download-report'), 3000);
   });
 });
