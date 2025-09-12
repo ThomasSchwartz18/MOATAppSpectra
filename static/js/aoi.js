@@ -1,3 +1,5 @@
+import { showSpinner, hideSpinner } from './utils.js';
+
 let aoiChartInstance = null;
 let aoiChartExpandedInstance = null;
 let currentData = { labels: [], accepted: [], rejected: [] };
@@ -440,78 +442,83 @@ async function copyChartImage() {
 document.getElementById('copy-image').addEventListener('click', copyChartImage);
 
 document.getElementById('download-pdf').addEventListener('click', async () => {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
+  showSpinner('download-pdf');
+  try {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
 
-  const title = document.getElementById('chart-title').value || 'Report';
-  const start = document.getElementById('start-date').value || '';
-  const end = document.getElementById('end-date').value || '';
-  const range = start || end ? `${start} to ${end}` : '';
+    const title = document.getElementById('chart-title').value || 'Report';
+    const start = document.getElementById('start-date').value || '';
+    const end = document.getElementById('end-date').value || '';
+    const range = start || end ? `${start} to ${end}` : '';
 
-  const logo = new Image();
-  logo.src = '/static/images/company-logo.png';
-  await logo.decode();
-  const pageWidth = doc.internal.pageSize.getWidth();
-  doc.addImage(logo, 'PNG', (pageWidth - 40) / 2, 20, 40, 40);
-  doc.setFontSize(18);
-  doc.text(title, pageWidth / 2, 70, { align: 'center' });
-  if (range) {
-    doc.setFontSize(12);
-    doc.text(range, pageWidth / 2, 80, { align: 'center' });
+    const logo = new Image();
+    logo.src = '/static/images/company-logo.png';
+    await logo.decode();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    doc.addImage(logo, 'PNG', (pageWidth - 40) / 2, 20, 40, 40);
+    doc.setFontSize(18);
+    doc.text(title, pageWidth / 2, 70, { align: 'center' });
+    if (range) {
+      doc.setFontSize(12);
+      doc.text(range, pageWidth / 2, 80, { align: 'center' });
+    }
+
+    doc.addPage();
+    const canvas = document.getElementById('aoiChart');
+    const dataURL = canvas.toDataURL('image/png', 1.0);
+    const imgProps = doc.getImageProperties(dataURL);
+    const pdfWidth = doc.internal.pageSize.getWidth();
+    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+    doc.addImage(dataURL, 'PNG', 0, 0, pdfWidth, pdfHeight);
+
+    doc.addPage();
+    let head = [];
+    const body = [];
+    if (currentData.shift1 && currentData.shift2) {
+      head = [['Date / Shift', 'Accepted', 'Rejected', 'Accepted %', 'Rejected %']];
+      currentData.labels.forEach((lab, i) => {
+        const acc1 = currentData.shift1.accepted[i];
+        const rej1 = currentData.shift1.rejected[i];
+        const tot1 = acc1 + rej1;
+        body.push([`${lab} 1st`, acc1, rej1, tot1 ? ((acc1 / tot1) * 100).toFixed(1) : 0, tot1 ? ((rej1 / tot1) * 100).toFixed(1) : 0]);
+        const acc2 = currentData.shift2.accepted[i];
+        const rej2 = currentData.shift2.rejected[i];
+        const tot2 = acc2 + rej2;
+        body.push([`${lab} 2nd`, acc2, rej2, tot2 ? ((acc2 / tot2) * 100).toFixed(1) : 0, tot2 ? ((rej2 / tot2) * 100).toFixed(1) : 0]);
+      });
+    } else if (currentData.yields) {
+      head = [['Date', 'Yield %']];
+      currentData.labels.forEach((lab, i) => {
+        body.push([lab, currentData.yields[i]?.toFixed ? currentData.yields[i].toFixed(1) : currentData.yields[i]]);
+      });
+    } else if (currentData.rates) {
+      head = [['Customer', 'Rejection %']];
+      currentData.labels.forEach((lab, i) => {
+        body.push([lab, currentData.rates[i]?.toFixed ? currentData.rates[i].toFixed(1) : currentData.rates[i]]);
+      });
+    } else if (currentData.assemblies) {
+      head = [['Assembly', 'Inspected', 'Rejected', 'Yield %']];
+      currentData.assemblies.forEach((asm, i) => {
+        const y = currentData.yields[i]?.toFixed ? currentData.yields[i].toFixed(1) : currentData.yields[i];
+        body.push([asm, currentData.inspected[i], currentData.rejected[i], y]);
+      });
+    } else {
+      head = [['Operator', 'Accepted', 'Rejected', 'Accepted %', 'Rejected %']];
+      currentData.labels.forEach((lab, i) => {
+        const total = currentData.accepted[i] + currentData.rejected[i];
+        const accPct = total ? ((currentData.accepted[i] / total) * 100).toFixed(1) : 0;
+        const rejPct = total ? ((currentData.rejected[i] / total) * 100).toFixed(1) : 0;
+        body.push([lab, currentData.accepted[i], currentData.rejected[i], accPct, rejPct]);
+      });
+    }
+    // eslint-disable-next-line no-undef
+    doc.autoTable({ head, body });
+
+    doc.save(`${title}.pdf`);
+  } finally {
+    hideSpinner('download-pdf');
   }
-
-  doc.addPage();
-  const canvas = document.getElementById('aoiChart');
-  const dataURL = canvas.toDataURL('image/png', 1.0);
-  const imgProps = doc.getImageProperties(dataURL);
-  const pdfWidth = doc.internal.pageSize.getWidth();
-  const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-  doc.addImage(dataURL, 'PNG', 0, 0, pdfWidth, pdfHeight);
-
-  doc.addPage();
-  let head = [];
-  const body = [];
-  if (currentData.shift1 && currentData.shift2) {
-    head = [['Date / Shift', 'Accepted', 'Rejected', 'Accepted %', 'Rejected %']];
-    currentData.labels.forEach((lab, i) => {
-      const acc1 = currentData.shift1.accepted[i];
-      const rej1 = currentData.shift1.rejected[i];
-      const tot1 = acc1 + rej1;
-      body.push([`${lab} 1st`, acc1, rej1, tot1 ? ((acc1 / tot1) * 100).toFixed(1) : 0, tot1 ? ((rej1 / tot1) * 100).toFixed(1) : 0]);
-      const acc2 = currentData.shift2.accepted[i];
-      const rej2 = currentData.shift2.rejected[i];
-      const tot2 = acc2 + rej2;
-      body.push([`${lab} 2nd`, acc2, rej2, tot2 ? ((acc2 / tot2) * 100).toFixed(1) : 0, tot2 ? ((rej2 / tot2) * 100).toFixed(1) : 0]);
-    });
-  } else if (currentData.yields) {
-    head = [['Date', 'Yield %']];
-    currentData.labels.forEach((lab, i) => {
-      body.push([lab, currentData.yields[i]?.toFixed ? currentData.yields[i].toFixed(1) : currentData.yields[i]]);
-    });
-  } else if (currentData.rates) {
-    head = [['Customer', 'Rejection %']];
-    currentData.labels.forEach((lab, i) => {
-      body.push([lab, currentData.rates[i]?.toFixed ? currentData.rates[i].toFixed(1) : currentData.rates[i]]);
-    });
-  } else if (currentData.assemblies) {
-    head = [['Assembly', 'Inspected', 'Rejected', 'Yield %']];
-    currentData.assemblies.forEach((asm, i) => {
-      const y = currentData.yields[i]?.toFixed ? currentData.yields[i].toFixed(1) : currentData.yields[i];
-      body.push([asm, currentData.inspected[i], currentData.rejected[i], y]);
-    });
-  } else {
-    head = [['Operator', 'Accepted', 'Rejected', 'Accepted %', 'Rejected %']];
-    currentData.labels.forEach((lab, i) => {
-      const total = currentData.accepted[i] + currentData.rejected[i];
-      const accPct = total ? ((currentData.accepted[i] / total) * 100).toFixed(1) : 0;
-      const rejPct = total ? ((currentData.rejected[i] / total) * 100).toFixed(1) : 0;
-      body.push([lab, currentData.accepted[i], currentData.rejected[i], accPct, rejPct]);
-    });
-  }
-  // eslint-disable-next-line no-undef
-  doc.autoTable({ head, body });
-
-  doc.save(`${title}.pdf`);
 });
 
 function defaultPresets() {
