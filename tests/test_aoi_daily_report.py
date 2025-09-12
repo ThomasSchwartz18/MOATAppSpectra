@@ -47,6 +47,7 @@ def _mock_payload(monkeypatch):
         "shift1": [
             {
                 "operator": "Op1",
+                "program": "Prog1",
                 "assembly": "Asm1",
                 "job": "J1",
                 "inspected": 5,
@@ -56,6 +57,7 @@ def _mock_payload(monkeypatch):
         "shift2": [
             {
                 "operator": "Op2",
+                "program": "Prog2",
                 "assembly": "Asm2",
                 "job": "J2",
                 "inspected": 10,
@@ -88,6 +90,7 @@ def test_export_aoi_daily_report_cover_fields(app_instance, monkeypatch):
         assert re.search(
             r"generated_at:</b> \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} EST", html
         )
+        assert "Prog1" in html and "Prog2" in html
 
 
 def test_export_aoi_daily_report_default_contact(app_instance, monkeypatch):
@@ -118,6 +121,7 @@ def test_shift_chart_description_rendered(app_instance, monkeypatch):
         "shift1": [
             {
                 "operator": "Op1",
+                "program": "Prog1",
                 "assembly": "Asm1",
                 "job": "J1",
                 "inspected": 5,
@@ -127,6 +131,7 @@ def test_shift_chart_description_rendered(app_instance, monkeypatch):
         "shift2": [
             {
                 "operator": "Op2",
+                "program": "Prog2",
                 "assembly": "Asm2",
                 "job": "J2",
                 "inspected": 10,
@@ -230,6 +235,7 @@ def test_historical_yield_uses_all_jobs(app_instance, monkeypatch):
                 "Quantity Inspected": 100,
                 "Quantity Rejected": 0,
                 "Shift": "1",
+                "Program": "Alpha",
             },
             {
                 "Date": "2024-06-04",
@@ -238,6 +244,7 @@ def test_historical_yield_uses_all_jobs(app_instance, monkeypatch):
                 "Job Number": "J5",
                 "Quantity Inspected": 100,
                 "Quantity Rejected": 10,
+                "Program": "Alpha",
             },
             {
                 "Date": "2024-06-03",
@@ -246,6 +253,7 @@ def test_historical_yield_uses_all_jobs(app_instance, monkeypatch):
                 "Job Number": "J4",
                 "Quantity Inspected": 100,
                 "Quantity Rejected": 20,
+                "Program": "Alpha",
             },
             {
                 "Date": "2024-06-02",
@@ -254,6 +262,7 @@ def test_historical_yield_uses_all_jobs(app_instance, monkeypatch):
                 "Job Number": "J3",
                 "Quantity Inspected": 100,
                 "Quantity Rejected": 30,
+                "Program": "Alpha",
             },
             {
                 "Date": "2024-06-01",
@@ -262,6 +271,7 @@ def test_historical_yield_uses_all_jobs(app_instance, monkeypatch):
                 "Job Number": "J2",
                 "Quantity Inspected": 100,
                 "Quantity Rejected": 40,
+                "Program": "Alpha",
             },
             {
                 "Date": "2024-05-31",
@@ -270,6 +280,7 @@ def test_historical_yield_uses_all_jobs(app_instance, monkeypatch):
                 "Job Number": "J1",
                 "Quantity Inspected": 100,
                 "Quantity Rejected": 50,
+                "Program": "Alpha",
             },
         ]
         monkeypatch.setattr(routes, "fetch_aoi_reports", lambda: (rows, None))
@@ -282,6 +293,7 @@ def test_historical_yield_uses_all_jobs(app_instance, monkeypatch):
         asm = data["assemblies"][0]
         assert asm["pastAvg"] == pytest.approx(70.0)
         assert asm["pastRejectsAvg"] == pytest.approx(30.0)
+        assert data["shift1"][0]["program"] == "Alpha"
 
 
 def test_smt_th_control_charts_render(app_instance, monkeypatch):

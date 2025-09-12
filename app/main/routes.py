@@ -1679,6 +1679,7 @@ def build_aoi_daily_report_payload(
 
         op_name = row.get("Operator") or "Unknown"
         asm_name = row.get("Assembly") or "Unknown"
+        program = row.get("Program") or "Unknown"
         if op_filter and op_name.lower() not in op_filter:
             continue
         if asm_filter and asm_name.lower() not in asm_filter:
@@ -1689,6 +1690,7 @@ def build_aoi_daily_report_payload(
 
         entry = {
             "operator": op_name,
+            "program": program,
             "assembly": asm_name,
             "job": row.get("Job Number") or "",
             "inspected": inspected,
