@@ -63,7 +63,8 @@ def test_api_assemblies_search(app_instance, monkeypatch):
         assert resp.get_json() == ["Asm1", "Asm2", "Asm3"]
 
 
-def test_api_assemblies_search_normalization(app_instance, monkeypatch):
+@pytest.mark.parametrize("query", ["asm-4", "asm 4"])
+def test_api_assemblies_search_normalization(app_instance, monkeypatch, query):
     client = app_instance.test_client()
     with app_instance.app_context():
         from app.main import routes
@@ -73,7 +74,7 @@ def test_api_assemblies_search_normalization(app_instance, monkeypatch):
         monkeypatch.setattr(routes, "fetch_moat", lambda: (moat_rows, None))
         monkeypatch.setattr(routes, "fetch_aoi_reports", lambda: (aoi_rows, None))
         _login(client)
-        resp = client.get("/api/assemblies/search?q=asm-4")
+        resp = client.get("/api/assemblies/search", query_string={"q": query})
         assert resp.status_code == 200
         assert set(resp.get_json()) == {"Asm-4", "Asm 4"}
 
@@ -166,3 +167,39 @@ def test_api_assemblies_forecast(app_instance, monkeypatch):
         assert asm3["predictedNGsPerBoard"] == pytest.approx(0.0)
         assert asm3["predictedFCPerBoard"] == pytest.approx(0.0)
         assert asm3["customerYield"] == pytest.approx(0.0)
+
+
+def test_api_assemblies_forecast_dash_query(app_instance, monkeypatch):
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        from app.main import routes
+
+        moat_rows = [
+            {
+                "Model Name": "Asm 5 SMT",
+                "Total Boards": 10,
+                "FalseCall Parts": 1,
+                "Customer": "CustA",
+            }
+        ]
+        aoi_rows = [
+            {
+                "Assembly": "Asm 5",
+                "Program": "SMT",
+                "Quantity Inspected": 8,
+                "Quantity Rejected": 0.4,
+                "Customer": "CustA",
+            }
+        ]
+        monkeypatch.setattr(routes, "fetch_moat", lambda: (moat_rows, None))
+        monkeypatch.setattr(routes, "fetch_aoi_reports", lambda: (aoi_rows, None))
+        _login(client)
+        resp = client.post(
+            "/api/assemblies/forecast", json={"assemblies": ["Asm-5"]}
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()["assemblies"][0]
+        assert data["assembly"] == "Asm-5"
+        assert data["boards"] == pytest.approx(10.0)
+        assert data["inspected"] == pytest.approx(8.0)
+        assert not data["missing"]
