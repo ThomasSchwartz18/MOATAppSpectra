@@ -67,6 +67,8 @@ function renderTable(rows) {
       <td>${r.assembly}</td>
       <td>${r.boards}</td>
       <td>${r.falseCalls}</td>
+      <td>${r.avgFalseCalls.toFixed(2)}</td>
+      <td>${r.predictedFalseCalls.toFixed(2)}</td>
       <td>${r.inspected}</td>
       <td>${r.rejected}</td>
       <td>${r.yield.toFixed(2)}</td>
