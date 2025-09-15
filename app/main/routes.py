@@ -145,6 +145,8 @@ def _aggregate_forecast(
                     )
                 except (TypeError, ValueError):
                     continue
+        avg_fc = false_calls / boards if boards else 0.0
+        predicted_fc = avg_fc * boards
         preds = _predict_counts(inspected, rejected, boards)
         yield_pct = (
             (inspected - rejected) / inspected * 100.0 if inspected else 0.0
@@ -154,6 +156,8 @@ def _aggregate_forecast(
                 "assembly": original,
                 "boards": boards,
                 "falseCalls": false_calls,
+                "avgFalseCalls": avg_fc,
+                "predictedFalseCalls": predicted_fc,
                 "inspected": inspected,
                 "rejected": rejected,
                 "yield": yield_pct,
