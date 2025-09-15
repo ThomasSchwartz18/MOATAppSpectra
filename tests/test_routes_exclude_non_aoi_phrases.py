@@ -26,6 +26,7 @@ def app(monkeypatch):
         'aoi_Job Number': 'J1',
         'aoi_Assembly': 'M1',
         'aoi_Rev': 'R1',
+        'aoi_Program': 'Alpha',
         'fi_Date': '2024-01-05',
         'fi_Additional Information': 'Missing Coating (5), Solder Bridge (1)',
         'aoi_Quantity Inspected': 10,

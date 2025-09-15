@@ -27,6 +27,7 @@ def test_summary_sections(app_instance, monkeypatch):
             {
                 "Date": "2024-01-01",
                 "Operator": "Op1",
+                "Program": "Alpha",
                 "Assembly": "ASM1",
                 "Job Number": "J1",
                 "Quantity Inspected": 100,
@@ -35,6 +36,7 @@ def test_summary_sections(app_instance, monkeypatch):
             {
                 "Date": "2024-01-02",
                 "Operator": "Op2",
+                "Program": "Alpha",
                 "Assembly": "ASM2",
                 "Job Number": "J2",
                 "Quantity Inspected": 100,

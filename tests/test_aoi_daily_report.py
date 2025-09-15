@@ -303,6 +303,7 @@ def test_smt_th_control_charts_render(app_instance, monkeypatch):
             "Shift": "1",
             "Operator": "Op1",
             "Assembly": "Asm1",
+            "Program": "Alpha",
             "Quantity Inspected": 10,
             "Quantity Rejected": 1,
         }
