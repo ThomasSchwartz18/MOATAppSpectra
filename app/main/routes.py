@@ -118,7 +118,7 @@ def _split_model_name(name: str) -> tuple[str, str]:
 
 def _norm(value: str) -> str:
     """Normalize an assembly or program string for comparisons."""
-    return value.strip().lower() if value else ""
+    return re.sub(r'[-\s]+', ' ', value).strip().lower() if value else ''
 
 
 def _aggregate_forecast(
@@ -764,7 +764,7 @@ def api_assemblies_search():
     """Search distinct assembly names across MOAT and AOI data."""
     if 'username' not in session:
         return redirect(url_for('auth.login'))
-    q = (request.args.get('q') or '').strip().lower()
+    q = _norm(request.args.get('q') or '')
     assemblies: set[str] = set()
     moat_rows, moat_error = fetch_moat()
     if moat_error:
@@ -773,7 +773,8 @@ def api_assemblies_search():
         asm, _ = _split_model_name(row.get("Model Name"))
         if not asm:
             continue
-        if q and q not in asm.lower():
+        asm_norm = _norm(asm)
+        if q and q not in asm_norm:
             continue
         assemblies.add(asm)
     aoi_rows, aoi_error = fetch_aoi_reports()
@@ -783,7 +784,8 @@ def api_assemblies_search():
         asm = row.get("Assembly") or ""
         if not asm:
             continue
-        if q and q not in asm.lower():
+        asm_norm = _norm(asm)
+        if q and q not in asm_norm:
             continue
         assemblies.add(asm)
     return jsonify(sorted(assemblies))
