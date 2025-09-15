@@ -48,11 +48,12 @@ def test_api_assemblies_search(app_instance, monkeypatch):
 
         moat_rows = [
             {"Model Name": "Asm1 SMT"},
+            {"Model Name": "Asm1 TH"},
             {"Model Name": "Asm2 TH"},
         ]
         aoi_rows = [
-            {"Assembly": "Asm1"},
-            {"Assembly": "Asm3"},
+            {"Assembly": "Asm1", "Program": "SMT"},
+            {"Assembly": "Asm3", "Program": "SMT"},
         ]
         monkeypatch.setattr(routes, "fetch_moat", lambda: (moat_rows, None))
         monkeypatch.setattr(routes, "fetch_aoi_reports", lambda: (aoi_rows, None))
@@ -80,7 +81,12 @@ def test_api_assemblies_forecast(app_instance, monkeypatch):
                 "FalseCall Parts": 2,
                 "Customer": "CustA",
             },
-            {"Model Name": "Asm2 SMT", "total_boards": 50, "falsecall_parts": 2},
+            {
+                "Model Name": "Asm2 SMT",
+                "total_boards": 50,
+                "falsecall_parts": 2,
+                "Customer": "CustB",
+            },
         ]
         aoi_rows = [
             {
@@ -141,4 +147,7 @@ def test_api_assemblies_forecast(app_instance, monkeypatch):
         assert asm3["missing"]
         assert asm3["boards"] == pytest.approx(0.0)
         assert asm3["inspected"] == pytest.approx(0.0)
+        assert asm3["ngRatio"] == pytest.approx(0.0)
+        assert asm3["predictedNGsPerBoard"] == pytest.approx(0.0)
+        assert asm3["predictedFCPerBoard"] == pytest.approx(0.0)
         assert asm3["customerYield"] == pytest.approx(0.0)
