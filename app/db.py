@@ -7,6 +7,28 @@ def _get_client():
     return current_app.config["SUPABASE"]
 
 
+def _apply_report_date_offset(rows: list[dict]) -> list[dict]:
+    """Subtract one day from any MOAT ``Report Date`` fields.
+
+    MOAT data currently stores ``Report Date`` one day ahead of the actual run
+    date.  This temporary workaround presents the original run date until the
+    historical records are corrected.  Remove this helper once the upstream data
+    is fixed.
+    """
+    offset = timedelta(days=1)
+    for row in rows or []:
+        for key in ("Report Date", "report_date"):
+            val = row.get(key)
+            if not val:
+                continue
+            try:
+                dt = datetime.fromisoformat(str(val)) - offset
+                row[key] = dt.date().isoformat()
+            except Exception:  # pragma: no cover - parsing errors
+                continue
+    return rows
+
+
 def fetch_aoi_reports():
     """Retrieve all AOI reports from the database.
 
@@ -46,17 +68,26 @@ def fetch_combined_reports():
 
 
 def fetch_moat():
-    """Retrieve MOAT data from the database."""
+    """Retrieve MOAT data from the database.
+
+    ``Report Date`` values are offset by -1 day to represent the original run
+    date.
+    """
     supabase = _get_client()
     try:
         response = supabase.table("moat").select("*").execute()
-        return response.data, None
+        data = _apply_report_date_offset(response.data)
+        return data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to fetch MOAT data: {exc}"
 
 
 def fetch_recent_moat(days: int = 7):
-    """Retrieve MOAT data for the past ``days`` days."""
+    """Retrieve MOAT data for the past ``days`` days.
+
+    ``Report Date`` values are offset by -1 day to represent the original run
+    date.
+    """
     supabase = _get_client()
     start_date = (datetime.utcnow() - timedelta(days=days)).date().isoformat()
     try:
@@ -66,7 +97,8 @@ def fetch_recent_moat(days: int = 7):
             .gte("Report Date", start_date)
             .execute()
         )
-        return response.data, None
+        data = _apply_report_date_offset(response.data)
+        return data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to fetch recent MOAT data: {exc}"
 
