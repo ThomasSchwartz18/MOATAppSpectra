@@ -202,6 +202,10 @@ h2 {
   transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
 }
 
+.dashboard-card canvas {
+  height: 140px !important;
+}
+
 .dashboard-card:hover {
   border-color: var(--accent);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
