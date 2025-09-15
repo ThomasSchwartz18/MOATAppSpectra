@@ -63,6 +63,21 @@ def test_api_assemblies_search(app_instance, monkeypatch):
         assert resp.get_json() == ["Asm1", "Asm2", "Asm3"]
 
 
+def test_api_assemblies_search_normalization(app_instance, monkeypatch):
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        from app.main import routes
+
+        moat_rows = [{"Model Name": "Asm-4 SMT"}]
+        aoi_rows = [{"Assembly": "Asm 4", "Program": "SMT"}]
+        monkeypatch.setattr(routes, "fetch_moat", lambda: (moat_rows, None))
+        monkeypatch.setattr(routes, "fetch_aoi_reports", lambda: (aoi_rows, None))
+        _login(client)
+        resp = client.get("/api/assemblies/search?q=asm-4")
+        assert resp.status_code == 200
+        assert set(resp.get_json()) == {"Asm-4", "Asm 4"}
+
+
 def test_api_assemblies_forecast(app_instance, monkeypatch):
     client = app_instance.test_client()
     with app_instance.app_context():
