@@ -1,5 +1,39 @@
 let inputCount = 0;
-let chartInstance = null;
+let yieldChartInstance = null;
+let fcChartInstance = null;
+let ngChartInstance = null;
+
+const hLinePlugin = {
+  id: 'hLines',
+  afterDraw(chart) {
+    const {
+      ctx,
+      chartArea: { left, right, top, bottom },
+      scales,
+    } = chart;
+    const yScale = scales.y;
+    if (!yScale) return;
+    const lines = [
+      { value: 20, color: 'red' },
+      { value: 15, color: 'gold' },
+      { value: 10, color: 'green' },
+    ];
+    ctx.save();
+    ctx.setLineDash([4, 4]);
+    lines.forEach((ln) => {
+      const y = yScale.getPixelForValue(ln.value);
+      if (y >= top && y <= bottom) {
+        ctx.beginPath();
+        ctx.moveTo(left, y);
+        ctx.lineTo(right, y);
+        ctx.strokeStyle = ln.color;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    });
+    ctx.restore();
+  },
+};
 
 function addAssemblyInput() {
   const container = document.getElementById('assembly-inputs');
@@ -53,7 +87,9 @@ async function runForecast() {
     const data = await res.json();
     const rows = data.assemblies || [];
     renderTable(rows);
-    renderChart(rows);
+    renderYieldChart(rows);
+    renderFalseCallChart(rows);
+    renderNGRatioChart(rows);
   } catch (err) {
     console.error('Forecast request failed', err);
   }
@@ -61,31 +97,49 @@ async function runForecast() {
 
 function renderTable(rows) {
   const tbody = document.querySelector('#forecast-table tbody');
+  const missingEl = document.getElementById('missing-msg');
+  const missingAsms = [];
   tbody.innerHTML = rows
-    .map(
-      (r) => `<tr>
+    .map((r) => {
+      if (r.missing) missingAsms.push(r.assembly);
+      return `<tr${r.missing ? ' class="missing"' : ''}>
       <td>${r.assembly}</td>
       <td>${r.boards}</td>
       <td>${r.falseCalls}</td>
       <td>${r.avgFalseCalls.toFixed(2)}</td>
       <td>${r.predictedFalseCalls.toFixed(2)}</td>
+      <td>${r.predictedFCPerBoard.toFixed(2)}</td>
       <td>${r.inspected}</td>
       <td>${r.rejected}</td>
+      <td>${r.ngRatio.toFixed(2)}</td>
       <td>${r.yield.toFixed(2)}</td>
       <td>${r.predictedRejects.toFixed(2)}</td>
+      <td>${r.predictedNGsPerBoard.toFixed(2)}</td>
       <td>${r.predictedYield.toFixed(2)}</td>
-    </tr>`
-    )
+      <td>${r.customerYield.toFixed(2)}</td>
+    </tr>`;
+    })
     .join('');
+  if (missingEl) {
+    if (missingAsms.length) {
+      missingEl.style.display = 'block';
+      missingEl.textContent = `Assemblies not found: ${missingAsms.join(', ')}`;
+    } else {
+      missingEl.style.display = 'none';
+      missingEl.textContent = '';
+    }
+  }
 }
 
-function renderChart(rows) {
+function renderYieldChart(rows) {
   const labels = rows.map((r) => r.assembly);
   const actual = rows.map((r) => r.yield);
   const predicted = rows.map((r) => r.predictedYield);
+  const cust = rows.map((r) => r.customerYield);
   const ctx = document.getElementById('forecastChart').getContext('2d');
-  if (chartInstance) chartInstance.destroy();
-  chartInstance = new Chart(ctx, {
+  if (yieldChartInstance) yieldChartInstance.destroy();
+  // eslint-disable-next-line no-undef
+  yieldChartInstance = new Chart(ctx, {
     type: 'bar',
     data: {
       labels,
@@ -100,12 +154,89 @@ function renderChart(rows) {
           data: predicted,
           backgroundColor: 'rgba(255,99,132,0.5)',
         },
+        {
+          type: 'line',
+          label: 'Customer Yield %',
+          data: cust,
+          borderColor: 'rgba(75,192,192,1)',
+          backgroundColor: 'rgba(75,192,192,0.2)',
+          fill: false,
+          tension: 0,
+        },
       ],
     },
     options: {
       responsive: true,
       scales: { y: { beginAtZero: true, max: 100 } },
     },
+  });
+}
+
+function renderFalseCallChart(rows) {
+  const labels = rows.map((r) => r.assembly);
+  const data = rows.map((r) => r.avgFalseCalls);
+  const ctx = document.getElementById('falseCallChart').getContext('2d');
+  if (fcChartInstance) fcChartInstance.destroy();
+  // eslint-disable-next-line no-undef
+  fcChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Avg FC/Board',
+          data,
+          borderColor: '#000',
+          backgroundColor: '#000',
+          pointBackgroundColor: '#000',
+          pointBorderColor: '#000',
+          pointRadius: 3,
+          fill: false,
+          tension: 0,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } },
+    },
+    plugins: [hLinePlugin],
+  });
+}
+
+function renderNGRatioChart(rows) {
+  const labels = rows.map((r) => r.assembly);
+  const data = rows.map((r) => r.ngRatio);
+  const ctx = document.getElementById('ngRatioChart').getContext('2d');
+  if (ngChartInstance) ngChartInstance.destroy();
+  // eslint-disable-next-line no-undef
+  ngChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'NG Ratio %',
+          data,
+          borderColor: '#000',
+          backgroundColor: '#000',
+          pointBackgroundColor: '#000',
+          pointBorderColor: '#000',
+          pointRadius: 3,
+          fill: false,
+          tension: 0,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: { y: { beginAtZero: true } },
+    },
+    plugins: [hLinePlugin],
   });
 }
 

@@ -11,6 +11,13 @@
   <div class="preview-card" style="height:300px;">
     <canvas id="forecastChart"></canvas>
   </div>
+  <div class="preview-card" style="height:300px; margin-top:16px;">
+    <canvas id="falseCallChart"></canvas>
+  </div>
+  <div class="preview-card" style="height:300px; margin-top:16px;">
+    <canvas id="ngRatioChart"></canvas>
+  </div>
+  <div id="missing-msg" style="display:none; margin-top:16px;"></div>
   <table id="forecast-table" class="data-table" style="margin-top:16px;">
     <thead>
       <tr>
@@ -19,11 +26,15 @@
         <th>False Calls</th>
         <th>Avg FC/Board</th>
         <th>Pred FC</th>
+        <th>Pred FC/Board</th>
         <th>Inspected</th>
         <th>Rejected</th>
+        <th>NG Ratio %</th>
         <th>Yield %</th>
         <th>Pred Rej</th>
+        <th>Pred NG/Board</th>
         <th>Pred Yield %</th>
+        <th>Cust Yield %</th>
       </tr>
     </thead>
     <tbody></tbody>
