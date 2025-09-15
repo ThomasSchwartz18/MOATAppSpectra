@@ -2,6 +2,7 @@ let inputCount = 0;
 let yieldChartInstance = null;
 let fcChartInstance = null;
 let ngChartInstance = null;
+let customerYieldChartInstance = null;
 
 const hLinePlugin = {
   id: 'hLines',
@@ -88,6 +89,7 @@ async function runForecast() {
     const rows = data.assemblies || [];
     renderTable(rows);
     renderYieldChart(rows);
+    renderCustomerYieldChart(rows);
     renderFalseCallChart(rows);
     renderNGRatioChart(rows);
   } catch (err) {
@@ -135,7 +137,6 @@ function renderYieldChart(rows) {
   const labels = rows.map((r) => r.assembly);
   const actual = rows.map((r) => r.yield);
   const predicted = rows.map((r) => r.predictedYield);
-  const cust = rows.map((r) => r.customerYield);
   const ctx = document.getElementById('forecastChart').getContext('2d');
   if (yieldChartInstance) yieldChartInstance.destroy();
   // eslint-disable-next-line no-undef
@@ -154,14 +155,44 @@ function renderYieldChart(rows) {
           data: predicted,
           backgroundColor: 'rgba(255,99,132,0.5)',
         },
+      ],
+    },
+    options: {
+      responsive: true,
+      scales: { y: { beginAtZero: true, max: 100 } },
+    },
+  });
+}
+
+function renderCustomerYieldChart(rows) {
+  const aggregates = {};
+  rows.forEach((r) => {
+    const cust = r.customer || 'Unknown';
+    if (!aggregates[cust]) {
+      aggregates[cust] = { inspected: 0, rejected: 0 };
+    }
+    aggregates[cust].inspected += r.inspected;
+    aggregates[cust].rejected += r.rejected;
+  });
+  const labels = Object.keys(aggregates);
+  const data = labels.map((c) => {
+    const { inspected, rejected } = aggregates[c];
+    return inspected ? ((inspected - rejected) / inspected) * 100 : 0;
+  });
+  const ctx = document
+    .getElementById('customerYieldChart')
+    .getContext('2d');
+  if (customerYieldChartInstance) customerYieldChartInstance.destroy();
+  // eslint-disable-next-line no-undef
+  customerYieldChartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
         {
-          type: 'line',
           label: 'Customer Yield %',
-          data: cust,
-          borderColor: 'rgba(75,192,192,1)',
-          backgroundColor: 'rgba(75,192,192,0.2)',
-          fill: false,
-          tension: 0,
+          data,
+          backgroundColor: 'rgba(75,192,192,0.5)',
         },
       ],
     },

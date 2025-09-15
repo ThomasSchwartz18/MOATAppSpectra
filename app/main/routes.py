@@ -248,6 +248,7 @@ def _aggregate_forecast(
         results.append(
             {
                 "assembly": original,
+                "customer": cust_raw,
                 "boards": boards,
                 "falseCalls": false_calls,
                 "avgFalseCalls": avg_fc,
