@@ -747,7 +747,10 @@ async function runPresetChart() {
     if (cols.model) {
       const m = String(row[cols.model] ?? '').toLowerCase();
       if (f.modelContains && !m.includes(f.modelContains)) return false;
-      if ((f.hasTH || f.hasSMT) && !(m.includes('th') || m.includes('smt'))) return false;
+      const groups = [];
+      if (f.hasTH) groups.push('th');
+      if (f.hasSMT) groups.push('smt');
+      if (groups.length && !groups.some((g) => m.includes(g))) return false;
     }
     return true;
   });
