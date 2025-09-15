@@ -217,11 +217,10 @@ def _aggregate_forecast(
         false_calls = 0.0
         inspected = 0.0
         rejected = 0.0
-        prog_keys = {
-            p for a, p in moat_map.keys() if a == asm_key
-        } & {
-            p for a, p in aoi_map.keys() if a == asm_key
-        }
+        prog_keys = (
+            {p for a, p in moat_map.keys() if a == asm_key}
+            | {p for a, p in aoi_map.keys() if a == asm_key}
+        )
         for prog in prog_keys:
             m = moat_map.get((asm_key, prog), {})
             a = aoi_map.get((asm_key, prog), {})
