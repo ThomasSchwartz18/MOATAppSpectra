@@ -146,11 +146,18 @@ def _aggregate_forecast(
         lambda: {"boards": 0.0, "falseCalls": 0.0}
     )
     for row in moat_rows or []:
-        asm_guess, prog_guess = _split_model_name(row.get("Model Name"))
+        model_name = row.get("Model Name") or ""
+        model_norm = _norm(model_name)
+        asm_guess, prog_guess = _split_model_name(model_name)
         asm_raw = row.get("Assembly") or row.get("Model") or asm_guess
         prog_raw = row.get("Program") or row.get("program") or prog_guess
         cust_raw = row.get("Customer") or row.get("customer") or ""
-        asm_key = _norm(asm_raw)
+
+        matched_asm = next(
+            (a for a in sorted(by_name.keys(), key=len, reverse=True) if a in model_norm),
+            None,
+        )
+        asm_key = matched_asm or _norm(asm_raw)
         prog_key = _norm(prog_raw)
         if asm_key and cust_raw and asm_key not in assembly_customer:
             assembly_customer[asm_key] = cust_raw

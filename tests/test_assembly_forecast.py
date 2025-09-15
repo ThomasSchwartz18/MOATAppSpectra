@@ -202,6 +202,41 @@ def test_api_assemblies_forecast_dash_query(app_instance, monkeypatch):
         assert resp.status_code == 200
 
 
+def test_api_assemblies_forecast_model_name_with_revision(app_instance, monkeypatch):
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        from app.main import routes
+
+        moat_rows = [
+            {
+                "Model Name": "Asm1 RevA SMT",
+                "Total Boards": 100,
+                "FalseCall Parts": 5,
+                "Customer": "CustA",
+            }
+        ]
+        aoi_rows = [
+            {
+                "Assembly": "Asm1",
+                "Program": "SMT",
+                "Quantity Inspected": 80,
+                "Quantity Rejected": 4,
+                "Customer": "CustA",
+            }
+        ]
+        monkeypatch.setattr(routes, "fetch_moat", lambda: (moat_rows, None))
+        monkeypatch.setattr(routes, "fetch_aoi_reports", lambda: (aoi_rows, None))
+        _login(client)
+        resp = client.post("/api/assemblies/forecast", json={"assemblies": ["Asm1"]})
+        assert resp.status_code == 200
+        data = resp.get_json()
+        asm1 = next(a for a in data["assemblies"] if a["assembly"] == "Asm1")
+        assert asm1["boards"] == pytest.approx(100.0)
+        assert asm1["falseCalls"] == pytest.approx(5.0)
+        assert asm1["inspected"] == pytest.approx(80.0)
+        assert not asm1["missing"]
+
+
 def test_api_assemblies_forecast_includes_aoi_only_programs(app_instance, monkeypatch):
     client = app_instance.test_client()
     with app_instance.app_context():
