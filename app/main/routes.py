@@ -440,7 +440,7 @@ def upload_ppm_reports():
             ),
         )
     start_date, end_date, line = m.groups()
-    report_date = end_date or start_date
+    report_date = None
 
     try:
         uploaded.stream.seek(0)
@@ -476,6 +476,9 @@ def upload_ppm_reports():
                     pass
     except Exception as exc:
         abort(400, description=f'Failed to read Excel file: {exc}')
+
+    if not report_date:
+        report_date = start_date
 
     rows = []
     row_idx = 7
