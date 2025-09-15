@@ -2,7 +2,34 @@
 
 {% block content %}
 <h1>Assembly Forecast</h1>
+<div class="section-card">
+  <div id="assembly-inputs" class="field-column"></div>
+  <button type="button" id="run-forecast">Run Forecast</button>
+</div>
+
+<div class="section-card" style="margin-top:16px;">
+  <div class="preview-card" style="height:300px;">
+    <canvas id="forecastChart"></canvas>
+  </div>
+  <table id="forecast-table" class="data-table" style="margin-top:16px;">
+    <thead>
+      <tr>
+        <th>Assembly</th>
+        <th>Boards</th>
+        <th>False Calls</th>
+        <th>Inspected</th>
+        <th>Rejected</th>
+        <th>Yield %</th>
+        <th>Pred Rej</th>
+        <th>Pred Yield %</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
 {% endblock %}
 
 {% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/assembly_forecast.js') }}"></script>
 {% endblock %}
