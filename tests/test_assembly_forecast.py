@@ -47,12 +47,12 @@ def test_api_assemblies_search(app_instance, monkeypatch):
         from app.main import routes
 
         moat_rows = [
-            {"Assembly": "Asm1"},
-            {"Model": "Asm2"},
+            {"Model Name": "Asm1 SMT"},
+            {"Model Name": "Asm2 TH"},
         ]
         aoi_rows = [
             {"Assembly": "Asm1"},
-            {"aoi_Assembly": "Asm3"},
+            {"Assembly": "Asm3"},
         ]
         monkeypatch.setattr(routes, "fetch_moat", lambda: (moat_rows, None))
         monkeypatch.setattr(routes, "fetch_aoi_reports", lambda: (aoi_rows, None))
@@ -85,11 +85,11 @@ def test_api_assemblies_forecast(app_instance, monkeypatch):
         monkeypatch.setattr(routes, "fetch_aoi_reports", lambda: (aoi_rows, None))
         _login(client)
         resp = client.post(
-            "/api/assemblies/forecast", json={"assemblies": ["Asm1", "Asm2"]}
+            "/api/assemblies/forecast", json={"assemblies": ["Asm1", "Asm2", "Asm3"]}
         )
         assert resp.status_code == 200
         data = resp.get_json()
-        assert {a["assembly"] for a in data["assemblies"]} == {"Asm1", "Asm2"}
+        assert {a["assembly"] for a in data["assemblies"]} == {"Asm1", "Asm2", "Asm3"}
         asm1 = next(a for a in data["assemblies"] if a["assembly"] == "Asm1")
         assert asm1["boards"] == pytest.approx(100.0)
         assert asm1["falseCalls"] == pytest.approx(5.0)
@@ -100,6 +100,7 @@ def test_api_assemblies_forecast(app_instance, monkeypatch):
         assert asm1["yield"] == pytest.approx(95.0)
         assert asm1["predictedRejects"] == pytest.approx(5.0)
         assert asm1["predictedYield"] == pytest.approx(95.0)
+        assert not asm1["missing"]
         asm2 = next(a for a in data["assemblies"] if a["assembly"] == "Asm2")
         assert asm2["boards"] == pytest.approx(50.0)
         assert asm2["falseCalls"] == pytest.approx(2.0)
@@ -110,3 +111,8 @@ def test_api_assemblies_forecast(app_instance, monkeypatch):
         assert asm2["yield"] == pytest.approx(97.5)
         assert asm2["predictedRejects"] == pytest.approx(1.25)
         assert asm2["predictedYield"] == pytest.approx(97.5)
+        assert not asm2["missing"]
+        asm3 = next(a for a in data["assemblies"] if a["assembly"] == "Asm3")
+        assert asm3["missing"]
+        assert asm3["boards"] == pytest.approx(0.0)
+        assert asm3["inspected"] == pytest.approx(0.0)
