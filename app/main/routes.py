@@ -130,7 +130,9 @@ def _aggregate_forecast(
     represents the program. We split that field into separate assembly/program
     pieces so that MOAT and AOI records can be joined on both attributes.
     Assembly and program strings are normalised to lower-case without leading or
-    trailing whitespace prior to comparison.
+    trailing whitespace prior to comparison. The returned dictionaries include a
+    ``missing`` boolean flag indicating when an assembly does not appear in
+    either dataset.
     """
 
     by_name = {_norm(a): a for a in assemblies if a}
@@ -182,6 +184,9 @@ def _aggregate_forecast(
         aoi_map[(asm_key, prog_key)]["inspected"] += inspected
         aoi_map[(asm_key, prog_key)]["rejected"] += rejected
 
+    moat_asms = {a for a, _ in moat_map.keys()}
+    aoi_asms = {a for a, _ in aoi_map.keys()}
+
     results: list[dict] = []
     for asm_key, original in by_name.items():
         boards = 0.0
@@ -207,6 +212,7 @@ def _aggregate_forecast(
         yield_pct = (
             (inspected - rejected) / inspected * 100.0 if inspected else 0.0
         )
+        missing = not ((asm_key in moat_asms) or (asm_key in aoi_asms))
         results.append(
             {
                 "assembly": original,
@@ -218,6 +224,7 @@ def _aggregate_forecast(
                 "rejected": rejected,
                 "yield": yield_pct,
                 **preds,
+                "missing": missing,
             }
         )
     return results
@@ -723,12 +730,7 @@ def api_assemblies_search():
     if moat_error:
         abort(500, description=moat_error)
     for row in moat_rows or []:
-        asm = (
-            row.get('Assembly')
-            or row.get('Model')
-            or row.get('Model Name')
-            or ''
-        )
+        asm, _ = _split_model_name(row.get("Model Name"))
         if not asm:
             continue
         if q and q not in asm.lower():
@@ -738,7 +740,7 @@ def api_assemblies_search():
     if aoi_error:
         abort(500, description=aoi_error)
     for row in aoi_rows or []:
-        asm = row.get('Assembly') or row.get('aoi_Assembly') or ''
+        asm = row.get("Assembly") or ""
         if not asm:
             continue
         if q and q not in asm.lower():
