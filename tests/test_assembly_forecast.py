@@ -68,17 +68,34 @@ def test_api_assemblies_forecast(app_instance, monkeypatch):
         from app.main import routes
 
         moat_rows = [
-            {"Model Name": "Asm1 SMT", "Total Boards": 100, "FalseCall Parts": 5},
-            {"Model Name": "Asm1 TH", "Total Boards": 50, "FalseCall Parts": 2},
+            {
+                "Model Name": "Asm1 SMT",
+                "Total Boards": 100,
+                "FalseCall Parts": 5,
+                "Customer": "CustA",
+            },
+            {
+                "Model Name": "Asm1 TH",
+                "Total Boards": 50,
+                "FalseCall Parts": 2,
+                "Customer": "CustA",
+            },
             {"Model Name": "Asm2 SMT", "total_boards": 50, "falsecall_parts": 2},
         ]
         aoi_rows = [
-            {"Assembly": "Asm1", "Program": "SMT", "Quantity Inspected": 80, "Quantity Rejected": 4},
+            {
+                "Assembly": "Asm1",
+                "Program": "SMT",
+                "Quantity Inspected": 80,
+                "Quantity Rejected": 4,
+                "Customer": "CustA",
+            },
             {
                 "Assembly": "Asm2",
                 "Program": "SMT",
                 "aoi_Quantity Inspected": 40,
                 "aoi_Quantity Rejected": 1,
+                "Customer": "CustB",
             },
         ]
         monkeypatch.setattr(routes, "fetch_moat", lambda: (moat_rows, None))
@@ -100,6 +117,10 @@ def test_api_assemblies_forecast(app_instance, monkeypatch):
         assert asm1["yield"] == pytest.approx(95.0)
         assert asm1["predictedRejects"] == pytest.approx(5.0)
         assert asm1["predictedYield"] == pytest.approx(95.0)
+        assert asm1["ngRatio"] == pytest.approx(5.0)
+        assert asm1["predictedNGsPerBoard"] == pytest.approx(0.05)
+        assert asm1["predictedFCPerBoard"] == pytest.approx(0.05)
+        assert asm1["customerYield"] == pytest.approx(95.0)
         assert not asm1["missing"]
         asm2 = next(a for a in data["assemblies"] if a["assembly"] == "Asm2")
         assert asm2["boards"] == pytest.approx(50.0)
@@ -111,8 +132,13 @@ def test_api_assemblies_forecast(app_instance, monkeypatch):
         assert asm2["yield"] == pytest.approx(97.5)
         assert asm2["predictedRejects"] == pytest.approx(1.25)
         assert asm2["predictedYield"] == pytest.approx(97.5)
+        assert asm2["ngRatio"] == pytest.approx(2.5)
+        assert asm2["predictedNGsPerBoard"] == pytest.approx(0.025)
+        assert asm2["predictedFCPerBoard"] == pytest.approx(0.04)
+        assert asm2["customerYield"] == pytest.approx(97.5)
         assert not asm2["missing"]
         asm3 = next(a for a in data["assemblies"] if a["assembly"] == "Asm3")
         assert asm3["missing"]
         assert asm3["boards"] == pytest.approx(0.0)
         assert asm3["inspected"] == pytest.approx(0.0)
+        assert asm3["customerYield"] == pytest.approx(0.0)

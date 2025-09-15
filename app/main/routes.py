@@ -137,6 +137,11 @@ def _aggregate_forecast(
 
     by_name = {_norm(a): a for a in assemblies if a}
 
+    assembly_customer: dict[str, str] = {}
+    customer_totals: dict[str, dict[str, float]] = defaultdict(
+        lambda: {"inspected": 0.0, "rejected": 0.0}
+    )
+
     moat_map: dict[tuple[str, str], dict[str, float]] = defaultdict(
         lambda: {"boards": 0.0, "falseCalls": 0.0}
     )
@@ -144,8 +149,11 @@ def _aggregate_forecast(
         asm_guess, prog_guess = _split_model_name(row.get("Model Name"))
         asm_raw = row.get("Assembly") or row.get("Model") or asm_guess
         prog_raw = row.get("Program") or row.get("program") or prog_guess
+        cust_raw = row.get("Customer") or row.get("customer") or ""
         asm_key = _norm(asm_raw)
         prog_key = _norm(prog_raw)
+        if asm_key and cust_raw and asm_key not in assembly_customer:
+            assembly_customer[asm_key] = cust_raw
         if not asm_key:
             continue
         try:
@@ -164,8 +172,11 @@ def _aggregate_forecast(
     for row in aoi_rows or []:
         asm_raw = row.get("Assembly") or row.get("aoi_Assembly") or ""
         prog_raw = row.get("Program") or row.get("aoi_Program") or ""
+        cust_raw = row.get("Customer") or row.get("aoi_Customer") or ""
         asm_key = _norm(asm_raw)
         prog_key = _norm(prog_raw)
+        if asm_key and cust_raw and asm_key not in assembly_customer:
+            assembly_customer[asm_key] = cust_raw
         if not asm_key:
             continue
         try:
@@ -183,6 +194,19 @@ def _aggregate_forecast(
             continue
         aoi_map[(asm_key, prog_key)]["inspected"] += inspected
         aoi_map[(asm_key, prog_key)]["rejected"] += rejected
+        if cust_raw:
+            ck = _norm(cust_raw)
+            customer_totals[ck]["inspected"] += inspected
+            customer_totals[ck]["rejected"] += rejected
+
+    customer_yields = {
+        c: (
+            (vals["inspected"] - vals["rejected"]) / vals["inspected"] * 100.0
+            if vals["inspected"]
+            else 0.0
+        )
+        for c, vals in customer_totals.items()
+    }
 
     moat_asms = {a for a, _ in moat_map.keys()}
     aoi_asms = {a for a, _ in aoi_map.keys()}
@@ -212,6 +236,15 @@ def _aggregate_forecast(
         yield_pct = (
             (inspected - rejected) / inspected * 100.0 if inspected else 0.0
         )
+        ng_ratio = rejected / inspected * 100.0 if inspected else 0.0
+        predicted_ng_per_board = (
+            preds.get("predictedRejects", 0.0) / boards if boards else 0.0
+        )
+        predicted_fc_per_board = predicted_fc / boards if boards else 0.0
+        cust_yield = 0.0
+        cust_raw = assembly_customer.get(asm_key)
+        if cust_raw:
+            cust_yield = customer_yields.get(_norm(cust_raw), 0.0)
         missing = not ((asm_key in moat_asms) or (asm_key in aoi_asms))
         results.append(
             {
@@ -223,6 +256,10 @@ def _aggregate_forecast(
                 "inspected": inspected,
                 "rejected": rejected,
                 "yield": yield_pct,
+                "ngRatio": ng_ratio,
+                "predictedNGsPerBoard": predicted_ng_per_board,
+                "predictedFCPerBoard": predicted_fc_per_board,
+                "customerYield": cust_yield,
                 **preds,
                 "missing": missing,
             }
