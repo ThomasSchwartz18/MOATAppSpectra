@@ -137,6 +137,7 @@ def test_api_assemblies_forecast(app_instance, monkeypatch):
         assert asm1["inspected"] == pytest.approx(80.0)
         assert asm1["rejected"] == pytest.approx(4.0)
         assert asm1["yield"] == pytest.approx(95.0)
+        assert asm1["customer"] == "CustA"
         assert asm1["predictedRejects"] == pytest.approx(7.5)
         assert asm1["predictedYield"] == pytest.approx(95.0)
         assert asm1["ngRatio"] == pytest.approx(5.0)
@@ -152,6 +153,7 @@ def test_api_assemblies_forecast(app_instance, monkeypatch):
         assert asm2["inspected"] == pytest.approx(40.0)
         assert asm2["rejected"] == pytest.approx(1.0)
         assert asm2["yield"] == pytest.approx(97.5)
+        assert asm2["customer"] == "CustB"
         assert asm2["predictedRejects"] == pytest.approx(1.25)
         assert asm2["predictedYield"] == pytest.approx(97.5)
         assert asm2["ngRatio"] == pytest.approx(2.5)
