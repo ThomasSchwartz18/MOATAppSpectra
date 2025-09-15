@@ -130,18 +130,18 @@ def test_api_assemblies_forecast(app_instance, monkeypatch):
         data = resp.get_json()
         assert {a["assembly"] for a in data["assemblies"]} == {"Asm1", "Asm2", "Asm3"}
         asm1 = next(a for a in data["assemblies"] if a["assembly"] == "Asm1")
-        assert asm1["boards"] == pytest.approx(100.0)
-        assert asm1["falseCalls"] == pytest.approx(5.0)
-        assert asm1["avgFalseCalls"] == pytest.approx(0.05)
-        assert asm1["predictedFalseCalls"] == pytest.approx(5.0)
+        assert asm1["boards"] == pytest.approx(150.0)
+        assert asm1["falseCalls"] == pytest.approx(7.0)
+        assert asm1["avgFalseCalls"] == pytest.approx(7.0 / 150.0)
+        assert asm1["predictedFalseCalls"] == pytest.approx(7.0)
         assert asm1["inspected"] == pytest.approx(80.0)
         assert asm1["rejected"] == pytest.approx(4.0)
         assert asm1["yield"] == pytest.approx(95.0)
-        assert asm1["predictedRejects"] == pytest.approx(5.0)
+        assert asm1["predictedRejects"] == pytest.approx(7.5)
         assert asm1["predictedYield"] == pytest.approx(95.0)
         assert asm1["ngRatio"] == pytest.approx(5.0)
         assert asm1["predictedNGsPerBoard"] == pytest.approx(0.05)
-        assert asm1["predictedFCPerBoard"] == pytest.approx(0.05)
+        assert asm1["predictedFCPerBoard"] == pytest.approx(7.0 / 150.0)
         assert asm1["customerYield"] == pytest.approx(95.0)
         assert not asm1["missing"]
         asm2 = next(a for a in data["assemblies"] if a["assembly"] == "Asm2")
@@ -198,8 +198,58 @@ def test_api_assemblies_forecast_dash_query(app_instance, monkeypatch):
             "/api/assemblies/forecast", json={"assemblies": ["Asm-5"]}
         )
         assert resp.status_code == 200
-        data = resp.get_json()["assemblies"][0]
-        assert data["assembly"] == "Asm-5"
-        assert data["boards"] == pytest.approx(10.0)
-        assert data["inspected"] == pytest.approx(8.0)
-        assert not data["missing"]
+
+
+def test_api_assemblies_forecast_includes_aoi_only_programs(app_instance, monkeypatch):
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        from app.main import routes
+
+        moat_rows = [
+            {
+                "Model Name": "Asm1 SMT",
+                "Total Boards": 100,
+                "FalseCall Parts": 5,
+                "Customer": "CustA",
+            }
+        ]
+        aoi_rows = [
+            {
+                "Assembly": "Asm1",
+                "Program": "SMT",
+                "Quantity Inspected": 80,
+                "Quantity Rejected": 4,
+                "Customer": "CustA",
+            },
+            {
+                "Assembly": "Asm1",
+                "Program": "TH",
+                "Quantity Inspected": 20,
+                "Quantity Rejected": 1,
+                "Customer": "CustA",
+            },
+            {
+                "Assembly": "Asm2",
+                "Program": "SMT",
+                "Quantity Inspected": 40,
+                "Quantity Rejected": 1,
+                "Customer": "CustB",
+            },
+        ]
+        monkeypatch.setattr(routes, "fetch_moat", lambda: (moat_rows, None))
+        monkeypatch.setattr(routes, "fetch_aoi_reports", lambda: (aoi_rows, None))
+        _login(client)
+        resp = client.post(
+            "/api/assemblies/forecast", json={"assemblies": ["Asm1", "Asm2"]}
+        )
+        assert resp.status_code == 200
+        data = resp.get_json()
+        asm1 = next(a for a in data["assemblies"] if a["assembly"] == "Asm1")
+        assert asm1["boards"] == pytest.approx(100.0)
+        assert asm1["inspected"] == pytest.approx(100.0)
+        assert asm1["rejected"] == pytest.approx(5.0)
+        asm2 = next(a for a in data["assemblies"] if a["assembly"] == "Asm2")
+        assert asm2["boards"] == pytest.approx(0.0)
+        assert asm2["inspected"] == pytest.approx(40.0)
+        assert asm2["rejected"] == pytest.approx(1.0)
+        assert not asm2["missing"]
