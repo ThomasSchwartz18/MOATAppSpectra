@@ -552,38 +552,43 @@ def moat_preview():
             "models": [],
             "avg_false_calls": [],
             "overall_avg": 0,
+            "labels": [],
+            "values": [],
             "start_date": None,
             "end_date": None,
         })
     from collections import defaultdict
 
     grouped = defaultdict(lambda: {"falsecall": 0, "boards": 0})
-    dates = []
+    date_values: list[date] = []
     for row in data:
         fc = row.get('FalseCall Parts') or row.get('falsecall_parts') or 0
         boards = row.get('Total Boards') or row.get('total_boards') or 0
         model = row.get('Model Name') or row.get('model_name') or 'Unknown'
-        date = row.get('Report Date') or row.get('report_date')
-        if date:
-            dates.append(str(date))
-        grouped[model]["falsecall"] += fc
-        grouped[model]["boards"] += boards
+        report_date = _parse_date(row.get('Report Date') or row.get('report_date'))
+        if report_date:
+            date_values.append(report_date)
+        grouped[model]["falsecall"] += float(fc)
+        grouped[model]["boards"] += float(boards)
 
     models, averages = [], []
-    total_avg = 0
+    total_avg = 0.0
     for model, vals in grouped.items():
-        avg = (vals["falsecall"] / vals["boards"]) if vals["boards"] else 0
+        boards = vals["boards"]
+        avg = (vals["falsecall"] / boards) if boards else 0.0
         models.append(model)
         averages.append(avg)
         total_avg += avg
 
-    overall_avg = total_avg / len(averages) if averages else 0
-    start_date = min(dates) if dates else None
-    end_date = max(dates) if dates else None
+    overall_avg = total_avg / len(averages) if averages else 0.0
+    start_date = min(date_values).isoformat() if date_values else None
+    end_date = max(date_values).isoformat() if date_values else None
     return jsonify({
         "models": models,
         "avg_false_calls": averages,
         "overall_avg": overall_avg,
+        "labels": models,
+        "values": averages,
         "start_date": start_date,
         "end_date": end_date,
     })
@@ -601,20 +606,12 @@ def _yield_preview(fetch_func):
     from datetime import datetime, timedelta
     from collections import defaultdict
 
-    def parse_date(d):
-        if not d:
-            return None
-        try:
-            return datetime.fromisoformat(str(d)).date()
-        except Exception:
-            return None
-
     today = datetime.utcnow().date()
     start = today - timedelta(days=6)
     agg = defaultdict(lambda: {'accepted': 0, 'rejected': 0})
 
     for row in data:
-        d = parse_date(row.get('Date') or row.get('date'))
+        d = _parse_date(row.get('Date') or row.get('date'))
         if not d or d < start or d > today:
             continue
         inspected = int(row.get('Quantity Inspected') or row.get('quantity_inspected') or 0)
@@ -635,11 +632,13 @@ def _yield_preview(fetch_func):
         yields.append(y)
 
     avg_yield = sum(yields) / len(yields) if yields else 0
-    start_date = dates[0].isoformat() if dates else None
-    end_date = dates[-1].isoformat() if dates else None
+    labels = [d.isoformat() for d in dates]
+    start_date = labels[0] if labels else None
+    end_date = labels[-1] if labels else None
 
     return jsonify({
-        'labels': [d.isoformat() for d in dates],
+        'labels': labels,
+        'values': yields,
         'yields': yields,
         'avg_yield': avg_yield,
         'start_date': start_date,
@@ -655,6 +654,138 @@ def aoi_preview():
 @main_bp.route('/fi_preview', methods=['GET'])
 def fi_preview():
     return _yield_preview(fetch_fi_reports)
+
+
+@main_bp.route('/daily_reports_preview', methods=['GET'])
+def daily_reports_preview():
+    """Return recent AOI/FI daily yields for the dashboard preview."""
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+
+    rows, error = fetch_combined_reports()
+    if error:
+        abort(500, description=error)
+
+    from datetime import datetime, timedelta
+    from collections import defaultdict
+
+    today = datetime.utcnow().date()
+    start = today - timedelta(days=6)
+    daily = defaultdict(lambda: {"inspected": 0.0, "rejected": 0.0})
+
+    for row in rows or []:
+        day = (
+            _parse_date(row.get('aoi_Date'))
+            or _parse_date(row.get('Date'))
+            or _parse_date(row.get('fi_Date'))
+        )
+        if not day or day < start or day > today:
+            continue
+        inspected = float(
+            row.get('aoi_Quantity Inspected')
+            or row.get('Quantity Inspected')
+            or row.get('fi_Quantity Inspected')
+            or 0
+        )
+        rejected = float(
+            row.get('aoi_Quantity Rejected')
+            or row.get('Quantity Rejected')
+            or row.get('fi_Quantity Rejected')
+            or 0
+        )
+        daily[day]['inspected'] += inspected
+        daily[day]['rejected'] += rejected
+
+    dates = sorted(daily.keys())
+    labels = [d.isoformat() for d in dates]
+    values = []
+    for d in dates:
+        inspected = daily[d]['inspected']
+        rejected = daily[d]['rejected']
+        accepted = inspected - rejected
+        yield_pct = (accepted / inspected * 100.0) if inspected else 0.0
+        values.append(yield_pct)
+
+    avg_yield = sum(values) / len(values) if values else 0.0
+    start_date = labels[0] if labels else None
+    end_date = labels[-1] if labels else None
+
+    return jsonify({
+        'labels': labels,
+        'values': values,
+        'avg_yield': avg_yield,
+        'start_date': start_date,
+        'end_date': end_date,
+    })
+
+
+@main_bp.route('/forecast_preview', methods=['GET'])
+def forecast_preview():
+    """Return forecast summary metrics for the dashboard preview."""
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+
+    moat_rows, moat_error = fetch_recent_moat()
+    if moat_error:
+        abort(500, description=moat_error)
+    aoi_rows, aoi_error = fetch_aoi_reports()
+    if aoi_error:
+        abort(500, description=aoi_error)
+
+    from datetime import datetime, timedelta
+
+    today = datetime.utcnow().date()
+    start = today - timedelta(days=6)
+
+    recent_aoi: list[dict] = []
+    assemblies: list[str] = []
+    seen: set[str] = set()
+
+    def _add_assembly(name: str | None):
+        if not name:
+            return
+        if name not in seen:
+            assemblies.append(name)
+            seen.add(name)
+
+    for row in moat_rows or []:
+        asm, _ = _split_model_name(row.get('Model Name'))
+        _add_assembly(asm)
+
+    for row in aoi_rows or []:
+        day = _parse_date(row.get('Date') or row.get('aoi_Date'))
+        if not day or day < start or day > today:
+            continue
+        recent_aoi.append(row)
+        _add_assembly(row.get('Assembly') or row.get('aoi_Assembly'))
+
+    metrics = _aggregate_forecast(assemblies, moat_rows or [], recent_aoi)
+    metrics = [m for m in metrics if (m.get('boards') or m.get('inspected'))]
+    metrics.sort(key=lambda m: m.get('boards', 0.0), reverse=True)
+    top_metrics = metrics[:5]
+
+    labels = [m.get('assembly') or 'Unknown' for m in top_metrics]
+    values = [m.get('predictedYield', 0.0) for m in top_metrics]
+
+    date_values: list[date] = []
+    for row in moat_rows or []:
+        report_date = _parse_date(row.get('Report Date') or row.get('report_date'))
+        if report_date:
+            date_values.append(report_date)
+    for row in recent_aoi:
+        day = _parse_date(row.get('Date') or row.get('aoi_Date'))
+        if day:
+            date_values.append(day)
+
+    start_date = min(date_values).isoformat() if date_values else None
+    end_date = max(date_values).isoformat() if date_values else None
+
+    return jsonify({
+        'labels': labels,
+        'values': values,
+        'start_date': start_date,
+        'end_date': end_date,
+    })
 
 
 @main_bp.route('/analysis/ppm', methods=['GET'])

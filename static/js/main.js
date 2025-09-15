@@ -23,10 +23,13 @@ function renderLinePreview({ endpoint, canvasId, infoId, onClickHref }) {
       if (!ctx) return;
 
       const isFalseCallPreview = Array.isArray(data.avg_false_calls);
-      const labels = (isFalseCallPreview ? data.models : data.labels) || [];
-      const values = (isFalseCallPreview
-        ? data.avg_false_calls
-        : data.yields || data.avg_false_calls || data.values) || [];
+      const labels =
+        data.labels || (isFalseCallPreview ? data.models : undefined) || [];
+      const values =
+        data.values ||
+        (isFalseCallPreview
+          ? data.avg_false_calls
+          : data.yields || data.avg_false_calls) || [];
 
       const chartConfig = {
         type: 'line',
@@ -161,11 +164,12 @@ document.addEventListener('DOMContentLoaded', () => {
       onClickHref: '/analysis/aoi/grades/view',
     },
     {
-      endpoint: '/fi_preview',
+      endpoint: '/daily_reports_preview',
       canvasId: 'dailyReportsPreview',
       onClickHref: '/reports/aoi_daily',
     },
     {
+      endpoint: '/forecast_preview',
       canvasId: 'assemblyForecastPreview',
       onClickHref: '/tools/assembly-forecast',
     },
