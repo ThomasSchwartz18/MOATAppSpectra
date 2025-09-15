@@ -99,52 +99,108 @@ def _predict_counts(inspected: float, rejected: float, boards: float) -> dict[st
     return {"predictedRejects": predicted_rejects, "predictedYield": predicted_yield}
 
 
+def _split_model_name(name: str) -> tuple[str, str]:
+    """Split a MOAT 'Model Name' into assembly and program.
+
+    Examples::
+        'Asm1 SMT' -> ('Asm1', 'SMT')
+
+    If a program cannot be determined, the program portion will be an empty
+    string. Whitespace is trimmed from both parts.
+    """
+    if not name:
+        return "", ""
+    parts = re.split(r"\s+", str(name).strip())
+    if len(parts) >= 2:
+        return " ".join(parts[:-1]), parts[-1]
+    return str(name).strip(), ""
+
+
+def _norm(value: str) -> str:
+    """Normalize an assembly or program string for comparisons."""
+    return value.strip().lower() if value else ""
+
+
 def _aggregate_forecast(
     assemblies: list[str], moat_rows: list[dict], aoi_rows: list[dict]
 ) -> list[dict]:
-    """Aggregate MOAT and AOI data for selected assemblies."""
-    by_name = {a.lower(): a for a in assemblies if a}
+    """Aggregate MOAT and AOI data for selected assemblies.
+
+    MOAT rows may contain a combined "Model Name" field where the final token
+    represents the program. We split that field into separate assembly/program
+    pieces so that MOAT and AOI records can be joined on both attributes.
+    Assembly and program strings are normalised to lower-case without leading or
+    trailing whitespace prior to comparison.
+    """
+
+    by_name = {_norm(a): a for a in assemblies if a}
+
+    moat_map: dict[tuple[str, str], dict[str, float]] = defaultdict(
+        lambda: {"boards": 0.0, "falseCalls": 0.0}
+    )
+    for row in moat_rows or []:
+        asm_guess, prog_guess = _split_model_name(row.get("Model Name"))
+        asm_raw = row.get("Assembly") or row.get("Model") or asm_guess
+        prog_raw = row.get("Program") or row.get("program") or prog_guess
+        asm_key = _norm(asm_raw)
+        prog_key = _norm(prog_raw)
+        if not asm_key:
+            continue
+        try:
+            boards = float(row.get("Total Boards") or row.get("total_boards") or 0)
+            false_calls = float(
+                row.get("FalseCall Parts") or row.get("falsecall_parts") or 0
+            )
+        except (TypeError, ValueError):
+            continue
+        moat_map[(asm_key, prog_key)]["boards"] += boards
+        moat_map[(asm_key, prog_key)]["falseCalls"] += false_calls
+
+    aoi_map: dict[tuple[str, str], dict[str, float]] = defaultdict(
+        lambda: {"inspected": 0.0, "rejected": 0.0}
+    )
+    for row in aoi_rows or []:
+        asm_raw = row.get("Assembly") or row.get("aoi_Assembly") or ""
+        prog_raw = row.get("Program") or row.get("aoi_Program") or ""
+        asm_key = _norm(asm_raw)
+        prog_key = _norm(prog_raw)
+        if not asm_key:
+            continue
+        try:
+            inspected = float(
+                row.get("Quantity Inspected")
+                or row.get("aoi_Quantity Inspected")
+                or 0
+            )
+            rejected = float(
+                row.get("Quantity Rejected")
+                or row.get("aoi_Quantity Rejected")
+                or 0
+            )
+        except (TypeError, ValueError):
+            continue
+        aoi_map[(asm_key, prog_key)]["inspected"] += inspected
+        aoi_map[(asm_key, prog_key)]["rejected"] += rejected
+
     results: list[dict] = []
-    for key, original in by_name.items():
+    for asm_key, original in by_name.items():
         boards = 0.0
         false_calls = 0.0
-        for row in moat_rows or []:
-            asm = (
-                row.get("Assembly")
-                or row.get("Model")
-                or row.get("Model Name")
-                or ""
-            )
-            if asm and asm.strip().lower() == key:
-                try:
-                    boards += float(
-                        row.get("Total Boards") or row.get("total_boards") or 0
-                    )
-                    false_calls += float(
-                        row.get("FalseCall Parts")
-                        or row.get("falsecall_parts")
-                        or 0
-                    )
-                except (TypeError, ValueError):
-                    continue
         inspected = 0.0
         rejected = 0.0
-        for row in aoi_rows or []:
-            asm = row.get("Assembly") or row.get("aoi_Assembly") or ""
-            if asm and asm.strip().lower() == key:
-                try:
-                    inspected += float(
-                        row.get("Quantity Inspected")
-                        or row.get("aoi_Quantity Inspected")
-                        or 0
-                    )
-                    rejected += float(
-                        row.get("Quantity Rejected")
-                        or row.get("aoi_Quantity Rejected")
-                        or 0
-                    )
-                except (TypeError, ValueError):
-                    continue
+        prog_keys = {
+            p for a, p in moat_map.keys() if a == asm_key
+        } & {
+            p for a, p in aoi_map.keys() if a == asm_key
+        }
+        for prog in prog_keys:
+            m = moat_map.get((asm_key, prog), {})
+            a = aoi_map.get((asm_key, prog), {})
+            boards += m.get("boards", 0.0)
+            false_calls += m.get("falseCalls", 0.0)
+            inspected += a.get("inspected", 0.0)
+            rejected += a.get("rejected", 0.0)
+
         avg_fc = false_calls / boards if boards else 0.0
         predicted_fc = avg_fc * boards
         preds = _predict_counts(inspected, rejected, boards)

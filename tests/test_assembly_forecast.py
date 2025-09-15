@@ -68,12 +68,18 @@ def test_api_assemblies_forecast(app_instance, monkeypatch):
         from app.main import routes
 
         moat_rows = [
-            {"Assembly": "Asm1", "Total Boards": 100, "FalseCall Parts": 5},
-            {"Model": "Asm2", "total_boards": 50, "falsecall_parts": 2},
+            {"Model Name": "Asm1 SMT", "Total Boards": 100, "FalseCall Parts": 5},
+            {"Model Name": "Asm1 TH", "Total Boards": 50, "FalseCall Parts": 2},
+            {"Model Name": "Asm2 SMT", "total_boards": 50, "falsecall_parts": 2},
         ]
         aoi_rows = [
-            {"Assembly": "Asm1", "Quantity Inspected": 80, "Quantity Rejected": 4},
-            {"Assembly": "Asm2", "aoi_Quantity Inspected": 40, "aoi_Quantity Rejected": 1},
+            {"Assembly": "Asm1", "Program": "SMT", "Quantity Inspected": 80, "Quantity Rejected": 4},
+            {
+                "Assembly": "Asm2",
+                "Program": "SMT",
+                "aoi_Quantity Inspected": 40,
+                "aoi_Quantity Rejected": 1,
+            },
         ]
         monkeypatch.setattr(routes, "fetch_moat", lambda: (moat_rows, None))
         monkeypatch.setattr(routes, "fetch_aoi_reports", lambda: (aoi_rows, None))
