@@ -2,33 +2,32 @@
 
 {% block content %}
 <h1>Welcome to MOAA</h1>
-<div id="moat-preview" class="preview-wrapper">
-  <div class="preview-info">
-    <div id="moat-title" style="font-size:14px;">Average False Calls Preview</div>
-    <div id="moat-info" style="font-size:12px;color:#333;"></div>
-  </div>
-  <div class="preview-card">
-    <canvas id="moatChart"></canvas>
-  </div>
-</div>
-<div id="aoi-preview" class="preview-wrapper">
-  <div class="preview-info">
-    <div id="aoi-title" style="font-size:14px;">AOI Yield Preview</div>
-    <div id="aoi-info" style="font-size:12px;color:#333;"></div>
-  </div>
-  <div class="preview-card">
-    <canvas id="aoiChart"></canvas>
-  </div>
-</div>
-<div id="fi-preview" class="preview-wrapper">
-  <div class="preview-info">
-    <div id="fi-title" style="font-size:14px;">FI Yield Preview</div>
-    <div id="fi-info" style="font-size:12px;color:#333;"></div>
-  </div>
-  <div class="preview-card">
-    <canvas id="fiChart"></canvas>
-  </div>
-</div>
+<section class="dashboard-grid">
+  <a class="dashboard-link" href="{{ url_for('main.ppm_analysis') }}">
+    <div class="dashboard-card">
+      <h2>PPM Analysis</h2>
+      <canvas id="ppmAnalysisPreview"></canvas>
+    </div>
+  </a>
+  <a class="dashboard-link" href="{{ url_for('main.aoi_grades_page') }}">
+    <div class="dashboard-card">
+      <h2>AOI &amp; FI Analysis</h2>
+      <canvas id="aoiFiAnalysisPreview"></canvas>
+    </div>
+  </a>
+  <a class="dashboard-link" href="{{ url_for('main.aoi_daily_report_page') }}">
+    <div class="dashboard-card">
+      <h2>Daily Reports</h2>
+      <canvas id="dailyReportsPreview"></canvas>
+    </div>
+  </a>
+  <a class="dashboard-link" href="{{ url_for('main.assembly_forecast') }}">
+    <div class="dashboard-card">
+      <h2>Assembly Forecast</h2>
+      <canvas id="assemblyForecastPreview"></canvas>
+    </div>
+  </a>
+</section>
 {% endblock %}
 
 {% block scripts %}
