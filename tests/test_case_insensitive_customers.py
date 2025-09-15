@@ -26,12 +26,14 @@ def test_aoi_grades_customer_yield_case_insensitive(app_instance, monkeypatch):
         data = [
             {
                 "aoi_Customer": "PG LifeLink",
+                "aoi_Program": "Alpha",
                 "aoi_Quantity Inspected": 100,
                 "aoi_Quantity Rejected": 10,
                 "fi_Quantity Rejected": 5,
             },
             {
                 "aoi_Customer": "pg lifelink",
+                "aoi_Program": "Alpha",
                 "aoi_Quantity Inspected": 50,
                 "aoi_Quantity Rejected": 5,
                 "fi_Quantity Rejected": 2,

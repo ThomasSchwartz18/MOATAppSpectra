@@ -27,6 +27,7 @@ def test_operator_stats_from_aoi_reports(app_instance, monkeypatch):
             {
                 "Date": "2024-07-01",
                 "Operator": "Alice",
+                "Program": "Alpha",
                 "Quantity Inspected": 100,
                 "Quantity Rejected": 5,
             }

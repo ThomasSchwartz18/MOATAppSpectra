@@ -40,12 +40,14 @@ def test_export_integrated_report_respects_date_range(app_instance, monkeypatch)
             {
                 "Date": "2024-07-01",
                 "Operator": "Alice",
+                "Program": "Alpha",
                 "Quantity Inspected": 100,
                 "Quantity Rejected": 5,
             },
             {
                 "Date": "2024-08-01",
                 "Operator": "Bob",
+                "Program": "Alpha",
                 "Quantity Inspected": 100,
                 "Quantity Rejected": 5,
             },
@@ -116,6 +118,7 @@ def test_export_integrated_report_filename_in_header(app_instance, monkeypatch):
             {
                 "Date": "2024-07-01",
                 "Operator": "Alice",
+                "Program": "Alpha",
                 "Quantity Inspected": 100,
                 "Quantity Rejected": 5,
             }

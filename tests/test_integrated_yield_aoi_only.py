@@ -28,6 +28,7 @@ def test_yield_from_aoi_only_data(app_instance, monkeypatch):
                 "Date": "2024-07-01",
                 "Assembly": "ASM1",
                 "Operator": "Alice",
+                "Program": "Alpha",
                 "Quantity Inspected": 100,
                 "Quantity Rejected": 5,
             }

@@ -15,6 +15,7 @@ def test_aoi_grades_excludes_non_aoi_defects():
         'aoi_Job Number': 'J1',
         'aoi_Operator': 'Op',
         'aoi_Date': '2024-01-01',
+        'aoi_Program': 'Alpha',
         'aoi_Quantity Inspected': 10,
         'aoi_Quantity Rejected': 0,
         'fi_Date': '2024-01-02',
