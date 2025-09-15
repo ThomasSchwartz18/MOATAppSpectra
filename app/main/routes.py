@@ -89,6 +89,80 @@ def _gap_days(row):
     return None
 
 
+def _predict_counts(inspected: float, rejected: float, boards: float) -> dict[str, float]:
+    """Compute predicted reject count and yield based on historical rates."""
+    reject_rate = (rejected / inspected) if inspected else 0.0
+    predicted_rejects = reject_rate * boards
+    predicted_yield = (
+        (boards - predicted_rejects) / boards * 100.0 if boards else 0.0
+    )
+    return {"predictedRejects": predicted_rejects, "predictedYield": predicted_yield}
+
+
+def _aggregate_forecast(
+    assemblies: list[str], moat_rows: list[dict], aoi_rows: list[dict]
+) -> list[dict]:
+    """Aggregate MOAT and AOI data for selected assemblies."""
+    by_name = {a.lower(): a for a in assemblies if a}
+    results: list[dict] = []
+    for key, original in by_name.items():
+        boards = 0.0
+        false_calls = 0.0
+        for row in moat_rows or []:
+            asm = (
+                row.get("Assembly")
+                or row.get("Model")
+                or row.get("Model Name")
+                or ""
+            )
+            if asm and asm.strip().lower() == key:
+                try:
+                    boards += float(
+                        row.get("Total Boards") or row.get("total_boards") or 0
+                    )
+                    false_calls += float(
+                        row.get("FalseCall Parts")
+                        or row.get("falsecall_parts")
+                        or 0
+                    )
+                except (TypeError, ValueError):
+                    continue
+        inspected = 0.0
+        rejected = 0.0
+        for row in aoi_rows or []:
+            asm = row.get("Assembly") or row.get("aoi_Assembly") or ""
+            if asm and asm.strip().lower() == key:
+                try:
+                    inspected += float(
+                        row.get("Quantity Inspected")
+                        or row.get("aoi_Quantity Inspected")
+                        or 0
+                    )
+                    rejected += float(
+                        row.get("Quantity Rejected")
+                        or row.get("aoi_Quantity Rejected")
+                        or 0
+                    )
+                except (TypeError, ValueError):
+                    continue
+        preds = _predict_counts(inspected, rejected, boards)
+        yield_pct = (
+            (inspected - rejected) / inspected * 100.0 if inspected else 0.0
+        )
+        results.append(
+            {
+                "assembly": original,
+                "boards": boards,
+                "falseCalls": false_calls,
+                "inspected": inspected,
+                "rejected": rejected,
+                "yield": yield_pct,
+                **preds,
+            }
+        )
+    return results
+
+
 main_bp = Blueprint('main', __name__)
 
 
@@ -568,6 +642,66 @@ def ppm_saved_queries():
     if error:
         abort(500, description=error)
     return jsonify(data), status
+
+
+@main_bp.route('/tools/assembly-forecast')
+def assembly_forecast():
+    """Render the Assembly Forecast tool page."""
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    return render_template('assembly_forecast.html', username=session.get('username'))
+
+
+@main_bp.route('/api/assemblies/search')
+def api_assemblies_search():
+    """Search distinct assembly names across MOAT and AOI data."""
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    q = (request.args.get('q') or '').strip().lower()
+    assemblies: set[str] = set()
+    moat_rows, moat_error = fetch_moat()
+    if moat_error:
+        abort(500, description=moat_error)
+    for row in moat_rows or []:
+        asm = (
+            row.get('Assembly')
+            or row.get('Model')
+            or row.get('Model Name')
+            or ''
+        )
+        if not asm:
+            continue
+        if q and q not in asm.lower():
+            continue
+        assemblies.add(asm)
+    aoi_rows, aoi_error = fetch_aoi_reports()
+    if aoi_error:
+        abort(500, description=aoi_error)
+    for row in aoi_rows or []:
+        asm = row.get('Assembly') or row.get('aoi_Assembly') or ''
+        if not asm:
+            continue
+        if q and q not in asm.lower():
+            continue
+        assemblies.add(asm)
+    return jsonify(sorted(assemblies))
+
+
+@main_bp.route('/api/assemblies/forecast', methods=['POST'])
+def api_assemblies_forecast():
+    """Return forecast metrics for selected assemblies."""
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    payload = request.get_json(silent=True) or {}
+    assemblies = payload.get('assemblies') or []
+    moat_rows, moat_error = fetch_moat()
+    if moat_error:
+        abort(500, description=moat_error)
+    aoi_rows, aoi_error = fetch_aoi_reports()
+    if aoi_error:
+        abort(500, description=aoi_error)
+    metrics = _aggregate_forecast(assemblies, moat_rows, aoi_rows)
+    return jsonify({'assemblies': metrics})
 
 
 def _fig_to_data_uri(fig):
