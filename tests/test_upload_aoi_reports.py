@@ -42,6 +42,8 @@ def test_upload_aoi_with_program_column(app_instance, monkeypatch):
     assert resp.status_code == 201
     assert resp.get_json()["inserted"] == 1
     assert captured["rows"][0]["Program"] == "Alpha"
+    assert captured["rows"][0]["Rev"] == "R1"
+    assert captured["rows"][0]["Additional Information"] == "Info"
 
 
 def test_upload_and_payload_builder_with_program(app_instance, monkeypatch):
@@ -84,7 +86,12 @@ def test_upload_aoi_reports_reordered_headers(app_instance):
     body = resp.get_data(as_text=True)
     assert "Missing columns: none" in body
     assert "Columns out of order: Shift, Date" in body
-    assert "Column order should be:" in body
+    expected_order_msg = (
+        "Column order should be: Date, Shift, Operator, Customer, Program, "
+        "Assembly, Rev, Job Number, Quantity Inspected, Quantity Rejected, "
+        "Additional Information"
+    )
+    assert expected_order_msg in body
 
 
 def test_upload_aoi_reports_missing_header(app_instance):
@@ -126,6 +133,31 @@ def test_upload_aoi_reports_headers_with_spaces(app_instance, monkeypatch):
     assert resp.get_json()["inserted"] == 1
     assert captured["rows"][0]["Date"] == "2024-07-01"
     assert captured["rows"][0]["Quantity Rejected"] == "1"
+
+
+def test_upload_aoi_reports_without_optional_headers(app_instance, monkeypatch):
+    client = app_instance.test_client()
+    captured = {}
+
+    def fake_insert(rows):
+        captured["rows"] = rows
+        return None, None
+
+    monkeypatch.setattr(routes, "insert_aoi_reports_bulk", fake_insert)
+    csv_content = (
+        "Date,Shift,Operator,Customer,Program,Assembly,Job Number,Quantity Inspected,Quantity Rejected\n"
+        "07/01/2024,1,Alice,ACME,Alpha,A1,J1,10,1\n"
+    )
+    data = {"file": (io.BytesIO(csv_content.encode("utf-8")), "aoi.csv")}
+    with app_instance.app_context():
+        with client.session_transaction() as sess:
+            sess["username"] = "ADMIN"
+        resp = client.post("/aoi_reports/upload", data=data, content_type="multipart/form-data")
+    assert resp.status_code == 201
+    assert resp.get_json()["inserted"] == 1
+    assert captured["rows"][0]["Program"] == "Alpha"
+    assert "Rev" not in captured["rows"][0]
+    assert "Additional Information" not in captured["rows"][0]
 
 
 def test_upload_aoi_reports_missing_required_data(app_instance):
