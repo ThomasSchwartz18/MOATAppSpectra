@@ -57,6 +57,66 @@ from fi_utils import parse_fi_rejections
 # Helpers for AOI Grades analytics
 from collections import defaultdict, Counter
 
+
+def _normalize_header(value: str | None) -> str:
+    """Normalize a CSV header by trimming whitespace and lowercasing."""
+
+    return (value or "").strip().lower()
+
+
+def _compare_headers(
+    fieldnames: list[str] | None, required_columns: list[str]
+) -> tuple[list[str], list[str], list[str], dict[str, str | None]]:
+    """Compare CSV headers against the required column list.
+
+    Returns lists of missing, unexpected, and out-of-order columns along with a
+    mapping from required column names to the actual header present in the CSV
+    (if any). Comparison is performed after trimming whitespace and
+    normalising casing so that minor formatting issues do not prevent uploads.
+    """
+
+    actual_headers = fieldnames or []
+    normalized_actual = [_normalize_header(name) for name in actual_headers]
+    normalized_required = [_normalize_header(name) for name in required_columns]
+
+    actual_lookup: dict[str, str] = {}
+    for original, normalized in zip(actual_headers, normalized_actual):
+        if normalized and normalized not in actual_lookup:
+            actual_lookup[normalized] = original
+
+    required_set = set(normalized_required)
+
+    missing = [
+        required
+        for required, normalized in zip(required_columns, normalized_required)
+        if normalized not in actual_lookup
+    ]
+
+    unexpected = [
+        original
+        for original, normalized in zip(actual_headers, normalized_actual)
+        if normalized not in required_set
+    ]
+
+    out_of_order: list[str] = []
+    if (
+        not missing
+        and not unexpected
+        and len(normalized_actual) == len(normalized_required)
+    ):
+        for idx, (actual_norm, required_norm) in enumerate(
+            zip(normalized_actual, normalized_required)
+        ):
+            if actual_norm != required_norm:
+                out_of_order.append(actual_headers[idx])
+
+    mapping = {
+        required: actual_lookup.get(normalized)
+        for required, normalized in zip(required_columns, normalized_required)
+    }
+
+    return missing, unexpected, out_of_order, mapping
+
 def _parse_date(val):
     if not val:
         return None
@@ -342,13 +402,25 @@ def upload_aoi_reports():
         'Quantity Rejected',
         'Additional Information',
     ]
-    if reader.fieldnames != required_columns:
-        abort(400, description='CSV must contain the required columns')
+    missing, unexpected, out_of_order, header_map = _compare_headers(
+        reader.fieldnames, required_columns
+    )
+    if missing or unexpected or out_of_order:
+        message_parts = [
+            f"Missing columns: {', '.join(missing) if missing else 'none'}",
+            f"Unexpected columns: {', '.join(unexpected) if unexpected else 'none'}",
+            f"Columns out of order: {', '.join(out_of_order) if out_of_order else 'none'}",
+            f"Column order should be: {', '.join(required_columns)}",
+        ]
+        abort(400, description='; '.join(message_parts))
 
     rows = []
     for row in reader:
         # Copy required columns (including 'Program') for each record
-        current = {col: row.get(col, '') for col in required_columns}
+        current = {}
+        for col in required_columns:
+            source = header_map.get(col) or col
+            current[col] = row.get(source, '')
         date_str = current.get('Date')
         if date_str:
             try:
@@ -408,10 +480,25 @@ def upload_fi_reports():
         'Quantity Rejected',
         'Additional Information',
     ]
-    if reader.fieldnames != required_columns:
-        abort(400, description='CSV must contain the required columns')
+    missing, unexpected, out_of_order, header_map = _compare_headers(
+        reader.fieldnames, required_columns
+    )
+    if missing or unexpected or out_of_order:
+        message_parts = [
+            f"Missing columns: {', '.join(missing) if missing else 'none'}",
+            f"Unexpected columns: {', '.join(unexpected) if unexpected else 'none'}",
+            f"Columns out of order: {', '.join(out_of_order) if out_of_order else 'none'}",
+            f"Column order should be: {', '.join(required_columns)}",
+        ]
+        abort(400, description='; '.join(message_parts))
 
-    rows = [{col: row.get(col, '') for col in required_columns} for row in reader]
+    rows = []
+    for row in reader:
+        current = {}
+        for col in required_columns:
+            source = header_map.get(col) or col
+            current[col] = row.get(source, '')
+        rows.append(current)
     if not rows:
         return jsonify({'inserted': 0}), 200
 
