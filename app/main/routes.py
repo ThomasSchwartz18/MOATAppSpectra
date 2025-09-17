@@ -65,7 +65,9 @@ def _normalize_header(value: str | None) -> str:
 
 
 def _compare_headers(
-    fieldnames: list[str] | None, required_columns: list[str]
+    fieldnames: list[str] | None,
+    ordered_columns: list[str],
+    optional_columns: list[str] | None = None,
 ) -> tuple[list[str], list[str], list[str], dict[str, str | None]]:
     """Compare CSV headers against the required column list.
 
@@ -76,43 +78,54 @@ def _compare_headers(
     """
 
     actual_headers = fieldnames or []
+    optional_columns = optional_columns or []
     normalized_actual = [_normalize_header(name) for name in actual_headers]
-    normalized_required = [_normalize_header(name) for name in required_columns]
+    normalized_order = [_normalize_header(name) for name in ordered_columns]
 
     actual_lookup: dict[str, str] = {}
     for original, normalized in zip(actual_headers, normalized_actual):
         if normalized and normalized not in actual_lookup:
             actual_lookup[normalized] = original
 
-    required_set = set(normalized_required)
+    expected_set = set(normalized_order)
 
     missing = [
-        required
-        for required, normalized in zip(required_columns, normalized_required)
-        if normalized not in actual_lookup
+        column
+        for column, normalized in zip(ordered_columns, normalized_order)
+        if column not in optional_columns and normalized not in actual_lookup
     ]
 
     unexpected = [
         original
         for original, normalized in zip(actual_headers, normalized_actual)
-        if normalized not in required_set
+        if normalized not in expected_set
     ]
 
     out_of_order: list[str] = []
+    filtered_actual = [
+        (original, normalized)
+        for original, normalized in zip(actual_headers, normalized_actual)
+        if normalized in expected_set
+    ]
+    expected_order = [
+        normalized
+        for normalized in normalized_order
+        if normalized in actual_lookup
+    ]
     if (
         not missing
         and not unexpected
-        and len(normalized_actual) == len(normalized_required)
+        and len(filtered_actual) == len(expected_order)
     ):
-        for idx, (actual_norm, required_norm) in enumerate(
-            zip(normalized_actual, normalized_required)
+        for (original, actual_norm), required_norm in zip(
+            filtered_actual, expected_order
         ):
             if actual_norm != required_norm:
-                out_of_order.append(actual_headers[idx])
+                out_of_order.append(original)
 
     mapping = {
-        required: actual_lookup.get(normalized)
-        for required, normalized in zip(required_columns, normalized_required)
+        column: actual_lookup.get(normalized)
+        for column, normalized in zip(ordered_columns, normalized_order)
     }
 
     return missing, unexpected, out_of_order, mapping
@@ -389,7 +402,7 @@ def upload_aoi_reports():
 
     stream = io.StringIO(uploaded.stream.read().decode('utf-8'))
     reader = csv.DictReader(stream)
-    required_columns = [
+    ordered_columns = [
         'Date',
         'Shift',
         'Operator',
@@ -402,19 +415,26 @@ def upload_aoi_reports():
         'Quantity Rejected',
         'Additional Information',
     ]
+    optional_columns = ['Rev', 'Additional Information']
+    required_columns = [
+        column for column in ordered_columns if column not in optional_columns
+    ]
     missing, unexpected, out_of_order, header_map = _compare_headers(
-        reader.fieldnames, required_columns
+        reader.fieldnames, ordered_columns, optional_columns
     )
     if missing or unexpected or out_of_order:
+        expected_order_display = [
+            column
+            for column in ordered_columns
+            if column not in optional_columns or header_map.get(column)
+        ]
         message_parts = [
             f"Missing columns: {', '.join(missing) if missing else 'none'}",
             f"Unexpected columns: {', '.join(unexpected) if unexpected else 'none'}",
             f"Columns out of order: {', '.join(out_of_order) if out_of_order else 'none'}",
-            f"Column order should be: {', '.join(required_columns)}",
+            f"Column order should be: {', '.join(expected_order_display)}",
         ]
         abort(400, description='; '.join(message_parts))
-
-    optional_columns = {'Additional Information'}
     rows = []
     rows_with_missing = []
     for idx, row in enumerate(reader, start=2):
@@ -429,9 +449,17 @@ def upload_aoi_reports():
             if value is None:
                 value = ''
             value = value.strip()
-            if col not in optional_columns and not value:
+            if not value:
                 missing_cols.append(col)
             current[col] = value
+        for col in optional_columns:
+            source = header_map.get(col)
+            if not source:
+                continue
+            value = row.get(source, '')
+            if value is None:
+                value = ''
+            current[col] = value.strip()
         if missing_cols:
             rows_with_missing.append((idx, missing_cols))
             continue
@@ -487,7 +515,7 @@ def upload_fi_reports():
 
     stream = io.StringIO(uploaded.stream.read().decode('utf-8'))
     reader = csv.DictReader(stream)
-    required_columns = [
+    ordered_columns = [
         'Date',
         'Shift',
         'Operator',
@@ -499,19 +527,26 @@ def upload_fi_reports():
         'Quantity Rejected',
         'Additional Information',
     ]
+    optional_columns = ['Rev', 'Additional Information']
+    required_columns = [
+        column for column in ordered_columns if column not in optional_columns
+    ]
     missing, unexpected, out_of_order, header_map = _compare_headers(
-        reader.fieldnames, required_columns
+        reader.fieldnames, ordered_columns, optional_columns
     )
     if missing or unexpected or out_of_order:
+        expected_order_display = [
+            column
+            for column in ordered_columns
+            if column not in optional_columns or header_map.get(column)
+        ]
         message_parts = [
             f"Missing columns: {', '.join(missing) if missing else 'none'}",
             f"Unexpected columns: {', '.join(unexpected) if unexpected else 'none'}",
             f"Columns out of order: {', '.join(out_of_order) if out_of_order else 'none'}",
-            f"Column order should be: {', '.join(required_columns)}",
+            f"Column order should be: {', '.join(expected_order_display)}",
         ]
         abort(400, description='; '.join(message_parts))
-
-    optional_columns = {'Additional Information'}
     rows = []
     rows_with_missing = []
     for idx, row in enumerate(reader, start=2):
@@ -525,9 +560,17 @@ def upload_fi_reports():
             if value is None:
                 value = ''
             value = value.strip()
-            if col not in optional_columns and not value:
+            if not value:
                 missing_cols.append(col)
             current[col] = value
+        for col in optional_columns:
+            source = header_map.get(col)
+            if not source:
+                continue
+            value = row.get(source, '')
+            if value is None:
+                value = ''
+            current[col] = value.strip()
         if missing_cols:
             rows_with_missing.append((idx, missing_cols))
             continue
