@@ -126,3 +126,45 @@ def test_upload_aoi_reports_headers_with_spaces(app_instance, monkeypatch):
     assert resp.get_json()["inserted"] == 1
     assert captured["rows"][0]["Date"] == "2024-07-01"
     assert captured["rows"][0]["Quantity Rejected"] == "1"
+
+
+def test_upload_aoi_reports_missing_required_data(app_instance):
+    client = app_instance.test_client()
+    csv_content = (
+        "Date,Shift,Operator,Customer,Program,Assembly,Rev,Job Number,Quantity Inspected,Quantity Rejected,Additional Information\n"
+        "07/01/2024,1,Alice,ACME,Alpha,A1,R1,J1,10,1,\n"
+        "07/01/2024,1,,ACME,Alpha,A1,R1,J2,5,0,\n"
+        ",,,,,,,,,,\n"
+    )
+    data = {"file": (io.BytesIO(csv_content.encode("utf-8")), "aoi.csv")}
+    with app_instance.app_context():
+        with client.session_transaction() as sess:
+            sess["username"] = "ADMIN"
+        resp = client.post("/aoi_reports/upload", data=data, content_type="multipart/form-data")
+    assert resp.status_code == 400
+    body = resp.get_data(as_text=True)
+    assert "Missing required data in rows - Row 3: Operator" in body
+
+
+def test_upload_aoi_reports_ignores_blank_rows(app_instance, monkeypatch):
+    client = app_instance.test_client()
+    captured = {}
+
+    def fake_insert(rows):
+        captured["rows"] = rows
+        return None, None
+
+    monkeypatch.setattr(routes, "insert_aoi_reports_bulk", fake_insert)
+    csv_content = (
+        "Date,Shift,Operator,Customer,Program,Assembly,Rev,Job Number,Quantity Inspected,Quantity Rejected,Additional Information\n"
+        "07/01/2024,1,Alice,ACME,Alpha,A1,R1,J1,10,1,\n"
+        ",,,,,,,,,,\n"
+    )
+    data = {"file": (io.BytesIO(csv_content.encode("utf-8")), "aoi.csv")}
+    with app_instance.app_context():
+        with client.session_transaction() as sess:
+            sess["username"] = "ADMIN"
+        resp = client.post("/aoi_reports/upload", data=data, content_type="multipart/form-data")
+    assert resp.status_code == 201
+    assert resp.get_json()["inserted"] == 1
+    assert captured["rows"][0]["Operator"] == "Alice"

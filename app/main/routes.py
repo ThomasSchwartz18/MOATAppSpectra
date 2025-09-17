@@ -414,13 +414,27 @@ def upload_aoi_reports():
         ]
         abort(400, description='; '.join(message_parts))
 
+    optional_columns = {'Additional Information'}
     rows = []
-    for row in reader:
+    rows_with_missing = []
+    for idx, row in enumerate(reader, start=2):
+        if not any((value or '').strip() for value in row.values()):
+            continue
         # Copy required columns (including 'Program') for each record
         current = {}
+        missing_cols = []
         for col in required_columns:
             source = header_map.get(col) or col
-            current[col] = row.get(source, '')
+            value = row.get(source, '')
+            if value is None:
+                value = ''
+            value = value.strip()
+            if col not in optional_columns and not value:
+                missing_cols.append(col)
+            current[col] = value
+        if missing_cols:
+            rows_with_missing.append((idx, missing_cols))
+            continue
         date_str = current.get('Date')
         if date_str:
             try:
@@ -429,6 +443,11 @@ def upload_aoi_reports():
             except ValueError:
                 pass
         rows.append(current)
+    if rows_with_missing:
+        details = '; '.join(
+            f"Row {row_num}: {', '.join(columns)}" for row_num, columns in rows_with_missing
+        )
+        abort(400, description=f"Missing required data in rows - {details}")
     if not rows:
         return jsonify({'inserted': 0}), 200
 
@@ -492,13 +511,32 @@ def upload_fi_reports():
         ]
         abort(400, description='; '.join(message_parts))
 
+    optional_columns = {'Additional Information'}
     rows = []
-    for row in reader:
+    rows_with_missing = []
+    for idx, row in enumerate(reader, start=2):
+        if not any((value or '').strip() for value in row.values()):
+            continue
         current = {}
+        missing_cols = []
         for col in required_columns:
             source = header_map.get(col) or col
-            current[col] = row.get(source, '')
+            value = row.get(source, '')
+            if value is None:
+                value = ''
+            value = value.strip()
+            if col not in optional_columns and not value:
+                missing_cols.append(col)
+            current[col] = value
+        if missing_cols:
+            rows_with_missing.append((idx, missing_cols))
+            continue
         rows.append(current)
+    if rows_with_missing:
+        details = '; '.join(
+            f"Row {row_num}: {', '.join(columns)}" for row_num, columns in rows_with_missing
+        )
+        abort(400, description=f"Missing required data in rows - {details}")
     if not rows:
         return jsonify({'inserted': 0}), 200
 
