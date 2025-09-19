@@ -1,4 +1,4 @@
-"""Utilities for generating PDFs via WeasyPrint."""
+"""Utilities for generating PDFs via WeasyPrint with optional fallbacks."""
 from __future__ import annotations
 
 import ctypes.util
@@ -16,6 +16,13 @@ _REQUIRED_NATIVE_DEPS_MESSAGE = (
     "Unable to generate PDF exports because WeasyPrint's native dependencies "
     "are missing. Install the Pango, GObject, and Cairo libraries (see the "
     "README for platform-specific instructions) to enable PDF generation."
+)
+
+_FALLBACK_DEPENDENCY_MESSAGE = (
+    "Unable to generate PDF exports using the wkhtmltopdf fallback because the "
+    "binary is not installed or configured. Set the WKHTMLTOPDF_CMD environment "
+    "variable or configure the application with the wkhtmltopdf command (see the "
+    "README for instructions)."
 )
 
 
@@ -137,17 +144,9 @@ def _ensure_native_dependencies_configured() -> None:
 
     _PATCHED_FIND_LIBRARY = True
 
-def render_html_to_pdf(html: str, base_url: str | None = None) -> bytes:
-    """Render HTML content to PDF bytes using WeasyPrint.
 
-    Args:
-        html: The HTML string to convert into a PDF document.
-        base_url: The base URL used by WeasyPrint to resolve relative assets.
-
-    Raises:
-        PdfGenerationError: If WeasyPrint or its native dependencies are not
-            available on the system.
-    """
+def _render_html_to_pdf_with_weasyprint(html: str, base_url: str | None = None) -> bytes:
+    """Render HTML to PDF bytes using WeasyPrint."""
 
     try:
         _ensure_native_dependencies_configured()
@@ -164,3 +163,80 @@ def render_html_to_pdf(html: str, base_url: str | None = None) -> bytes:
         )
     except OSError as exc:  # pragma: no cover - exercised via tests
         raise PdfGenerationError(_REQUIRED_NATIVE_DEPS_MESSAGE) from exc
+
+
+def _get_configured_wkhtmltopdf_command() -> str | None:
+    """Return the configured wkhtmltopdf command, if available."""
+
+    env_value = os.environ.get("WKHTMLTOPDF_CMD")
+    if env_value:
+        return env_value
+
+    try:
+        from flask import current_app
+
+        try:
+            return current_app.config.get("WKHTMLTOPDF_CMD")
+        except RuntimeError:
+            # Accessing current_app outside of an application context.
+            return None
+    except Exception:
+        return None
+
+
+def _render_html_to_pdf_with_wkhtmltopdf(
+    html: str, base_url: str | None = None
+) -> bytes:
+    """Render HTML to PDF bytes using pdfkit/wkhtmltopdf."""
+
+    try:
+        import pdfkit
+    except ImportError as exc:  # pragma: no cover - exercised via tests
+        raise PdfGenerationError(_FALLBACK_DEPENDENCY_MESSAGE) from exc
+
+    wkhtmltopdf_cmd = _get_configured_wkhtmltopdf_command()
+    try:
+        configuration = (
+            pdfkit.configuration(wkhtmltopdf=wkhtmltopdf_cmd)
+            if wkhtmltopdf_cmd
+            else pdfkit.configuration()
+        )
+    except (OSError, IOError) as exc:  # pragma: no cover - exercised via tests
+        raise PdfGenerationError(_FALLBACK_DEPENDENCY_MESSAGE) from exc
+
+    options: dict[str, str | None] = {
+        "encoding": "UTF-8",
+        "quiet": "",
+    }
+    if base_url:
+        options["--base-url"] = base_url
+        options["enable-local-file-access"] = ""
+
+    try:
+        return pdfkit.from_string(
+            html,
+            False,
+            options=options,
+            configuration=configuration,
+        )
+    except Exception as exc:  # pragma: no cover - exercised via tests
+        raise PdfGenerationError(_FALLBACK_DEPENDENCY_MESSAGE) from exc
+
+
+def render_html_to_pdf(html: str, base_url: str | None = None) -> bytes:
+    """Render HTML content to PDF bytes using WeasyPrint."""
+
+    weasyprint_error: PdfGenerationError | None = None
+    try:
+        return _render_html_to_pdf_with_weasyprint(html, base_url=base_url)
+    except PdfGenerationError as exc:
+        weasyprint_error = exc
+
+    try:
+        return _render_html_to_pdf_with_wkhtmltopdf(html, base_url=base_url)
+    except PdfGenerationError as exc:
+        messages: list[str] = []
+        if weasyprint_error is not None:
+            messages.append(str(weasyprint_error))
+        messages.append(str(exc))
+        raise PdfGenerationError(" ".join(messages)) from exc
