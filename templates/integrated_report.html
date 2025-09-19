@@ -1,103 +1,291 @@
 {% extends 'base.html' %}
 
+{% block extra_head %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/integrated_report.css') }}">
+{% endblock %}
+
 {% block content %}
-<h2>AOI Integrated Report</h2>
+<div class="integrated-report-page">
+  <header class="ir-header">
+    <div class="ir-header-text">
+      <h1>AOI Integrated Report</h1>
+      <p class="ir-subtitle">Document inspection findings with the same layout as the paper intake form.</p>
+    </div>
+    <div class="ir-header-meta">
+      <label>
+        Report Date
+        <input type="date" id="report-date" name="report-date">
+      </label>
+      <label>
+        Prepared By
+        <input type="text" id="prepared-by" name="prepared-by" placeholder="Name">
+      </label>
+    </div>
+  </header>
 
-<div class="section-card">
-  <div class="field-row">
-    <div class="field">
-      <label for="start-date">Start Date</label>
-      <input type="date" id="start-date" />
+  <section class="ir-section ir-section--info">
+    <h2 class="ir-section-title">Job &amp; Schedule Information</h2>
+    <div class="ir-field-grid">
+      <label>
+        Customer
+        <input type="text" id="customer" name="customer">
+      </label>
+      <label>
+        Program
+        <input type="text" id="program" name="program">
+      </label>
+      <label>
+        Assembly
+        <input type="text" id="assembly" name="assembly">
+      </label>
+      <label>
+        Job Number
+        <input type="text" id="job-number" name="job-number">
+      </label>
     </div>
-    <div class="field">
-      <label for="end-date">End Date</label>
-      <input type="date" id="end-date" />
+    <div class="ir-field-grid">
+      <label>
+        Production Line
+        <input type="text" id="line" name="line">
+      </label>
+      <label>
+        Shift
+        <select id="shift" name="shift">
+          <option value="" selected disabled>Select shift</option>
+          <option value="1st">1st</option>
+          <option value="2nd">2nd</option>
+          <option value="3rd">3rd</option>
+        </select>
+      </label>
+      <label>
+        Lot / Work Order
+        <input type="text" id="lot" name="lot">
+      </label>
+      <label>
+        Inspector
+        <input type="text" id="inspector" name="inspector">
+      </label>
     </div>
-    <button type="button" id="run-report">Run</button>
+    <div class="ir-field-grid">
+      <label>
+        Inspection Start
+        <input type="date" id="inspection-start" name="inspection-start">
+      </label>
+      <label>
+        Inspection End
+        <input type="date" id="inspection-end" name="inspection-end">
+      </label>
+      <label>
+        Time In
+        <input type="time" id="time-in" name="time-in">
+      </label>
+      <label>
+        Time Out
+        <input type="time" id="time-out" name="time-out">
+      </label>
+    </div>
+  </section>
+
+  <div class="integrated-report-grid">
+    <aside class="ir-defect-panel">
+      <div class="ir-section">
+        <div class="ir-section-header">
+          <h2 class="ir-section-title">Defect Reference</h2>
+          <button type="button" class="ir-refresh" data-defect-refresh>Refresh</button>
+        </div>
+        <p class="ir-section-desc">Codes remain synchronised with the reason-for-rejection selector.</p>
+        <div class="ir-defect-table-wrapper">
+          <table id="defect-catalog" class="ir-defect-table">
+            <thead>
+              <tr>
+                <th scope="col">ID</th>
+                <th scope="col">Name</th>
+              </tr>
+            </thead>
+            <tbody data-defect-body>
+              <tr class="is-placeholder">
+                <td colspan="2">Loading defects…</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="ir-defect-status" data-defect-status hidden></p>
+      </div>
+    </aside>
+
+    <section class="ir-form-panel">
+      <div class="ir-section">
+        <h2 class="ir-section-title">Inspection Summary</h2>
+        <div class="ir-field-grid ir-field-grid--compact">
+          <label>
+            Boards Inspected
+            <input type="number" id="boards-inspected" name="boards-inspected" min="0" step="1">
+          </label>
+          <label>
+            Boards Rejected
+            <input type="number" id="boards-rejected" name="boards-rejected" min="0" step="1">
+          </label>
+          <label>
+            Rework Quantity
+            <input type="number" id="rework-qty" name="rework-qty" min="0" step="1">
+          </label>
+          <label>
+            Lot Status
+            <input type="text" id="lot-status" name="lot-status" placeholder="Accept / Rework / Scrap">
+          </label>
+        </div>
+        <div class="ir-field-grid ir-field-grid--full">
+          <label class="ir-field ir-field--wide">
+            Reason for Rejection
+            <select id="rejection-reason" name="rejection-reason" data-defect-select disabled>
+              <option value="" selected disabled>Loading defects…</option>
+            </select>
+          </label>
+          <label class="ir-field ir-field--wide">
+            Defect Notes
+            <textarea id="defect-notes" name="defect-notes" rows="3" placeholder="Summarise location, symptoms, or tooling"></textarea>
+          </label>
+        </div>
+        <div class="ir-field-grid ir-field-grid--full">
+          <label class="ir-field ir-field--wide">
+            Corrective Action
+            <textarea id="corrective-action" name="corrective-action" rows="3"></textarea>
+          </label>
+        </div>
+      </div>
+
+      <div class="ir-section">
+        <h2 class="ir-section-title">Verification &amp; Follow-up</h2>
+        <div class="ir-field-grid ir-field-grid--compact">
+          <label>
+            QA Sign-off
+            <input type="text" id="qa-signoff" name="qa-signoff" placeholder="Initials or name">
+          </label>
+          <label>
+            Completion Date
+            <input type="date" id="completion-date" name="completion-date">
+          </label>
+          <label>
+            Follow-up Owner
+            <input type="text" id="follow-up-owner" name="follow-up-owner">
+          </label>
+          <label>
+            Follow-up Due
+            <input type="date" id="follow-up-due" name="follow-up-due">
+          </label>
+        </div>
+        <div class="ir-field-grid ir-field-grid--full">
+          <label class="ir-field ir-field--wide">
+            Additional Notes
+            <textarea id="additional-notes" name="additional-notes" rows="3" placeholder="Use this space for communication or escalation details."></textarea>
+          </label>
+        </div>
+      </div>
+    </section>
   </div>
-</div>
 
-  <details id="charts" class="section-card">
-    <summary>Preview Charts</summary>
-    <div>
-      <div class="chart-block">
-        <canvas id="yieldTrendChart"></canvas>
-        <div class="chart-summary">
-          <p id="yieldTrendDesc"></p>
-          <table id="yieldTrendTable" class="data-table"><tbody></tbody></table>
+  <details class="ir-legacy">
+    <summary>Legacy analytics &amp; exports</summary>
+    <div class="ir-legacy-content">
+      <p class="ir-legacy-note">The previous interactive workflow remains available here for teams that still depend on the charts or exports.</p>
+      <div class="section-card">
+        <div class="field-row">
+          <div class="field">
+            <label for="start-date">Start Date</label>
+            <input type="date" id="start-date" />
+          </div>
+          <div class="field">
+            <label for="end-date">End Date</label>
+            <input type="date" id="end-date" />
+          </div>
+          <button type="button" id="run-report">Run</button>
         </div>
       </div>
-      <div class="chart-block">
-        <canvas id="operatorRejectChart"></canvas>
-        <div class="chart-summary">
-          <p id="operatorRejectDesc"></p>
-          <table id="operatorRejectTable" class="data-table">
-            <thead>
-              <tr>
-                <th>Operator</th>
-                <th>Inspected</th>
-                <th>Rejected</th>
-                <th>Reject %</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
+
+      <details id="charts" class="section-card">
+        <summary>Preview Charts</summary>
+        <div>
+          <div class="chart-block">
+            <canvas id="yieldTrendChart"></canvas>
+            <div class="chart-summary">
+              <p id="yieldTrendDesc"></p>
+              <table id="yieldTrendTable" class="data-table"><tbody></tbody></table>
+            </div>
+          </div>
+          <div class="chart-block">
+            <canvas id="operatorRejectChart"></canvas>
+            <div class="chart-summary">
+              <p id="operatorRejectDesc"></p>
+              <table id="operatorRejectTable" class="data-table">
+                <thead>
+                  <tr>
+                    <th>Operator</th>
+                    <th>Inspected</th>
+                    <th>Rejected</th>
+                    <th>Reject %</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+          <div class="chart-block">
+            <canvas id="modelFalseCallsChart"></canvas>
+            <div class="chart-summary">
+              <p id="modelFalseCallsDesc"></p>
+              <table id="problem-assemblies" class="data-table"><tbody></tbody></table>
+            </div>
+          </div>
+          <div class="chart-block">
+            <canvas id="fcVsNgRateChart"></canvas>
+            <div class="chart-summary">
+              <p id="fcVsNgDesc"></p>
+              <table id="fcVsNgRateTable" class="data-table"><tbody></tbody></table>
+            </div>
+          </div>
+          <div class="chart-block">
+            <canvas id="fcNgRatioChart"></canvas>
+            <div class="chart-summary">
+              <p id="fcNgRatioDesc"></p>
+              <table id="fcNgRatioTable" class="data-table">
+                <thead>
+                  <tr>
+                    <th>Model</th>
+                    <th>FalseCall Parts</th>
+                    <th>NG Parts</th>
+                    <th>FC/NG Ratio</th>
+                  </tr>
+                </thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="chart-block">
-        <canvas id="modelFalseCallsChart"></canvas>
-        <div class="chart-summary">
-          <p id="modelFalseCallsDesc"></p>
-          <table id="problem-assemblies" class="data-table"><tbody></tbody></table>
+      </details>
+
+      <div class="field-row" id="download-controls">
+        <div class="field">
+          <label for="file-format">Format</label>
+          <select id="file-format">
+            <option value="pdf">pdf</option>
+            <option value="xlsx">xlsx</option>
+            <option value="html">html</option>
+          </select>
         </div>
-      </div>
-      <div class="chart-block">
-        <canvas id="fcVsNgRateChart"></canvas>
-        <div class="chart-summary">
-          <p id="fcVsNgDesc"></p>
-          <table id="fcVsNgRateTable" class="data-table"><tbody></tbody></table>
+        <div class="field">
+          <label for="include-cover">Cover Page</label>
+          <input type="checkbox" id="include-cover" checked />
         </div>
-      </div>
-      <div class="chart-block">
-        <canvas id="fcNgRatioChart"></canvas>
-        <div class="chart-summary">
-          <p id="fcNgRatioDesc"></p>
-          <table id="fcNgRatioTable" class="data-table">
-            <thead>
-              <tr>
-                <th>Model</th>
-                <th>FalseCall Parts</th>
-                <th>NG Parts</th>
-                <th>FC/NG Ratio</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
+        <button id="download-report">Download</button>
+        <span class="spinner" id="download-spinner" hidden></span>
+        <button id="email-report">Email Report</button>
       </div>
     </div>
   </details>
-
-<div class="field-row" id="download-controls">
-  <div class="field">
-    <label for="file-format">Format</label>
-    <select id="file-format">
-      <option value="pdf">pdf</option>
-      <option value="xlsx">xlsx</option>
-      <option value="html">html</option>
-    </select>
-  </div>
-  <div class="field">
-    <label for="include-cover">Cover Page</label>
-    <input type="checkbox" id="include-cover" checked />
-  </div>
-  <button id="download-report">Download</button>
-  <span class="spinner" id="download-spinner" hidden></span>
-  <button id="email-report">Email Report</button>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script type="module" src="{{ url_for('static', filename='js/integrated_report.js') }}"></script>
+  {{ super() }}
+  <script type="module" src="{{ url_for('static', filename='js/integrated_report.js') }}"></script>
 {% endblock %}

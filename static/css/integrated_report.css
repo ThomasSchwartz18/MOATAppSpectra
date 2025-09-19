@@ -1,0 +1,260 @@
+.integrated-report-page {
+  max-width: 1200px;
+  margin: 24px auto;
+  padding: 32px;
+  background: var(--surface);
+  border: var(--border-thin) solid var(--border-muted);
+  box-shadow: var(--shadow-ambient);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.ir-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 24px;
+  border: var(--border-thin) solid var(--border-muted);
+  background: var(--muted);
+  padding: 20px;
+}
+
+.ir-header-text h1 {
+  font-size: 1.65rem;
+  margin-bottom: 8px;
+}
+
+.ir-subtitle {
+  color: var(--ink-subtle);
+  font-size: 0.95rem;
+  margin: 0;
+}
+
+.ir-header-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  min-width: 260px;
+}
+
+.ir-header-meta label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  gap: 6px;
+}
+
+.ir-header-meta input,
+.ir-header-meta select {
+  font-size: 1rem;
+  padding: 10px;
+  border: var(--border-thick) solid var(--border-muted);
+  background: var(--surface);
+}
+
+.ir-section {
+  border: var(--border-thick) solid var(--border-muted);
+  background: var(--surface);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ir-section--info {
+  gap: 20px;
+}
+
+.ir-section-title {
+  font-size: 1.1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ir-section-desc {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--ink-subtle);
+}
+
+.ir-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.ir-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+.ir-field-grid--compact {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.ir-field-grid--full {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+.ir-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ir-field--wide {
+  min-height: 100%;
+}
+
+.ir-field-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+}
+
+.ir-field-grid input,
+.ir-field-grid select,
+.ir-field-grid textarea {
+  padding: 10px;
+  border: var(--border-thick) solid var(--border-muted);
+  background: var(--surface-alt);
+  font-size: 1rem;
+  min-height: 44px;
+}
+
+.ir-field-grid textarea {
+  resize: vertical;
+}
+
+.integrated-report-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) 1fr;
+  gap: 24px;
+}
+
+.ir-defect-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ir-defect-table-wrapper {
+  border: var(--border-thick) solid var(--border-muted);
+  background: var(--muted);
+  max-height: 420px;
+  overflow: auto;
+}
+
+.ir-defect-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.ir-defect-table th,
+.ir-defect-table td {
+  border-bottom: var(--border-thin) solid var(--border-muted);
+  padding: 8px 12px;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+.ir-defect-table tbody tr:nth-child(even) {
+  background: var(--surface);
+}
+
+.ir-defect-table tbody tr.is-placeholder td {
+  text-align: center;
+  font-style: italic;
+  color: var(--ink-subtle);
+}
+
+.ir-refresh {
+  border: none;
+  background: var(--accent);
+  color: var(--surface);
+  padding: 8px 14px;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+
+.ir-refresh:hover,
+.ir-refresh:focus {
+  background: var(--accent-strong);
+}
+
+.ir-defect-status {
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.ir-defect-status[data-tone='success'] {
+  color: #0b8457;
+}
+
+.ir-defect-status[data-tone='error'] {
+  color: var(--danger);
+}
+
+.ir-defect-status[data-tone='info'] {
+  color: var(--ink-subtle);
+}
+
+.ir-legacy {
+  border: var(--border-thick) solid var(--border-muted);
+  background: var(--muted);
+  padding: 0 20px 20px;
+}
+
+.ir-legacy > summary {
+  font-weight: 600;
+  padding: 16px 0;
+  cursor: pointer;
+}
+
+.ir-legacy-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.ir-legacy-note {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--ink-subtle);
+}
+
+@media (max-width: 1024px) {
+  .integrated-report-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ir-defect-table-wrapper {
+    max-height: none;
+  }
+}
+
+@media (max-width: 640px) {
+  .integrated-report-page {
+    padding: 20px;
+  }
+
+  .ir-header {
+    padding: 16px;
+  }
+
+  .ir-field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ir-field-grid--compact,
+  .ir-field-grid--full {
+    grid-template-columns: 1fr;
+  }
+}

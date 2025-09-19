@@ -60,11 +60,11 @@ def _login_employee(client):
 def test_employee_defect_endpoint_returns_unique_ids(employee_app):
     app, supabase = employee_app
     supabase.tables['defect'] = [
-        {'id': 'DEF-2'},
-        {'id': 'DEF-1'},
-        {'id': 'DEF-2'},
-        {'id': None},
-        {'id': '   '},
+        {'id': 'DEF-2', 'name': 'Solder Bridge'},
+        {'id': 'DEF-1', 'name': 'Component Shift'},
+        {'id': 'DEF-2', 'name': 'Solder Bridge'},
+        {'id': None, 'name': 'Ignore'},
+        {'id': '   ', 'name': 'Whitespace'},
     ]
 
     client = app.test_client()
@@ -73,7 +73,12 @@ def test_employee_defect_endpoint_returns_unique_ids(employee_app):
 
     assert response.status_code == 200
     payload = response.get_json()
-    assert payload == {'defects': ['DEF-1', 'DEF-2']}
+    assert payload == {
+        'defects': [
+            {'id': 'DEF-1', 'name': 'Component Shift'},
+            {'id': 'DEF-2', 'name': 'Solder Bridge'},
+        ]
+    }
 
 
 def test_employee_submission_validates_defect_selection(employee_app, monkeypatch):
