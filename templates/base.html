@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>MOAA</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block extra_head %}{% endblock %}
 </head>
 <body class="{% if user_role == 'EMPLOYEE' %}employee-layout{% endif %}">
   {% if user_role != 'EMPLOYEE' %}
@@ -29,6 +30,9 @@
               <a href="{{ url_for('main.aoi_grades_page') }}">AOI &amp; FI Analysis</a>
               <a href="{{ url_for('main.aoi_daily_reports') }}">AOI Daily Reports</a>
               <a href="{{ url_for('main.fi_daily_reports') }}">FI Daily Reports</a>
+              {% if user_role == 'ADMIN' %}
+              <a href="{{ url_for('main.analysis_tracker_logs') }}">Application Tracker Logs</a>
+              {% endif %}
             </div>
           </li>
           <li class="nav-item">
