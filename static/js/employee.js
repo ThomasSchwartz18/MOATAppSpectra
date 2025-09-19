@@ -34,12 +34,86 @@ function setupAoiArea(container) {
   const feedback = container.querySelector('.employee-feedback');
   const backButton = container.querySelector('[data-action="back-to-picker"]');
   const sheetButtons = picker ? picker.querySelectorAll('[data-sheet]') : [];
+  const defectSelect = container.querySelector('[data-defect-select]');
 
   if (!picker || !sheetPanel || !sheetTitle || !sheetForm || !feedback || !backButton) {
     return;
   }
 
   let activeSheet = null;
+  let defectOptionsLoaded = false;
+
+  function setDefectPlaceholder(message, disable) {
+    if (!defectSelect) return;
+    defectSelect.innerHTML = '';
+    const option = document.createElement('option');
+    option.value = '';
+    option.textContent = message;
+    option.disabled = true;
+    option.selected = true;
+    option.defaultSelected = true;
+    defectSelect.appendChild(option);
+    defectSelect.disabled = Boolean(disable);
+  }
+
+  async function loadDefectOptions() {
+    if (!defectSelect || defectSelect.dataset.loading === 'true' || defectOptionsLoaded) {
+      return;
+    }
+    defectSelect.dataset.loading = 'true';
+    setDefectPlaceholder('Loading defects...', true);
+    try {
+      const response = await fetch('/employee/defects');
+      if (!response.ok) {
+        throw new Error('Failed to load defects');
+      }
+      const payload = await response.json();
+      const rawDefects = Array.isArray(payload && payload.defects) ? payload.defects : [];
+      const unique = Array.from(new Set(
+        rawDefects
+          .filter((value) => value !== null && value !== undefined)
+          .map((value) => String(value).trim())
+          .filter(Boolean)
+      ));
+      unique.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+      if (!unique.length) {
+        setDefectPlaceholder('No defects available', true);
+        return;
+      }
+      setDefectPlaceholder('Select defect', false);
+      const fragment = document.createDocumentFragment();
+      unique.forEach((value) => {
+        const option = document.createElement('option');
+        option.value = value;
+        option.textContent = value;
+        fragment.appendChild(option);
+      });
+      defectSelect.appendChild(fragment);
+      defectSelect.disabled = false;
+      defectSelect.value = '';
+      defectOptionsLoaded = true;
+    } catch (error) {
+      setDefectPlaceholder('Unable to load defects', true);
+      setFeedback(feedback, 'Unable to load defect list. Please try again later.', 'error');
+    } finally {
+      delete defectSelect.dataset.loading;
+    }
+  }
+
+  function resetDefectSelection() {
+    if (!defectSelect) return;
+    if (defectOptionsLoaded) {
+      defectSelect.disabled = false;
+      defectSelect.selectedIndex = 0;
+      defectSelect.value = '';
+    } else if (defectSelect.dataset.loading !== 'true') {
+      loadDefectOptions();
+    }
+  }
+
+  if (defectSelect) {
+    loadDefectOptions();
+  }
 
   sheetButtons.forEach((button) => {
     button.addEventListener('click', () => {
@@ -49,6 +123,7 @@ function setupAoiArea(container) {
       sheetPanel.hidden = false;
       sheetPanel.dataset.sheet = activeSheet;
       sheetForm.reset();
+      resetDefectSelection();
       setFeedback(feedback, '');
     });
   });
@@ -57,6 +132,7 @@ function setupAoiArea(container) {
     sheetPanel.hidden = true;
     picker.hidden = false;
     sheetForm.reset();
+    resetDefectSelection();
     activeSheet = null;
     setFeedback(feedback, '');
   });
@@ -104,6 +180,7 @@ function setupAoiArea(container) {
         'AOI report submitted successfully.';
       setFeedback(feedback, successMessage, 'success');
       sheetForm.reset();
+      resetDefectSelection();
       const dateField = sheetForm.querySelector('[name="date"]');
       if (dateField) {
         dateField.focus();

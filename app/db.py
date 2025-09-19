@@ -196,6 +196,31 @@ def fetch_recent_moat(days: int = 7):
         return None, f"Failed to fetch recent MOAT data: {exc}"
 
 
+def fetch_distinct_defect_ids() -> tuple[list[str] | None, str | None]:
+    """Return unique defect identifiers from the ``defect`` table."""
+
+    supabase, error = _ensure_supabase_client()
+    if error:
+        return None, error
+
+    try:
+        response = supabase.table("defect").select("id").execute()
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to fetch defects: {exc}"
+
+    values = []
+    for row in response.data or []:
+        value = row.get("id")
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            values.append(text)
+
+    unique = sorted({text for text in values}, key=lambda item: item.lower())
+    return unique, None
+
+
 def insert_aoi_report(data: dict):
     """Insert a new AOI report.
 
