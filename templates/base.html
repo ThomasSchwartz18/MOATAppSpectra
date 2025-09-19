@@ -64,7 +64,7 @@
         {% if user_role == 'ADMIN' %}
         <a class="nav-utility" href="{{ url_for('main.admin_panel') }}">Admin Console</a>
         {% endif %}
-        <a class="nav-utility" href="{{ url_for('auth.logout') }}">Logout</a>
+        <a class="nav-utility" href="{{ url_for('auth.logout') }}" data-track-session-end="true">Logout</a>
       </div>
     </nav>
   </header>
@@ -72,6 +72,22 @@
   <main class="content" role="main">
     {% block content %}{% endblock %}
   </main>
+  {% set tracking_context = {
+    'user': {
+      'id': user_id,
+      'name': username,
+      'role': user_role,
+    },
+    'tracking': {
+      'sessionId': tracking_session_id,
+      'clickUrl': url_for('main.tracking_click_event'),
+      'sessionStartUrl': url_for('main.tracking_session_start'),
+      'sessionEndUrl': url_for('main.tracking_session_end'),
+    }
+  } %}
+  <script>
+    window.APP_CONTEXT = {{ tracking_context | tojson }};
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
   {% block scripts %}{% endblock %}

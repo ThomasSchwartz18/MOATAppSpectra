@@ -1,3 +1,97 @@
+const appTracker = (() => {
+  const ctx = window.APP_CONTEXT || {};
+  const user = ctx.user || {};
+  const endpoints = ctx.tracking || {};
+
+  if (!user || !user.role || !endpoints || (!endpoints.clickUrl && !endpoints.sessionStartUrl)) {
+    return null;
+  }
+
+  let sessionId = endpoints.sessionId || null;
+  let sessionClosed = false;
+
+  const nowIso = () => new Date().toISOString();
+
+  const send = (url, payload, { useBeacon } = {}) => {
+    if (!url) return Promise.resolve();
+    const body = JSON.stringify(payload);
+    if (useBeacon && navigator.sendBeacon) {
+      const blob = new Blob([body], { type: 'application/json' });
+      navigator.sendBeacon(url, blob);
+      return Promise.resolve();
+    }
+    return fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body,
+    }).then((res) => {
+      if (!res.ok) {
+        throw new Error(`Request failed: ${res.status}`);
+      }
+      return res
+        .json()
+        .catch(() => ({}));
+    });
+  };
+
+  return {
+    start(extraPayload = {}) {
+      if (!endpoints.sessionStartUrl) return Promise.resolve();
+      const payload = {
+        sessionId,
+        timestamp: nowIso(),
+        userId: user.id || null,
+        userRole: user.role || null,
+        ...extraPayload,
+      };
+      return send(endpoints.sessionStartUrl, payload)
+        .then((data) => {
+          if (data && data.session_id) {
+            sessionId = data.session_id;
+            if (window.APP_CONTEXT && window.APP_CONTEXT.tracking) {
+              window.APP_CONTEXT.tracking.sessionId = sessionId;
+            }
+          }
+          sessionClosed = false;
+        })
+        .catch((err) => {
+          // eslint-disable-next-line no-console
+          console.warn('Failed to start tracking session', err);
+        });
+    },
+    recordClick(eventName, context = {}, metadata) {
+      if (!endpoints.clickUrl || !eventName) return;
+      const payload = {
+        sessionId,
+        timestamp: nowIso(),
+        event: eventName,
+        context,
+        metadata: metadata || undefined,
+        userId: user.id || null,
+        userRole: user.role || null,
+      };
+      send(endpoints.clickUrl, payload).catch(() => {});
+    },
+    end(reason = 'client', options = {}) {
+      if (!endpoints.sessionEndUrl || sessionClosed) return;
+      sessionClosed = true;
+      const payload = {
+        sessionId,
+        timestamp: nowIso(),
+        reason,
+        userId: user.id || null,
+        userRole: user.role || null,
+      };
+      send(endpoints.sessionEndUrl, payload, { useBeacon: options.useBeacon === true }).catch(
+        () => {}
+      );
+    },
+  };
+})();
+
+window.APP_TRACKER = appTracker;
+
 function renderLinePreview({ endpoint, canvasId, infoId, onClickHref }) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
@@ -178,6 +272,42 @@ document.addEventListener('DOMContentLoaded', () => {
   previewConfigs.forEach((config) => {
     renderLinePreview(config);
   });
+
+  const tracker = window.APP_TRACKER;
+  if (tracker) {
+    tracker.start();
+
+    document.body.addEventListener('click', (event) => {
+      const actionable = event.target.closest(
+        '[data-track-event], [data-track-session-end], a, button'
+      );
+      if (!actionable || actionable.dataset.trackIgnore === 'true') return;
+
+      if (actionable.dataset.trackSessionEnd === 'true') {
+        tracker.end('logout', { useBeacon: true });
+      }
+
+      const tag = actionable.tagName.toLowerCase();
+      const eventName =
+        actionable.dataset.trackEvent || (tag === 'a' ? 'navigate' : `${tag}-click`);
+
+      const label = actionable.dataset.trackLabel || actionable.textContent || '';
+      const context = {
+        id: actionable.id || null,
+        href: actionable.getAttribute('href') || null,
+        text: label.trim().slice(0, 160),
+        role: actionable.getAttribute('role') || null,
+        classes: actionable.className || null,
+        dataset: actionable.dataset.trackContext || null,
+      };
+
+      tracker.recordClick(eventName, context);
+    });
+
+    window.addEventListener('beforeunload', () => {
+      tracker.end('page-unload', { useBeacon: true });
+    });
+  }
 
   // Auto-hide navbar on scroll down; reveal on scroll up
   const nav = document.querySelector('.navbar');

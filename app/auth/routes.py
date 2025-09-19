@@ -1,4 +1,5 @@
 import os
+from datetime import datetime, timezone
 
 from flask import (
     Blueprint,
@@ -35,6 +36,45 @@ def _load_environment_users() -> dict[str, str]:
 
 
 ENVIRONMENT_USERS = _load_environment_users()
+
+
+def _tracker_start_session() -> None:
+    tracker = current_app.config.get('TRACKER')
+    if not tracker:
+        return
+    started_at = datetime.now(tz=timezone.utc)
+    try:
+        token = tracker.start_session(
+            session.get('user_id'),
+            session.get('role'),
+            username=session.get('username'),
+            session_token=session.get('tracking_session_id'),
+            started_at=started_at,
+        )
+    except Exception as exc:  # pragma: no cover - logging only
+        current_app.logger.warning('Failed to start tracking session: %s', exc)
+        return
+    session['tracking_session_id'] = token
+
+
+def _tracker_end_session(reason: str = 'logout') -> None:
+    tracker = current_app.config.get('TRACKER')
+    session_token = session.get('tracking_session_id')
+    if not tracker or not session_token:
+        return
+    ended_at = datetime.now(tz=timezone.utc)
+    try:
+        tracker.end_session(session_token, ended_at=ended_at)
+        tracker.record_click(
+            session_token,
+            session.get('user_id'),
+            session.get('role'),
+            'session_end',
+            context={'reason': reason},
+            occurred_at=ended_at,
+        )
+    except Exception as exc:  # pragma: no cover - logging only
+        current_app.logger.warning('Failed to end tracking session: %s', exc)
 
 
 def _fetch_supabase_user(username: str) -> tuple[dict | None, str | None]:
@@ -89,6 +129,7 @@ def login():
                     or submitted_username
                 )
                 session['role'] = (supabase_user.get('role') or 'USER').upper()
+                _tracker_start_session()
                 return redirect(url_for('main.home'))
         elif supabase_error:
             flash(
@@ -102,6 +143,8 @@ def login():
         ):
             session['username'] = submitted_username or normalized_username
             session['role'] = normalized_username
+            session.pop('user_id', None)
+            _tracker_start_session()
             return redirect(url_for('main.home'))
         flash('Invalid credentials.')
     return render_template('login.html', employee_enabled=_employee_login_enabled())
@@ -109,7 +152,9 @@ def login():
 
 @auth_bp.route('/logout')
 def logout():
+    _tracker_end_session()
     session.pop('username', None)
     session.pop('role', None)
     session.pop('user_id', None)
+    session.pop('tracking_session_id', None)
     return redirect(url_for('auth.login'))

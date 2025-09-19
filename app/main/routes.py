@@ -17,7 +17,7 @@ import io
 import os
 from urllib.parse import urlparse
 import re
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from zoneinfo import ZoneInfo
 from openpyxl import load_workbook
 import xlrd
@@ -435,6 +435,13 @@ TRACKED_SUPABASE_TABLES = {
     "combined_reports": "Joined AOI/FI views surfaced in integrated analytics.",
     "app_users": "Application login accounts managed from this console.",
 }
+
+
+def _get_tracker():
+    tracker = current_app.config.get("TRACKER")
+    if not tracker:
+        abort(503, description="Tracking service unavailable")
+    return tracker
 
 
 def _summarize_supabase_status():
@@ -3667,3 +3674,102 @@ def aoi_saved_queries():
     if error:
         abort(500, description=error)
     return jsonify(data), status
+
+
+@main_bp.route('/api/tracking/session/start', methods=['POST'])
+def tracking_session_start():
+    if 'username' not in session:
+        return jsonify({'ok': False, 'error': 'unauthenticated'}), 401
+
+    tracker = _get_tracker()
+    payload = request.get_json(silent=True) or {}
+
+    requested_token = (
+        payload.get('session_id')
+        or payload.get('sessionId')
+        or session.get('tracking_session_id')
+    )
+    timestamp = payload.get('timestamp')
+    started_at = timestamp or datetime.now(tz=timezone.utc)
+
+    token = tracker.start_session(
+        session.get('user_id'),
+        session.get('role'),
+        username=session.get('username'),
+        session_token=requested_token,
+        started_at=started_at,
+    )
+    session['tracking_session_id'] = token
+
+    return jsonify({'ok': True, 'session_id': token})
+
+
+@main_bp.route('/api/tracking/session/end', methods=['POST'])
+def tracking_session_end():
+    if 'username' not in session:
+        return jsonify({'ok': False, 'error': 'unauthenticated'}), 401
+
+    tracker = _get_tracker()
+    payload = request.get_json(silent=True) or {}
+    requested_token = (
+        payload.get('session_id')
+        or payload.get('sessionId')
+        or session.get('tracking_session_id')
+    )
+    timestamp = payload.get('timestamp')
+    ended_at = timestamp or datetime.now(tz=timezone.utc)
+    reason = payload.get('reason') or 'client'
+
+    updated = tracker.end_session(requested_token, ended_at=ended_at)
+    if updated:
+        tracker.record_click(
+            requested_token,
+            session.get('user_id'),
+            session.get('role'),
+            'session_end',
+            context={'reason': reason},
+            occurred_at=ended_at,
+        )
+
+    if not session.get('tracking_session_id'):
+        session['tracking_session_id'] = requested_token
+
+    return jsonify({'ok': True, 'session_id': requested_token, 'closed': updated})
+
+
+@main_bp.route('/api/tracking/click', methods=['POST'])
+def tracking_click_event():
+    if 'username' not in session:
+        return jsonify({'ok': False, 'error': 'unauthenticated'}), 401
+
+    tracker = _get_tracker()
+    payload = request.get_json(silent=True) or {}
+
+    event_name = payload.get('event') or payload.get('event_name')
+    if not event_name:
+        return (
+            jsonify({'ok': False, 'error': 'event name required'}),
+            400,
+        )
+
+    requested_token = (
+        payload.get('session_id')
+        or payload.get('sessionId')
+        or session.get('tracking_session_id')
+    )
+
+    timestamp = payload.get('timestamp') or datetime.now(tz=timezone.utc)
+    context = payload.get('context')
+    metadata = payload.get('metadata')
+
+    tracker.record_click(
+        requested_token,
+        session.get('user_id'),
+        session.get('role'),
+        event_name,
+        context=context,
+        metadata=metadata,
+        occurred_at=timestamp,
+    )
+
+    return jsonify({'ok': True})
