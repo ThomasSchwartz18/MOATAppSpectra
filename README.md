@@ -40,6 +40,8 @@ Set the following variables (a `.env` file is supported via `python-dotenv`):
 - `NON_AOI_PHRASES_FILE` (optional) – Path to a JSON file containing FI rejection
   phrases to ignore when calculating AOI grades. Defaults to
   `config/non_aoi_phrases.json`.
+- `WKHTMLTOPDF_CMD` (optional) – Path to the wkhtmltopdf binary used by the PDF
+  fallback backend when WeasyPrint cannot run.
 
 ### Non-AOI phrases
 The ignore list in [`config/non_aoi_phrases.json`](config/non_aoi_phrases.json)
@@ -91,3 +93,29 @@ report PDFs:
 
 Once the packages are present, `pip install -r requirements.txt` will install
 WeasyPrint and the Flask endpoints will be able to stream PDF responses.
+
+### wkhtmltopdf fallback setup (Windows & macOS)
+If WeasyPrint or its native libraries are unavailable, the application can fall
+back to [wkhtmltopdf](https://wkhtmltopdf.org/) via `pdfkit`. Install the tool
+and point the app to the binary so developers on Windows or macOS can still
+export reports:
+
+- **Windows:** Download and install the official wkhtmltopdf build. Set the
+  `WKHTMLTOPDF_CMD` environment variable to the installed executable, for
+  example:
+
+  ```powershell
+  setx WKHTMLTOPDF_CMD "C:\\Program Files\\wkhtmltopdf\\bin\\wkhtmltopdf.exe"
+  ```
+
+- **macOS (Homebrew):** `brew install wkhtmltopdf`. Ensure the binary is either
+  on your `PATH` or export the command path before starting Flask:
+
+  ```bash
+  export WKHTMLTOPDF_CMD="/usr/local/bin/wkhtmltopdf"
+  ```
+
+The fallback runner also honours `app.config["WKHTMLTOPDF_CMD"]` if you prefer
+to configure the command within the Flask application. With the binary
+configured, PDF generation will transparently switch to wkhtmltopdf whenever
+WeasyPrint fails to load.

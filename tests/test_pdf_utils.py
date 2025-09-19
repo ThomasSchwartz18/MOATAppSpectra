@@ -70,9 +70,63 @@ def test_render_html_to_pdf_raises_on_oserror(monkeypatch):
 
     monkeypatch.setitem(sys.modules, "weasyprint", failing_module)
 
+    def failing_fallback(html: str, base_url: str | None = None) -> bytes:
+        raise pdf_utils.PdfGenerationError(pdf_utils._FALLBACK_DEPENDENCY_MESSAGE)
+
+    monkeypatch.setattr(
+        pdf_utils,
+        "_render_html_to_pdf_with_wkhtmltopdf",
+        failing_fallback,
+    )
+
     with pytest.raises(pdf_utils.PdfGenerationError) as excinfo:
         pdf_utils.render_html_to_pdf("<p>Hello</p>")
 
-    assert str(excinfo.value) == pdf_utils._REQUIRED_NATIVE_DEPS_MESSAGE
+    message = str(excinfo.value)
+    assert pdf_utils._REQUIRED_NATIVE_DEPS_MESSAGE in message
+    assert pdf_utils._FALLBACK_DEPENDENCY_MESSAGE in message
 
     monkeypatch.delitem(sys.modules, "weasyprint", raising=False)
+
+
+def test_render_html_to_pdf_uses_fallback_when_weasyprint_unavailable(monkeypatch):
+    def failing_weasyprint(html: str, base_url: str | None = None) -> bytes:
+        raise pdf_utils.PdfGenerationError("weasyprint unavailable")
+
+    def successful_fallback(html: str, base_url: str | None = None) -> bytes:
+        assert html == "<p>Hello</p>"
+        assert base_url == "http://example.com/"
+        return b"fake-pdf"
+
+    monkeypatch.setattr(
+        pdf_utils, "_render_html_to_pdf_with_weasyprint", failing_weasyprint
+    )
+    monkeypatch.setattr(
+        pdf_utils, "_render_html_to_pdf_with_wkhtmltopdf", successful_fallback
+    )
+
+    result = pdf_utils.render_html_to_pdf("<p>Hello</p>", base_url="http://example.com/")
+
+    assert result == b"fake-pdf"
+
+
+def test_render_html_to_pdf_raises_when_fallback_fails(monkeypatch):
+    def failing_weasyprint(html: str, base_url: str | None = None) -> bytes:
+        raise pdf_utils.PdfGenerationError("primary failure")
+
+    def failing_fallback(html: str, base_url: str | None = None) -> bytes:
+        raise pdf_utils.PdfGenerationError("fallback failure")
+
+    monkeypatch.setattr(
+        pdf_utils, "_render_html_to_pdf_with_weasyprint", failing_weasyprint
+    )
+    monkeypatch.setattr(
+        pdf_utils, "_render_html_to_pdf_with_wkhtmltopdf", failing_fallback
+    )
+
+    with pytest.raises(pdf_utils.PdfGenerationError) as excinfo:
+        pdf_utils.render_html_to_pdf("<p>Hello</p>")
+
+    message = str(excinfo.value)
+    assert "primary failure" in message
+    assert "fallback failure" in message

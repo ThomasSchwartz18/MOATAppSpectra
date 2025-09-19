@@ -9,4 +9,5 @@ uvicorn
 pytest
 numpy
 weasyprint
+pdfkit
 matplotlib
