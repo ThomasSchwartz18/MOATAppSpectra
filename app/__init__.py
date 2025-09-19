@@ -7,6 +7,7 @@ from supabase import create_client
 
 from .auth.routes import auth_bp
 from .main.routes import main_bp
+from .tracking import Tracker
 
 
 def create_app():
@@ -34,6 +35,10 @@ def create_app():
     except Exception:
         app.config["NON_AOI_PHRASES"] = []
 
+    tracker_path = Path(app.instance_path) / "tracking.db"
+    tracker = Tracker(tracker_path)
+    app.config["TRACKER"] = tracker
+
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
 
@@ -41,9 +46,12 @@ def create_app():
     def inject_user_context():
         username = session.get("username")
         role = session.get("role") or username
+        tracking_session_id = session.get("tracking_session_id")
         return {
             "username": username,
             "user_role": role,
+            "user_id": session.get("user_id"),
+            "tracking_session_id": tracking_session_id,
         }
 
     return app
@@ -51,3 +59,7 @@ def create_app():
 
 def get_supabase():
     return current_app.config["SUPABASE"]
+
+
+def get_tracker() -> Tracker:
+    return current_app.config["TRACKER"]
