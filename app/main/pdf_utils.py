@@ -137,6 +137,9 @@ def _ensure_native_dependencies_configured() -> None:
 
     _PATCHED_FIND_LIBRARY = True
 
+    "are missing. Install the Pango, GObject, and Cairo libraries to enable PDF "
+    "generation."
+)
 
 def render_html_to_pdf(html: str, base_url: str | None = None) -> bytes:
     """Render HTML content to PDF bytes using WeasyPrint.
@@ -152,6 +155,7 @@ def render_html_to_pdf(html: str, base_url: str | None = None) -> bytes:
 
     try:
         _ensure_native_dependencies_configured()
+
         from weasyprint import HTML
         from weasyprint.text.fonts import FontConfiguration
     except ImportError as exc:  # pragma: no cover - exercised via tests

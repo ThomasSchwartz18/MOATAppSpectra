@@ -86,6 +86,7 @@ report PDFs:
   export WEASYPRINT_NATIVE_LIB_PATHS="/opt/homebrew/lib"
   ```
 
+- **macOS (Homebrew):** `brew install cairo gobject-introspection pango`
 - **Debian/Ubuntu:** `sudo apt-get install libcairo2 libgdk-pixbuf2.0-0 libpango-1.0-0 gir1.2-pango-1.0`
 
 Once the packages are present, `pip install -r requirements.txt` will install
