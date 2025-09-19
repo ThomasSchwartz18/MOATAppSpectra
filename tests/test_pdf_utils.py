@@ -1,5 +1,7 @@
 import ctypes.util
 import importlib
+import sys
+import types
 
 import pytest
 
@@ -56,3 +58,21 @@ def test_nonexistent_hint_falls_back(monkeypatch, reset_find_library):
     assert result is None
     # Ensure the alias candidates were attempted.
     assert "libunknown-1.0-0" in calls
+
+
+def test_render_html_to_pdf_raises_on_oserror(monkeypatch):
+    failing_module = types.ModuleType("weasyprint")
+
+    def _getattr(name: str):  # pragma: no cover - accessed via import
+        raise OSError("native dependency load failure")
+
+    failing_module.__getattr__ = _getattr  # type: ignore[attr-defined]
+
+    monkeypatch.setitem(sys.modules, "weasyprint", failing_module)
+
+    with pytest.raises(pdf_utils.PdfGenerationError) as excinfo:
+        pdf_utils.render_html_to_pdf("<p>Hello</p>")
+
+    assert str(excinfo.value) == pdf_utils._REQUIRED_NATIVE_DEPS_MESSAGE
+
+    monkeypatch.delitem(sys.modules, "weasyprint", raising=False)
