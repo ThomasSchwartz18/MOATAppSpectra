@@ -192,6 +192,10 @@ def test_login_uses_supabase_accounts(admin_app):
     ]
     client = app.test_client()
 
+    get_response = client.get("/login")
+    assert get_response.status_code == 200
+    assert b"Ana Analyst" in get_response.data
+
     response = client.post(
         "/login",
         data={"username": "Analyst", "password": "s3cret"},
