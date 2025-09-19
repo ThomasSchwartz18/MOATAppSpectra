@@ -234,6 +234,7 @@
           <thead>
             <tr>
               <th>Username</th>
+              <th>Display Name</th>
               <th>Role</th>
               <th>Source</th>
             </tr>
@@ -242,6 +243,7 @@
             {% for user in users %}
             <tr>
               <td>{{ user.username }}</td>
+              <td>{{ user.display_name or user.username }}</td>
               <td>{{ user.role }}</td>
               <td>{{ user.source }}</td>
             </tr>
@@ -251,19 +253,22 @@
       </div>
 
       <form class="config-form" method="post" action="{{ url_for('main.admin_user_action') }}">
-        <h3>Request User Change</h3>
+        <h3>Create Account</h3>
         <div class="form-grid">
           <label>
             Username
             <input type="text" name="username" placeholder="New user name">
           </label>
           <label>
+            Display Name
+            <input type="text" name="display_name" placeholder="Shown in navigation" autocomplete="name">
+          </label>
+          <label>
             Role
             <select name="role">
-              <option value="viewer">Viewer</option>
-              <option value="analyst">Analyst</option>
-              <option value="manager">Manager</option>
-              <option value="admin">Administrator</option>
+              {% for code, label in user_role_choices %}
+              <option value="{{ code }}">{{ label }}</option>
+              {% endfor %}
             </select>
           </label>
           <label>
@@ -273,10 +278,25 @@
         </div>
         <div class="form-actions">
           <input type="hidden" name="action" value="invite">
-          <button type="submit" class="primary">Submit Request</button>
+          <button type="submit" class="primary">Create User</button>
           <button type="button" class="ghost" onclick="this.closest('form').reset()">Clear</button>
         </div>
-        <p class="form-helper">User accounts are loaded from environment variables (e.g., <code>ADMIN_PASSWORD</code>, <code>USER_PASSWORD</code>). To fully automate this panel, store credentials in a Supabase table such as <code>app_users</code> and update authentication to read from it.</p>
+        <p class="form-helper">Accounts created here are stored in the Supabase table <code>app_users</code>. New users must change their temporary password the first time they sign in.</p>
+      </form>
+
+      <form class="config-form" method="post" action="{{ url_for('main.admin_user_action') }}">
+        <h3>Remove Account</h3>
+        <div class="form-grid">
+          <label>
+            Username
+            <input type="text" name="username" placeholder="Existing user name">
+          </label>
+        </div>
+        <div class="form-actions">
+          <input type="hidden" name="action" value="remove">
+          <button type="submit" class="ghost">Remove User</button>
+        </div>
+        <p class="form-helper">Only Supabase-managed accounts can be removed here. Environment-backed users such as <code>ADMIN</code> remain available for emergency access.</p>
       </form>
     </article>
 

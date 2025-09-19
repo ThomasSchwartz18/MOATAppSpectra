@@ -1,10 +1,29 @@
-from flask import current_app
 from datetime import datetime, timedelta
+from typing import Any, Tuple
+
+from flask import current_app
 
 
 def _get_client():
     """Return the configured Supabase client."""
     return current_app.config["SUPABASE"]
+
+
+def _ensure_supabase_client() -> Tuple[Any, str | None]:
+    """Return the configured Supabase client or an explanatory error.
+
+    Returns:
+        tuple: (client, error). When Supabase is unavailable the client will be
+        ``None`` and ``error`` will contain a message explaining the failure.
+    """
+
+    supabase = current_app.config.get("SUPABASE")
+    if not supabase or not hasattr(supabase, "table"):
+        return None, (
+            "Supabase client is not configured. Set SUPABASE_URL and SUPABASE_"
+            "SERVICE_KEY to enable database-backed user management."
+        )
+    return supabase, None
 
 
 def _apply_report_date_offset(rows: list[dict]) -> list[dict]:
@@ -27,6 +46,80 @@ def _apply_report_date_offset(rows: list[dict]) -> list[dict]:
             except Exception:  # pragma: no cover - parsing errors
                 continue
     return rows
+
+
+def fetch_app_users(include_sensitive: bool = False) -> tuple[list[dict] | None, str | None]:
+    """Return application users stored in Supabase.
+
+    Args:
+        include_sensitive: When ``True`` the returned records include sensitive
+            fields such as ``password_hash``.  Callers must take care not to
+            expose these values.
+
+    Returns:
+        tuple[list | None, str | None]: The list of user dictionaries or an
+        error message if the query failed.
+    """
+
+    supabase, error = _ensure_supabase_client()
+    if error:
+        return None, error
+
+    try:
+        response = supabase.table("app_users").select("*").execute()
+        data = response.data or []
+        if not include_sensitive:
+            sanitized: list[dict] = []
+            for row in data:
+                sanitized.append(
+                    {key: value for key, value in row.items() if key != "password_hash"}
+                )
+            data = sanitized
+        return data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to fetch app users: {exc}"
+
+
+def fetch_app_user_credentials(username: str) -> tuple[dict | None, str | None]:
+    """Return the Supabase record for ``username`` if it exists."""
+
+    records, error = fetch_app_users(include_sensitive=True)
+    if error:
+        return None, error
+
+    normalized = (username or "").casefold()
+    for record in records or []:
+        if (record.get("username") or "").casefold() == normalized:
+            return record, None
+    return None, None
+
+
+def insert_app_user(record: dict) -> tuple[list[dict] | None, str | None]:
+    """Insert a new user into the ``app_users`` table."""
+
+    supabase, error = _ensure_supabase_client()
+    if error:
+        return None, error
+
+    try:
+        response = supabase.table("app_users").insert(record).execute()
+        return response.data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to create user: {exc}"
+
+
+def delete_app_user(user_id: str) -> tuple[list[dict] | None, str | None]:
+    """Delete the Supabase user identified by ``user_id``."""
+
+    supabase, error = _ensure_supabase_client()
+    if error:
+        return None, error
+
+    try:
+        response = supabase.table("app_users").delete().eq("id", user_id).execute()
+        return response.data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to delete user: {exc}"
 
 
 def fetch_aoi_reports():
