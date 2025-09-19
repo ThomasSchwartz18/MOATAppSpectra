@@ -30,6 +30,7 @@ function setupAoiArea(container) {
   const picker = container.querySelector('[data-aoi-picker]');
   const sheetPanel = container.querySelector('[data-sheet-panel]');
   const sheetTitle = container.querySelector('[data-sheet-title]');
+  const sheetSubtitle = container.querySelector('[data-sheet-subtitle]');
   const sheetForm = container.querySelector('[data-sheet-form]');
   const feedback = container.querySelector('.employee-feedback');
   const backButton = container.querySelector('[data-action="back-to-picker"]');
@@ -42,6 +43,10 @@ function setupAoiArea(container) {
 
   let activeSheet = null;
   let defectOptionsLoaded = false;
+  const sheetSubtitleMap = {
+    SMT: 'Surface Mount Technology',
+    TH: 'Through-Hole Assembly',
+  };
 
   function setDefectPlaceholder(message, disable) {
     if (!defectSelect) return;
@@ -133,6 +138,14 @@ function setupAoiArea(container) {
       picker.hidden = true;
       sheetPanel.hidden = false;
       sheetPanel.dataset.sheet = activeSheet;
+      if (sheetForm) {
+        sheetForm.dataset.sheetVariant = activeSheet;
+      }
+      if (sheetSubtitle) {
+        const subtitleText = sheetSubtitleMap[activeSheet] || '';
+        sheetSubtitle.textContent = subtitleText;
+        sheetSubtitle.hidden = !subtitleText;
+      }
       sheetForm.reset();
       resetDefectSelection();
       setFeedback(feedback, '');
@@ -142,10 +155,18 @@ function setupAoiArea(container) {
   backButton.addEventListener('click', () => {
     sheetPanel.hidden = true;
     picker.hidden = false;
+    delete sheetPanel.dataset.sheet;
     sheetForm.reset();
     resetDefectSelection();
     activeSheet = null;
     setFeedback(feedback, '');
+    if (sheetForm) {
+      delete sheetForm.dataset.sheetVariant;
+    }
+    if (sheetSubtitle) {
+      sheetSubtitle.textContent = '';
+      sheetSubtitle.hidden = true;
+    }
   });
 
   sheetForm.addEventListener('submit', async (event) => {
