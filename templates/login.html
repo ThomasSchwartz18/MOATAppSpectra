@@ -11,10 +11,17 @@
     <form method="post">
       <label for="username">Username</label>
       <select name="username" id="username">
-        <option value="USER">USER</option>
-        <option value="ADMIN">ADMIN</option>
-        {% if employee_enabled %}
-        <option value="EMPLOYEE">EMPLOYEE</option>
+        {% if supabase_users %}
+          {% for username, display_name in supabase_users %}
+          <option value="{{ username }}">{{ display_name }}</option>
+          {% endfor %}
+        {% else %}
+          {% for username in environment_users %}
+          <option value="{{ username }}">{{ username }}</option>
+          {% endfor %}
+          {% if employee_enabled and 'EMPLOYEE' not in environment_users %}
+          <option value="EMPLOYEE">EMPLOYEE</option>
+          {% endif %}
         {% endif %}
       </select>
       <label for="password">Password</label>

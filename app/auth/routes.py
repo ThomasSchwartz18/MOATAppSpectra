@@ -107,9 +107,32 @@ def _employee_login_enabled() -> bool:
     return False
 
 
+def _get_supabase_user_choices() -> list[tuple[str, str]]:
+    try:
+        records, error = db_module.fetch_app_users()
+    except Exception as exc:  # pragma: no cover - defensive guard
+        current_app.logger.warning('Failed to fetch Supabase users: %s', exc)
+        return []
+
+    if error or not records:
+        if error:  # pragma: no cover - logging only
+            current_app.logger.warning('Failed to fetch Supabase users: %s', error)
+        return []
+
+    choices: list[tuple[str, str]] = []
+    for record in records:
+        username = (record.get('username') or '').strip()
+        if not username:
+            continue
+        display_name = (record.get('display_name') or username).strip() or username
+        choices.append((username, display_name))
+    return choices
+
+
 @auth_bp.route('/', methods=['GET', 'POST'])
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
+    should_fetch_supabase_users = request.method == 'GET'
     if request.method == 'POST':
         submitted_username = (request.form.get('username') or '').strip()
         password = request.form.get('password') or ''
@@ -136,6 +159,7 @@ def login():
                 'Supabase user lookup failed; falling back to built-in credentials.',
                 'warning',
             )
+            should_fetch_supabase_users = True
 
         if (
             normalized_username in ENVIRONMENT_USERS
@@ -147,7 +171,15 @@ def login():
             _tracker_start_session()
             return redirect(url_for('main.home'))
         flash('Invalid credentials.')
-    return render_template('login.html', employee_enabled=_employee_login_enabled())
+        should_fetch_supabase_users = True
+    supabase_user_choices = _get_supabase_user_choices() if should_fetch_supabase_users else []
+    environment_usernames = sorted({*REQUIRED_USERS.keys(), *ENVIRONMENT_USERS.keys()})
+    return render_template(
+        'login.html',
+        employee_enabled=_employee_login_enabled(),
+        supabase_users=supabase_user_choices,
+        environment_users=environment_usernames,
+    )
 
 
 @auth_bp.route('/logout')
