@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="employee-portal" data-employee-portal>
+  <div class="employee-card">
+    <header class="employee-card__header">
+      <h1>Employee Portal</h1>
+      <p class="employee-card__summary">Signed in as <strong>{{ username or 'Employee' }}</strong></p>
+      <p class="employee-card__summary">Role: <strong>{{ user_role or 'Employee' }}</strong></p>
+      <a class="employee-card__logout" href="{{ url_for('auth.logout') }}">Log out</a>
+    </header>
+    <div class="employee-card__body">
+      <div class="employee-selection" data-area-selection>
+        <label for="employee-area">Select your area</label>
+        <select id="employee-area" data-area-select>
+          <option value="" disabled selected>Choose an area</option>
+          {% for area in areas %}
+          <option value="{{ area }}">{{ area }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <section class="employee-area-panel" data-area-content hidden>
+        <div class="employee-area-panel__header">
+          <button type="button" class="employee-back" data-action="change-area">&larr; Select a different area</button>
+          <h2 data-area-title></h2>
+        </div>
+        <div data-area-slot></div>
+      </section>
+    </div>
+  </div>
+
+  <template id="employee-area-message-template">
+    <div class="employee-area-message">
+      <p>This workflow is part of the prototype build and is not functional yet.</p>
+    </div>
+  </template>
+
+  <template id="employee-aoi-template">
+    <div class="employee-area-aoi">
+      <p>Submit AOI inspection details directly to the quality database.</p>
+      <div class="employee-subarea-picker" data-aoi-picker>
+        <p>Select a data sheet to continue:</p>
+        <div class="employee-button-group">
+          <button type="button" data-sheet="SMT">SMT AOI Inspection Data Sheet</button>
+          <button type="button" data-sheet="TH">TH AOI Inspection Data Sheet</button>
+        </div>
+      </div>
+      <section class="employee-aoi-panel" data-sheet-panel hidden>
+        <button type="button" class="employee-back" data-action="back-to-picker">&larr; Choose a different data sheet</button>
+        <h3 data-sheet-title></h3>
+        <form class="employee-form" data-sheet-form novalidate>
+          <div class="employee-field-grid">
+            <label>
+              Date
+              <input type="date" name="date" required>
+            </label>
+            <label>
+              Shift
+              <select name="shift" required>
+                <option value="" disabled selected>Select shift</option>
+                <option value="1st">1st</option>
+                <option value="2nd">2nd</option>
+                <option value="3rd">3rd</option>
+                <option value="Weekend">Weekend</option>
+                <option value="Other">Other</option>
+              </select>
+            </label>
+          </div>
+          <div class="employee-field-grid">
+            <label>
+              Operator
+              <input type="text" name="operator" required>
+            </label>
+            <label>
+              Customer
+              <input type="text" name="customer" required>
+            </label>
+          </div>
+          <div class="employee-field-grid">
+            <label>
+              Program
+              <input type="text" name="program" required>
+            </label>
+            <label>
+              Assembly
+              <input type="text" name="assembly" required>
+            </label>
+          </div>
+          <div class="employee-field-grid">
+            <label>
+              Revision
+              <input type="text" name="rev" placeholder="Optional">
+            </label>
+            <label>
+              Job Number
+              <input type="text" name="job_number" required>
+            </label>
+          </div>
+          <div class="employee-field-grid">
+            <label>
+              Quantity Inspected
+              <input type="number" name="quantity_inspected" min="0" step="1" required>
+            </label>
+            <label>
+              Quantity Rejected
+              <input type="number" name="quantity_rejected" min="0" step="1" required>
+            </label>
+          </div>
+          <label class="employee-field-full">
+            Additional Information
+            <textarea name="notes" rows="3" placeholder="Optional notes"></textarea>
+          </label>
+          <button type="submit" class="employee-submit">Submit inspection</button>
+        </form>
+        <div class="employee-feedback" role="alert" aria-live="polite"></div>
+      </section>
+    </div>
+  </template>
+</div>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script src="{{ url_for('static', filename='js/employee.js') }}" defer></script>
+{% endblock %}

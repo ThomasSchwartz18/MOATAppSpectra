@@ -352,21 +352,55 @@ def _aggregate_forecast(
 
 main_bp = Blueprint('main', __name__)
 
+EMPLOYEE_AREA_OPTIONS = [
+    "AOI",
+    "SMT",
+    "Rework",
+    "Hand Assembly",
+    "Solder",
+    "Test",
+    "RMA",
+    "Coating",
+    "Final Inspect",
+    "ICT",
+]
+
+EMPLOYEE_SHEET_LABELS = {
+    "SMT": "SMT AOI Inspection Data Sheet",
+    "TH": "TH AOI Inspection Data Sheet",
+}
+
 
 @main_bp.route('/home')
 def home():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
+    role = session.get('role')
+    if role == 'EMPLOYEE':
+        return render_template(
+            'employee_home.html',
+            username=session.get('username'),
+            areas=EMPLOYEE_AREA_OPTIONS,
+        )
     return render_template('home.html', username=session.get('username'))
 
 
-def admin_required(view):
-    @wraps(view)
-    def wrapped_view(**kwargs):
-        if session.get('username') != 'ADMIN':
-            abort(403)
-        return view(**kwargs)
-    return wrapped_view
+def _role_required(allowed_roles: set[str]):
+    def decorator(view):
+        @wraps(view)
+        def wrapped_view(**kwargs):
+            role = session.get('role') or session.get('username')
+            if role not in allowed_roles:
+                abort(403)
+            return view(**kwargs)
+
+        return wrapped_view
+
+    return decorator
+
+
+admin_required = _role_required({'ADMIN'})
+employee_portal_required = _role_required({'EMPLOYEE', 'ADMIN'})
 
 
 TRACKED_SUPABASE_TABLES = {
@@ -539,6 +573,107 @@ def add_aoi_report():
     if error:
         abort(500, description=error)
     return jsonify(data), 201
+
+
+def _normalize_employee_date(value: str | None) -> str | None:
+    if not value:
+        return None
+    for fmt in ('%Y-%m-%d', '%m/%d/%Y', '%m/%d/%y'):
+        try:
+            return datetime.strptime(value, fmt).date().isoformat()
+        except ValueError:
+            continue
+    return None
+
+
+def _prepare_employee_aoi_record(
+    payload: dict[str, str],
+) -> tuple[dict[str, str], dict[str, str], str | None]:
+    errors: dict[str, str] = {}
+    record: dict[str, str] = {}
+
+    date_raw = (payload.get('date') or '').strip()
+    if not date_raw:
+        errors['date'] = 'Date is required.'
+    else:
+        normalized_date = _normalize_employee_date(date_raw)
+        if not normalized_date:
+            errors['date'] = 'Enter a valid date.'
+        else:
+            record['Date'] = normalized_date
+
+    text_fields = (
+        ('shift', 'Shift'),
+        ('operator', 'Operator'),
+        ('customer', 'Customer'),
+        ('program', 'Program'),
+        ('assembly', 'Assembly'),
+        ('job_number', 'Job Number'),
+    )
+    for field, column in text_fields:
+        value = (payload.get(field) or '').strip()
+        if not value:
+            errors[field] = 'This field is required.'
+        else:
+            record[column] = value
+
+    numeric_fields = (
+        ('quantity_inspected', 'Quantity Inspected'),
+        ('quantity_rejected', 'Quantity Rejected'),
+    )
+    for field, column in numeric_fields:
+        value = (payload.get(field) or '').strip()
+        if not value:
+            errors[field] = 'This field is required.'
+            continue
+        try:
+            number = int(value)
+            if number < 0:
+                raise ValueError
+        except ValueError:
+            errors[field] = 'Enter a whole number of 0 or greater.'
+            continue
+        record[column] = str(number)
+
+    rev_value = (payload.get('rev') or '').strip()
+    if rev_value:
+        record['Rev'] = rev_value
+
+    sheet_key = (payload.get('inspection_type') or '').strip().upper()
+    sheet_label = None
+    if sheet_key:
+        sheet_label = EMPLOYEE_SHEET_LABELS.get(sheet_key)
+        if not sheet_label:
+            errors['inspection_type'] = 'Select a valid inspection data sheet.'
+    else:
+        errors['inspection_type'] = 'Select a valid inspection data sheet.'
+
+    notes_value = (payload.get('notes') or '').strip()
+    additional_parts = []
+    if sheet_label:
+        additional_parts.append(f'{sheet_label} submission')
+    if notes_value:
+        additional_parts.append(notes_value)
+    if additional_parts:
+        record['Additional Information'] = ' | '.join(additional_parts)
+
+    return record, errors, sheet_label
+
+
+@main_bp.route('/employee/aoi_reports', methods=['POST'])
+@employee_portal_required
+def employee_add_aoi_report():
+    payload = request.get_json() or {}
+    record, errors, sheet_label = _prepare_employee_aoi_record(payload)
+    if errors:
+        return jsonify({'errors': errors}), 400
+    _, error = insert_aoi_report(record)
+    if error:
+        return jsonify({'errors': {'base': error}}), 500
+    message = 'AOI report submitted successfully.'
+    if sheet_label:
+        message = f'{sheet_label} submission saved successfully.'
+    return jsonify({'message': message}), 201
 
 
 @main_bp.route('/aoi_reports/upload', methods=['POST'])
