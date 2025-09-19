@@ -2,63 +2,74 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>MOAA</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
-  <nav class="navbar">
-    <div class="nav-left">
-      <div class="logo"><img src="{{ url_for('static', filename='images/company-logo.png')}}" alt="Spectra Tech Manufacturing"></div>
-      <ul class="nav-links">
-        <li class="nav-item"><a href="{{ url_for('main.home') }}">Home</a></li>
-        <li class="nav-item">
-          <a href="#">Analysis <span class="arrow">&#9662;</span></a>
-          <div class="dropdown">
-            <a href="{{ url_for('main.ppm_analysis') }}">PPM Analysis</a>
-            <a href="{{ url_for('main.aoi_grades_page') }}">AOI & FI Analysis</a>
-            <a href="{{ url_for('main.aoi_daily_reports') }}">AOI Daily Reports</a>
-            <a href="{{ url_for('main.fi_daily_reports') }}">FI Daily Reports</a>
-          </div>
-        </li>
-        <li class="nav-item">
-          <a href="#">Tools <span class="arrow">&#9662;</span></a>
-          <div class="dropdown">
-            <a href="#">Rework Stencil Lookup</a>
-            <a href="#">Verified Part Markings</a>
-            <a href="{{ url_for('main.assembly_forecast') }}">Assembly Forecast</a>
-          </div>
-        </li>
-        <li class="nav-item">
-          <a href="#">Production <span class="arrow">&#9662;</span></a>
-          <div class="dropdown">
-            <a href="#"><em>Jobs</em></a>
-            <a href="#"><em>SPC Dashboard</em></a>
-          </div>
-        </li>
-        <li class="nav-item">
-          <a href="#">Reports <span class="arrow">&#9662;</span></a>
-          <div class="dropdown">
-            <a href="{{ url_for('main.integrated_report') }}">AOI Integrated Report</a>
-            <a href="{{ url_for('main.operator_report') }}">Operator Report</a>
-            <a href="{{ url_for('main.aoi_daily_report_page') }}">AOI Daily Report</a>
-          </div>
-        </li>
-      </ul>
-    </div>
-    <div class="nav-right">
-      {% if username %}
-      <span class="user-text">user:{{ username }}</span>
-      {% endif %}
-      <a href="#">Docs</a>
-      {% if username == 'ADMIN' %}
-      <a href="{{ url_for('main.admin_panel') }}">Settings</a>
-      {% endif %}
-      <a href="{{ url_for('auth.logout') }}">Logout</a>
-    </div>
-  </nav>
-  <div class="content">
+  <header class="app-header">
+    <nav class="navbar" role="navigation" aria-label="Primary">
+      <div class="nav-left">
+        <a class="logo" href="{{ url_for('main.home') }}">
+          <img src="{{ url_for('static', filename='images/company-logo.png')}}" alt="Spectra Tech Manufacturing">
+        </a>
+        <div class="brand-block">
+          <span class="brand-title">Spectra Operations Suite</span>
+          <span class="brand-subtitle">Manufacturing Oversight &amp; Analytics</span>
+        </div>
+      </div>
+      <div class="nav-center">
+        <ul class="nav-links">
+          <li class="nav-item"><a href="{{ url_for('main.home') }}">Home</a></li>
+          <li class="nav-item">
+            <a href="#">Analysis <span class="arrow">&#9662;</span></a>
+            <div class="dropdown" role="menu">
+              <a href="{{ url_for('main.ppm_analysis') }}">PPM Analysis</a>
+              <a href="{{ url_for('main.aoi_grades_page') }}">AOI &amp; FI Analysis</a>
+              <a href="{{ url_for('main.aoi_daily_reports') }}">AOI Daily Reports</a>
+              <a href="{{ url_for('main.fi_daily_reports') }}">FI Daily Reports</a>
+            </div>
+          </li>
+          <li class="nav-item">
+            <a href="#">Tools <span class="arrow">&#9662;</span></a>
+            <div class="dropdown" role="menu">
+              <a href="#">Rework Stencil Lookup</a>
+              <a href="#">Verified Part Markings</a>
+              <a href="{{ url_for('main.assembly_forecast') }}">Assembly Forecast</a>
+            </div>
+          </li>
+          <li class="nav-item">
+            <a href="#">Production <span class="arrow">&#9662;</span></a>
+            <div class="dropdown" role="menu">
+              <a href="#"><em>Jobs</em></a>
+              <a href="#"><em>SPC Dashboard</em></a>
+            </div>
+          </li>
+          <li class="nav-item">
+            <a href="#">Reports <span class="arrow">&#9662;</span></a>
+            <div class="dropdown" role="menu">
+              <a href="{{ url_for('main.integrated_report') }}">AOI Integrated Report</a>
+              <a href="{{ url_for('main.operator_report') }}">Operator Report</a>
+              <a href="{{ url_for('main.aoi_daily_report_page') }}">AOI Daily Report</a>
+            </div>
+          </li>
+        </ul>
+      </div>
+      <div class="nav-right">
+        {% if username %}
+        <span class="user-text">Signed in as {{ username }}</span>
+        {% endif %}
+        <a class="nav-utility" href="#">Docs</a>
+        {% if username == 'ADMIN' %}
+        <a class="nav-utility" href="{{ url_for('main.admin_panel') }}">Admin Console</a>
+        {% endif %}
+        <a class="nav-utility" href="{{ url_for('auth.logout') }}">Logout</a>
+      </div>
+    </nav>
+  </header>
+  <main class="content" role="main">
     {% block content %}{% endblock %}
-  </div>
+  </main>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="{{ url_for('static', filename='js/main.js') }}"></script>
   {% block scripts %}{% endblock %}
