@@ -793,14 +793,6 @@ def _build_defect_response():
     return payload, status
 
 
-@main_bp.route('/api/defects', methods=['GET'])
-def list_defects():
-    if 'username' not in session:
-        return redirect(url_for('auth.login'))
-    payload, status = _build_defect_response()
-    return jsonify(payload), status
-
-
 @main_bp.route('/employee/defects', methods=['GET'])
 @employee_portal_required
 def employee_list_defects():
