@@ -23,6 +23,7 @@ from openpyxl import load_workbook
 import xlrd
 import base64
 import math
+from werkzeug.security import generate_password_hash
 try:
     import matplotlib
     matplotlib.use('Agg')
@@ -32,8 +33,11 @@ except Exception:  # pragma: no cover
     plt = None
 
 from app.db import (
+    delete_app_user,
     fetch_aoi_reports,
     fetch_combined_reports,
+    fetch_app_user_credentials,
+    fetch_app_users,
     fetch_fi_reports,
     fetch_moat,
     fetch_recent_moat,
@@ -48,6 +52,7 @@ from app.db import (
     update_saved_fi_query,
     insert_aoi_report,
     insert_aoi_reports_bulk,
+    insert_app_user,
     insert_fi_report,
     insert_moat,
     insert_moat_bulk,
@@ -403,11 +408,32 @@ admin_required = _role_required({'ADMIN'})
 employee_portal_required = _role_required({'EMPLOYEE', 'ADMIN'})
 
 
+USER_ROLE_LABELS = {
+    "ADMIN": "Administrator",
+    "USER": "Standard User",
+    "EMPLOYEE": "Employee",
+    "VIEWER": "Viewer",
+    "ANALYST": "Analyst",
+    "MANAGER": "Manager",
+}
+
+
+USER_ROLE_CHOICES = [
+    ("VIEWER", USER_ROLE_LABELS["VIEWER"]),
+    ("ANALYST", USER_ROLE_LABELS["ANALYST"]),
+    ("MANAGER", USER_ROLE_LABELS["MANAGER"]),
+    ("EMPLOYEE", USER_ROLE_LABELS["EMPLOYEE"]),
+    ("USER", USER_ROLE_LABELS["USER"]),
+    ("ADMIN", USER_ROLE_LABELS["ADMIN"]),
+]
+
+
 TRACKED_SUPABASE_TABLES = {
     "aoi_reports": "AOI inspection uploads used across the AOI dashboards.",
     "fi_reports": "Final inspection data powering FI quality metrics.",
     "moat": "MOAT data feeding the integrated performance report.",
     "combined_reports": "Joined AOI/FI views surfaced in integrated analytics.",
+    "app_users": "Application login accounts managed from this console.",
 }
 
 
@@ -474,27 +500,55 @@ def _summarize_supabase_status():
     return status
 
 
-def _fetch_local_users():
-    """Return the user records managed by the Flask app itself."""
+def _fetch_configured_users() -> tuple[list[dict], str | None]:
+    """Return all known application users and any Supabase error."""
 
-    users = []
-    for username in sorted(auth_routes.USERS.keys()):
-        role = "Administrator" if username.upper() == "ADMIN" else "Standard User"
+    users: list[dict] = []
+    supabase_error: str | None = None
+
+    try:
+        supabase_users, supabase_error = fetch_app_users()
+    except Exception as exc:  # pragma: no cover - defensive guard
+        supabase_users = None
+        supabase_error = str(exc)
+
+    if supabase_users:
+        for record in sorted(
+            supabase_users,
+            key=lambda item: (item.get("username") or "").casefold(),
+        ):
+            role_code = (record.get("role") or "USER").upper()
+            users.append(
+                {
+                    "id": record.get("id"),
+                    "username": record.get("username"),
+                    "display_name": record.get("display_name") or record.get("username"),
+                    "role": USER_ROLE_LABELS.get(role_code, role_code.title()),
+                    "role_code": role_code,
+                    "source": "Supabase",
+                }
+            )
+
+    for username in sorted(auth_routes.ENVIRONMENT_USERS.keys()):
+        role_code = username.upper()
         users.append(
             {
                 "username": username,
-                "role": role,
+                "display_name": username,
+                "role": USER_ROLE_LABELS.get(role_code, "Standard User"),
+                "role_code": role_code,
                 "source": "Environment variables",
             }
         )
-    return users
+
+    return users, supabase_error
 
 
 @main_bp.route('/admin')
 @admin_required
 def admin_panel():
     supabase_status = _summarize_supabase_status()
-    users = _fetch_local_users()
+    users, supabase_user_error = _fetch_configured_users()
     overview = {
         "supabase_status": supabase_status["status"],
         "user_count": len(users),
@@ -512,6 +566,9 @@ def admin_panel():
             "service to manage them from this console."
         ),
     }
+    if supabase_user_error:
+        flash(supabase_user_error, "warning")
+
     return render_template(
         'admin.html',
         username=session.get('username'),
@@ -519,6 +576,7 @@ def admin_panel():
         users=users,
         overview=overview,
         missing_feeds=missing_feeds,
+        user_role_choices=USER_ROLE_CHOICES,
     )
 
 
@@ -540,18 +598,62 @@ def admin_data_sources_action():
 @main_bp.route('/admin/users', methods=['POST'])
 @admin_required
 def admin_user_action():
-    username = request.form.get('username', '').strip()
-    flash(
-        (
-            "User management is currently backed by environment variables. "
-            "Provision or remove users like `ADMIN` and `USER` by updating the "
-            "deployment secrets or introducing a Supabase table (e.g., `app_users`) "
-            "to persist credentials."
-        ),
-        'warning',
-    )
-    if username:
-        flash(f"No changes were applied for user '{username}'.", 'info')
+    action = (request.form.get('action') or 'invite').lower()
+    username = (request.form.get('username') or '').strip()
+    role = (request.form.get('role') or 'USER').strip().upper()
+    temporary_password = (request.form.get('temporary_password') or '').strip()
+    display_name = (request.form.get('display_name') or '').strip()
+
+    if role not in USER_ROLE_LABELS:
+        role = 'USER'
+
+    if action == 'invite':
+        if not username:
+            flash('Enter a username to create an account.', 'error')
+        elif not temporary_password:
+            flash('Provide a temporary password for the new account.', 'error')
+        else:
+            existing, error = fetch_app_user_credentials(username)
+            if error:
+                flash(error, 'error')
+            elif existing:
+                flash(f"User '{username}' already exists.", 'warning')
+            else:
+                payload = {
+                    'username': username,
+                    'display_name': display_name or username,
+                    'role': role,
+                    'password_hash': generate_password_hash(temporary_password),
+                    'must_reset_password': True,
+                }
+                inserted, error = insert_app_user(payload)
+                if error:
+                    flash(error, 'error')
+                else:
+                    flash(
+                        f"User '{username}' has been created and must reset their password on next login.",
+                        'success',
+                    )
+    elif action in {'remove', 'delete', 'deactivate'}:
+        if not username:
+            flash('Specify a username to remove.', 'error')
+        else:
+            existing, error = fetch_app_user_credentials(username)
+            if error:
+                flash(error, 'error')
+            elif not existing:
+                flash(f"User '{username}' was not found in Supabase.", 'warning')
+            else:
+                deleted, error = delete_app_user(existing['id'])
+                if error:
+                    flash(error, 'error')
+                elif deleted:
+                    flash(f"User '{username}' has been removed.", 'success')
+                else:
+                    flash(f"No changes were applied for '{username}'.", 'info')
+    else:
+        flash(f"Unrecognised action '{action}'.", 'error')
+
     return redirect(url_for('main.admin_panel'))
 
 
