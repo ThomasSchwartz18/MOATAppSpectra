@@ -3566,6 +3566,28 @@ def analysis_tracker_logs():
         end_ts = _parse_timestamp(row['end_time'])
         events = events_by_session.get(token, [])
 
+        logout_events = [
+            event
+            for event in events
+            if (event.get('name') or '').lower() in {'session_end', 'logout'}
+        ]
+        logout_event = logout_events[-1] if logout_events else None
+
+        derived_end_ts = None
+        derived_end_display = None
+        if logout_event:
+            derived_end_ts = logout_event.get('occurred')
+            derived_end_display = logout_event.get('occurred_display')
+        if derived_end_ts is None and end_ts is not None:
+            derived_end_ts = end_ts
+            derived_end_display = _format_timestamp(end_ts)
+        if derived_end_ts is None and events:
+            last_event = events[-1]
+            derived_end_ts = last_event.get('occurred')
+            derived_end_display = last_event.get('occurred_display')
+        if derived_end_ts is not None and derived_end_display is None:
+            derived_end_display = _format_timestamp(derived_end_ts)
+
         navigation_events = [ev for ev in events if ev['name'].lower() == 'navigate']
         seen_hrefs: set[str] = set()
         backtracking_events: list[dict] = []
@@ -3580,16 +3602,31 @@ def analysis_tracker_logs():
 
         raw_duration = row['duration_seconds']
         try:
-            duration_seconds = float(raw_duration) if raw_duration is not None else None
+            stored_duration = float(raw_duration) if raw_duration is not None else None
         except (TypeError, ValueError):
-            duration_seconds = None
+            stored_duration = None
+
+        duration_seconds = None
+        if start_ts and derived_end_ts:
+            try:
+                duration_seconds = max(
+                    0.0, (derived_end_ts - start_ts).total_seconds()
+                )
+            except Exception:
+                duration_seconds = None
+
+        if duration_seconds is None:
+            duration_seconds = stored_duration
+
         if duration_seconds is None and start_ts:
-            reference_ts = end_ts
+            reference_ts = derived_end_ts
             if reference_ts is None and events:
                 reference_ts = events[-1]['occurred']
             if reference_ts:
                 try:
-                    duration_seconds = (reference_ts - start_ts).total_seconds()
+                    duration_seconds = max(
+                        0.0, (reference_ts - start_ts).total_seconds()
+                    )
                 except Exception:
                     duration_seconds = None
 
@@ -3611,7 +3648,7 @@ def analysis_tracker_logs():
             'username': row['username'],
             'role': row['user_role'],
             'start_display': _format_timestamp(start_ts),
-            'end_display': _format_timestamp(end_ts),
+            'end_display': derived_end_display,
             'duration_seconds': duration_seconds,
             'duration_label': duration_label,
             'event_count': len(events),
