@@ -191,4 +191,46 @@ document.addEventListener('DOMContentLoaded', () => {
       lastY = y;
     }, { passive: true });
   }
+
+  // Tab navigation for admin console and other tabbed layouts
+  const tabContainers = document.querySelectorAll('[data-tabs]');
+  tabContainers.forEach((container) => {
+    const tabs = Array.from(container.querySelectorAll('[role="tab"]'));
+    const panels = Array.from(container.querySelectorAll('[role="tabpanel"]'));
+
+    const activateTab = (targetId) => {
+      tabs.forEach((tab) => {
+        const isActive = tab.dataset.tabTarget === targetId;
+        tab.classList.toggle('is-active', isActive);
+        tab.setAttribute('aria-selected', isActive ? 'true' : 'false');
+        tab.setAttribute('tabindex', isActive ? '0' : '-1');
+      });
+
+      panels.forEach((panel) => {
+        const isActive = panel.dataset.tabPanel === targetId;
+        panel.classList.toggle('is-active', isActive);
+        panel.setAttribute('aria-hidden', isActive ? 'false' : 'true');
+      });
+    };
+
+    tabs.forEach((tab) => {
+      tab.addEventListener('click', () => {
+        activateTab(tab.dataset.tabTarget);
+      });
+
+      tab.addEventListener('keydown', (event) => {
+        if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return;
+        event.preventDefault();
+        const currentIndex = tabs.indexOf(tab);
+        if (currentIndex === -1) return;
+        const offset = event.key === 'ArrowLeft' ? -1 : 1;
+        let nextIndex = (currentIndex + offset + tabs.length) % tabs.length;
+        const nextTab = tabs[nextIndex];
+        if (nextTab) {
+          nextTab.focus();
+          activateTab(nextTab.dataset.tabTarget);
+        }
+      });
+    });
+  });
 });
