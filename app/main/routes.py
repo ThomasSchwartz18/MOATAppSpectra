@@ -633,14 +633,13 @@ def admin_user_action():
                     'display_name': display_name or username,
                     'role': role,
                     'password_hash': generate_password_hash(temporary_password),
-                    'must_reset_password': True,
                 }
                 inserted, error = insert_app_user(payload)
                 if error:
                     flash(error, 'error')
                 else:
                     flash(
-                        f"User '{username}' has been created and must reset their password on next login.",
+                        f"User '{username}' has been created with the provided temporary password.",
                         'success',
                     )
     elif action in {'remove', 'delete', 'deactivate'}:
