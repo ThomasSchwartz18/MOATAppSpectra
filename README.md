@@ -70,3 +70,23 @@ Remove the helper once the source data is fixed.
    ```
    This FastAPI service powers external integrations that require operator grade
    calculations.
+
+### WeasyPrint native dependencies
+PDF exports rely on [WeasyPrint](https://weasyprint.org/), which in turn needs
+platform-specific libraries for font handling and rendering. Install the native
+dependencies before attempting to generate Integrated, Operator, or AOI Daily
+report PDFs:
+
+- **macOS (Homebrew):** `brew install cairo gobject-introspection pango`. If your
+  Homebrew prefix is non-standard (for example, when using an Apple Silicon
+  machine), set the `WEASYPRINT_NATIVE_LIB_PATHS` environment variable to point
+  to the directories or specific libraries installed by Homebrew, e.g.:
+
+  ```bash
+  export WEASYPRINT_NATIVE_LIB_PATHS="/opt/homebrew/lib"
+  ```
+
+- **Debian/Ubuntu:** `sudo apt-get install libcairo2 libgdk-pixbuf2.0-0 libpango-1.0-0 gir1.2-pango-1.0`
+
+Once the packages are present, `pip install -r requirements.txt` will install
+WeasyPrint and the Flask endpoints will be able to stream PDF responses.

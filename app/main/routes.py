@@ -62,6 +62,7 @@ from app.db import (
 )
 
 from app.grades import calculate_aoi_grades
+from app.main.pdf_utils import PdfGenerationError, render_html_to_pdf
 from app.auth import routes as auth_routes
 from fi_utils import parse_fi_rejections
 
@@ -2349,11 +2350,10 @@ def export_integrated_report():
     )
     fmt = request.args.get('format')
     if fmt == 'pdf':
-        from weasyprint import HTML
-        from weasyprint.text.fonts import FontConfiguration
-
-        font_config = FontConfiguration()
-        pdf = HTML(string=html, base_url=request.url_root).write_pdf(font_config=font_config)
+        try:
+            pdf = render_html_to_pdf(html, base_url=request.url_root)
+        except PdfGenerationError as exc:
+            return jsonify({'message': str(exc)}), 503
         filename = f"{start_str}_{end_str}_aoiIR.pdf"
         return send_file(
             io.BytesIO(pdf),
@@ -2413,11 +2413,10 @@ def export_aoi_daily_report():
 
     fmt = request.args.get('format')
     if fmt == 'pdf':
-        from weasyprint import HTML
-        from weasyprint.text.fonts import FontConfiguration
-
-        font_config = FontConfiguration()
-        pdf = HTML(string=html, base_url=request.url_root).write_pdf(font_config=font_config)
+        try:
+            pdf = render_html_to_pdf(html, base_url=request.url_root)
+        except PdfGenerationError as exc:
+            return jsonify({'message': str(exc)}), 503
         filename = f"{day.strftime('%y%m%d')}_aoi_daily_report.pdf"
         return send_file(
             io.BytesIO(pdf),
@@ -2882,13 +2881,10 @@ def export_operator_report():
 
     fmt = request.args.get('format')
     if fmt == 'pdf':
-        from weasyprint import HTML
-        from weasyprint.text.fonts import FontConfiguration
-
-        font_config = FontConfiguration()
-        pdf = HTML(string=html, base_url=request.url_root).write_pdf(
-            font_config=font_config
-        )
+        try:
+            pdf = render_html_to_pdf(html, base_url=request.url_root)
+        except PdfGenerationError as exc:
+            return jsonify({'message': str(exc)}), 503
         filename = f"{start_str}_{end_str}_operator_report.pdf"
         return send_file(
             io.BytesIO(pdf),
