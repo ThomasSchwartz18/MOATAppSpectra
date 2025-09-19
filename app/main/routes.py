@@ -9,11 +9,13 @@ from flask import (
     jsonify,
     current_app,
     send_file,
+    flash,
 )
 from functools import wraps
 import csv
 import io
 import os
+from urllib.parse import urlparse
 import re
 from datetime import datetime, date
 from zoneinfo import ZoneInfo
@@ -52,6 +54,7 @@ from app.db import (
 )
 
 from app.grades import calculate_aoi_grades
+from app.auth import routes as auth_routes
 from fi_utils import parse_fi_rejections
 
 # Helpers for AOI Grades analytics
@@ -366,10 +369,156 @@ def admin_required(view):
     return wrapped_view
 
 
+TRACKED_SUPABASE_TABLES = {
+    "aoi_reports": "AOI inspection uploads used across the AOI dashboards.",
+    "fi_reports": "Final inspection data powering FI quality metrics.",
+    "moat": "MOAT data feeding the integrated performance report.",
+    "combined_reports": "Joined AOI/FI views surfaced in integrated analytics.",
+}
+
+
+def _summarize_supabase_status():
+    """Return metadata about the configured Supabase project."""
+
+    supabase_url = current_app.config.get("SUPABASE_URL") or os.environ.get(
+        "SUPABASE_URL"
+    )
+    supabase = current_app.config.get("SUPABASE")
+
+    project_host = None
+    if supabase_url:
+        try:
+            project_host = urlparse(supabase_url).netloc or supabase_url
+        except Exception:  # pragma: no cover - defensive parsing
+            project_host = supabase_url
+
+    status = {
+        "url": supabase_url,
+        "project_host": project_host,
+        "status": "Not configured" if not supabase else "Connected",
+        "checked_at": datetime.utcnow(),
+        "error": None,
+        "tables": [],
+    }
+
+    if not supabase:
+        return status
+
+    for table, description in TRACKED_SUPABASE_TABLES.items():
+        try:
+            response = supabase.table(table).select("*").limit(1).execute()
+            record_count = None
+            if hasattr(response, "count") and response.count is not None:
+                record_count = response.count
+            elif response.data is not None:
+                record_count = len(response.data)
+            status["tables"].append(
+                {
+                    "name": table,
+                    "description": description,
+                    "status": "Available",
+                    "records_previewed": record_count,
+                    "error": None,
+                }
+            )
+        except Exception as exc:  # pragma: no cover - missing tables or auth errors
+            status["tables"].append(
+                {
+                    "name": table,
+                    "description": description,
+                    "status": "Unavailable",
+                    "records_previewed": None,
+                    "error": str(exc),
+                }
+            )
+
+    if status["tables"] and all(
+        entry["status"] != "Available" for entry in status["tables"]
+    ):
+        status["status"] = "No tracked tables reachable"
+
+    return status
+
+
+def _fetch_local_users():
+    """Return the user records managed by the Flask app itself."""
+
+    users = []
+    for username in sorted(auth_routes.USERS.keys()):
+        role = "Administrator" if username.upper() == "ADMIN" else "Standard User"
+        users.append(
+            {
+                "username": username,
+                "role": role,
+                "source": "Environment variables",
+            }
+        )
+    return users
+
+
 @main_bp.route('/admin')
 @admin_required
 def admin_panel():
-    return render_template('admin.html', username=session.get('username'))
+    supabase_status = _summarize_supabase_status()
+    users = _fetch_local_users()
+    overview = {
+        "supabase_status": supabase_status["status"],
+        "user_count": len(users),
+        "tracked_tables": supabase_status["tables"],
+        "last_checked": supabase_status["checked_at"],
+    }
+    missing_feeds = {
+        "roles": (
+            "Role definitions are currently hard-coded in the UI. Track them in "
+            "a Supabase table such as `roles` to enable real-time edits."
+        ),
+        "system_policies": (
+            "System policy settings are applied manually in environment "
+            "configuration. Persist them in Supabase storage or a configuration "
+            "service to manage them from this console."
+        ),
+    }
+    return render_template(
+        'admin.html',
+        username=session.get('username'),
+        supabase_status=supabase_status,
+        users=users,
+        overview=overview,
+        missing_feeds=missing_feeds,
+    )
+
+
+@main_bp.route('/admin/data-sources', methods=['POST'])
+@admin_required
+def admin_data_sources_action():
+    requested_action = request.form.get('action') or 'update'
+    flash(
+        (
+            "Data source management changes (" + requested_action + ") are not "
+            "automated yet. Track requested connections in a Supabase table such "
+            "as `data_sources` or update the deployment configuration directly."
+        ),
+        'info',
+    )
+    return redirect(url_for('main.admin_panel'))
+
+
+@main_bp.route('/admin/users', methods=['POST'])
+@admin_required
+def admin_user_action():
+    username = request.form.get('username', '').strip()
+    flash(
+        (
+            "User management is currently backed by environment variables. "
+            "Provision or remove users like `ADMIN` and `USER` by updating the "
+            "deployment secrets or introducing a Supabase table (e.g., `app_users`) "
+            "to persist credentials."
+        ),
+        'warning',
+    )
+    if username:
+        flash(f"No changes were applied for user '{username}'.", 'info')
+    return redirect(url_for('main.admin_panel'))
 
 
 @main_bp.route('/aoi_reports', methods=['GET'])

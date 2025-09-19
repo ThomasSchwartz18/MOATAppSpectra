@@ -499,6 +499,12 @@ p {
   letter-spacing: 0.08em;
 }
 
+.form-helper {
+  font-size: 0.85rem;
+  color: var(--ink-subtle);
+  line-height: 1.5;
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

@@ -22,6 +22,7 @@ def create_app():
         os.environ["SUPABASE_SERVICE_KEY"],
     )
     app.config["SUPABASE"] = supabase
+    app.config["SUPABASE_URL"] = os.environ["SUPABASE_URL"]
 
     phrases_path = (
         os.environ.get("NON_AOI_PHRASES_FILE")

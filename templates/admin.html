@@ -7,10 +7,20 @@
     <p>Configure Spectra Operations Suite for your organization, manage access, and oversee system integrations.</p>
   </div>
   <div class="intro-meta">
-    <span class="meta-label">Environment</span>
-    <span class="meta-value">Production</span>
+    <span class="meta-label">Supabase Project</span>
+    <span class="meta-value">{{ supabase_status.project_host or 'Not configured' }}</span>
   </div>
 </section>
+
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+  <ul class="flash-messages">
+    {% for category, message in messages %}
+    <li>{{ message }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+{% endwith %}
 
 <section class="admin-console" data-tabs>
   <aside class="tab-nav" role="tablist" aria-label="Administration Sections">
@@ -24,35 +34,137 @@
   <div class="tab-panels">
     <article class="tab-panel is-active" role="tabpanel" data-tab-panel="overview" aria-hidden="false">
       <h2>Operational Snapshot</h2>
+      {% set available_tables = overview.tracked_tables | selectattr('status', 'equalto', 'Available') | list %}
+      {% set unavailable_tables = overview.tracked_tables | selectattr('status', 'equalto', 'Unavailable') | list %}
       <div class="grid-two">
         <div class="summary-block">
           <h3>Platform Status</h3>
           <ul>
-            <li><strong>Authentication</strong> &mdash; Enabled</li>
-            <li><strong>Data Sync</strong> &mdash; Running (15 minutes ago)</li>
-            <li><strong>Last Configuration Change</strong> &mdash; 3 days ago by ADMIN</li>
+            <li><strong>Supabase Connection</strong> &mdash; {{ overview.supabase_status }}</li>
+            <li><strong>Tracked Tables Available</strong> &mdash; {{ available_tables|length }} / {{ overview.tracked_tables|length }}</li>
+            <li><strong>Users with Console Access</strong> &mdash; {{ overview.user_count }}</li>
+            <li><strong>Last Connectivity Check</strong> &mdash; {{ overview.last_checked.strftime('%Y-%m-%d %H:%M UTC') }}</li>
           </ul>
         </div>
         <div class="summary-block">
           <h3>Quick Actions</h3>
           <div class="action-grid">
-            <button type="button" class="primary">Add Database Source</button>
-            <button type="button" class="primary">Invite User</button>
-            <button type="button" class="ghost">Download Audit Log</button>
-            <button type="button" class="ghost">Open Runbook</button>
+            <form method="post" action="{{ url_for('main.admin_data_sources_action') }}">
+              <input type="hidden" name="action" value="create">
+              <button type="submit" class="primary">Add Database Source</button>
+            </form>
+            <form method="post" action="{{ url_for('main.admin_user_action') }}">
+              <input type="hidden" name="action" value="invite">
+              <button type="submit" class="primary">Invite User</button>
+            </form>
+            <a class="ghost" href="https://app.supabase.com/project" target="_blank" rel="noopener">Open Supabase Console</a>
+            <a class="ghost" href="https://supabase.com/docs" target="_blank" rel="noopener">Supabase Docs</a>
           </div>
         </div>
       </div>
       <div class="summary-block">
-        <h3>Recent Alerts</h3>
-        <p>No outstanding alerts. System performance is within service-level expectations.</p>
+        <h3>Tracked Tables</h3>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Table</th>
+              <th>Description</th>
+              <th>Status</th>
+              <th>Records Previewed</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for table in overview.tracked_tables %}
+            <tr>
+              <td>{{ table.name }}</td>
+              <td>{{ table.description }}</td>
+              <td>
+                {% if table.status == 'Available' %}
+                  <span class="status status-online">{{ table.status }}</span>
+                {% else %}
+                  <span class="status status-offline">{{ table.status }}</span>
+                {% endif %}
+                {% if table.error %}
+                  <br><small>{{ table.error }}</small>
+                {% endif %}
+              </td>
+              <td>{% if table.records_previewed is not none %}{{ table.records_previewed }}{% else %}&mdash;{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
       </div>
+      {% if supabase_status.error %}
+      <div class="summary-block">
+        <h3>Connection Diagnostics</h3>
+        <p>Attempted to reach Supabase but received: <code>{{ supabase_status.error }}</code>.</p>
+      </div>
+      {% endif %}
+      {% if unavailable_tables %}
+      <div class="summary-block">
+        <h3>Untracked Data</h3>
+        <p>The following tables could not be queried. Confirm that they exist and that the service role key has access.</p>
+        <ul>
+          {% for table in unavailable_tables %}
+          <li><strong>{{ table.name }}</strong> &mdash; {{ table.description }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endif %}
     </article>
 
     <article class="tab-panel" role="tabpanel" data-tab-panel="data" aria-hidden="true">
       <h2>Data Connections</h2>
-      <p>Link production databases and control how often data synchronizes with Spectra Operations Suite.</p>
-      <form class="config-form" method="post" action="#">
+      <p>Link production databases and control how data synchronizes with Spectra Operations Suite.</p>
+      <div class="summary-block">
+        <h3>Supabase Project</h3>
+        <table class="data-table">
+          <tbody>
+            <tr>
+              <th scope="row">Project URL</th>
+              <td>{% if supabase_status.url %}<code>{{ supabase_status.url }}</code>{% else %}Not configured{% endif %}</td>
+            </tr>
+            <tr>
+              <th scope="row">Status</th>
+              <td>{{ supabase_status.status }}</td>
+            </tr>
+            <tr>
+              <th scope="row">Last Checked</th>
+              <td>{{ supabase_status.checked_at.strftime('%Y-%m-%d %H:%M UTC') }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="summary-block">
+        <h3>Tracked Tables</h3>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Table</th>
+              <th>Status</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for table in supabase_status.tables %}
+            <tr>
+              <td>{{ table.name }}</td>
+              <td>{{ table.status }}</td>
+              <td>
+                {{ table.description }}
+                {% if table.error %}
+                  <br><small>{{ table.error }}</small>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <form class="config-form" method="post" action="{{ url_for('main.admin_data_sources_action') }}">
+        <h3>Request Data Source Change</h3>
         <div class="form-grid">
           <label>
             Data Source Name
@@ -88,7 +200,7 @@
         <div class="form-grid">
           <label>
             Service Account
-            <input type="text" name="service_account" placeholder="svc_moaa_ops">
+            <input type="text" name="service_account" placeholder="svc_moa_ops">
           </label>
           <label>
             Encryption
@@ -104,28 +216,50 @@
           </label>
         </div>
         <div class="form-actions">
-          <button type="submit" class="primary">Save Connection</button>
+          <input type="hidden" name="action" value="create">
+          <button type="submit" class="primary">Submit Request</button>
           <button type="reset" class="ghost">Clear</button>
         </div>
+        <p class="form-helper">Automated provisioning is not yet available. Requests are recorded for follow-up in Supabase (recommended table: <code>data_sources</code>).</p>
       </form>
     </article>
 
     <article class="tab-panel" role="tabpanel" data-tab-panel="users" aria-hidden="true">
       <h2>User Accounts</h2>
       <p>Create and deactivate user accounts to control who can access Spectra Operations Suite.</p>
-      <form class="config-form" method="post" action="#">
+
+      <div class="summary-block">
+        <h3>Configured Accounts</h3>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Username</th>
+              <th>Role</th>
+              <th>Source</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for user in users %}
+            <tr>
+              <td>{{ user.username }}</td>
+              <td>{{ user.role }}</td>
+              <td>{{ user.source }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <form class="config-form" method="post" action="{{ url_for('main.admin_user_action') }}">
+        <h3>Request User Change</h3>
         <div class="form-grid">
           <label>
-            Full Name
-            <input type="text" name="user_full_name" placeholder="Jordan Rivera">
-          </label>
-          <label>
-            Email Address
-            <input type="email" name="user_email" placeholder="jordan.rivera@example.com">
+            Username
+            <input type="text" name="username" placeholder="New user name">
           </label>
           <label>
             Role
-            <select name="user_role">
+            <select name="role">
               <option value="viewer">Viewer</option>
               <option value="analyst">Analyst</option>
               <option value="manager">Manager</option>
@@ -134,175 +268,32 @@
           </label>
           <label>
             Temporary Password
-            <input type="text" name="user_password" placeholder="Auto-generate">
+            <input type="text" name="temporary_password" placeholder="Provide or auto-generate">
           </label>
         </div>
         <div class="form-actions">
-          <button type="submit" class="primary">Provision User</button>
-          <button type="button" class="ghost">Bulk Import</button>
+          <input type="hidden" name="action" value="invite">
+          <button type="submit" class="primary">Submit Request</button>
+          <button type="button" class="ghost" onclick="this.closest('form').reset()">Clear</button>
         </div>
+        <p class="form-helper">User accounts are loaded from environment variables (e.g., <code>ADMIN_PASSWORD</code>, <code>USER_PASSWORD</code>). To fully automate this panel, store credentials in a Supabase table such as <code>app_users</code> and update authentication to read from it.</p>
       </form>
-
-      <div class="summary-block">
-        <h3>Active Sessions</h3>
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>User</th>
-              <th>Role</th>
-              <th>Last Activity</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>ADMIN</td>
-              <td>Administrator</td>
-              <td>2 minutes ago</td>
-              <td><span class="status status-online">Online</span></td>
-            </tr>
-            <tr>
-              <td>k.williams</td>
-              <td>Manager</td>
-              <td>23 minutes ago</td>
-              <td><span class="status">Idle</span></td>
-            </tr>
-            <tr>
-              <td>a.li</td>
-              <td>Analyst</td>
-              <td>Yesterday</td>
-              <td><span class="status status-offline">Offline</span></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
     </article>
 
     <article class="tab-panel" role="tabpanel" data-tab-panel="roles" aria-hidden="true">
       <h2>Roles &amp; Permissions</h2>
-      <p>Design role-based access policies by module and action.</p>
       <div class="summary-block">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Capability</th>
-              <th>Viewer</th>
-              <th>Analyst</th>
-              <th>Manager</th>
-              <th>Administrator</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td>View Dashboards</td>
-              <td>Read</td>
-              <td>Read</td>
-              <td>Read</td>
-              <td>Manage</td>
-            </tr>
-            <tr>
-              <td>Modify Data Sources</td>
-              <td>None</td>
-              <td>Propose</td>
-              <td>Approve</td>
-              <td>Manage</td>
-            </tr>
-            <tr>
-              <td>User Administration</td>
-              <td>None</td>
-              <td>None</td>
-              <td>Review</td>
-              <td>Manage</td>
-            </tr>
-            <tr>
-              <td>System Policies</td>
-              <td>Read</td>
-              <td>Read</td>
-              <td>Approve</td>
-              <td>Manage</td>
-            </tr>
-          </tbody>
-        </table>
+        <p>{{ missing_feeds.roles }}</p>
+        <p class="form-helper">Until a dedicated data feed is implemented, update role descriptions directly in the codebase or maintain a Supabase table named <code>roles</code> with modules, capabilities, and allowed actions.</p>
       </div>
-
-      <form class="config-form" method="post" action="#">
-        <h3>Role Change Request</h3>
-        <div class="form-grid">
-          <label>
-            Role Name
-            <input type="text" name="role_name" placeholder="Quality Auditor">
-          </label>
-          <label>
-            Base Permissions
-            <select name="base_role">
-              <option value="viewer">Viewer Template</option>
-              <option value="analyst">Analyst Template</option>
-              <option value="manager">Manager Template</option>
-              <option value="administrator">Administrator Template</option>
-            </select>
-          </label>
-          <label class="full-width">
-            Approval Notes
-            <textarea name="role_notes" rows="3" placeholder="Outline changes that require executive approval."></textarea>
-          </label>
-        </div>
-        <div class="form-actions">
-          <button type="submit" class="primary">Submit for Approval</button>
-          <button type="button" class="ghost">Export Matrix</button>
-        </div>
-      </form>
     </article>
 
     <article class="tab-panel" role="tabpanel" data-tab-panel="system" aria-hidden="true">
       <h2>System Policies</h2>
-      <p>Control global behaviors including security posture, notifications, and compliance automation.</p>
-      <form class="config-form" method="post" action="#">
-        <div class="form-grid">
-          <label>
-            Session Timeout (minutes)
-            <input type="number" name="session_timeout" value="30">
-          </label>
-          <label>
-            MFA Requirement
-            <select name="mfa">
-              <option value="required">Required for all users</option>
-              <option value="privileged">Required for privileged roles</option>
-              <option value="optional">Optional</option>
-            </select>
-          </label>
-          <label>
-            Password Rotation (days)
-            <input type="number" name="password_rotation" value="90">
-          </label>
-          <label>
-            Incident Webhook
-            <input type="url" name="incident_webhook" placeholder="https://hooks.example.com/incident">
-          </label>
-        </div>
-        <div class="form-grid">
-          <label>
-            Maintenance Window
-            <input type="text" name="maintenance_window" placeholder="Saturdays 02:00 - 04:00">
-          </label>
-          <label>
-            Data Retention Policy
-            <select name="retention">
-              <option value="180">180 days</option>
-              <option value="365">1 year</option>
-              <option value="730">2 years</option>
-              <option value="compliant">Custom - Compliant with customer contracts</option>
-            </select>
-          </label>
-          <label class="full-width">
-            Executive Summary Distribution
-            <textarea name="executive_distribution" rows="3" placeholder="List the executive recipients for automated KPI summaries."></textarea>
-          </label>
-        </div>
-        <div class="form-actions">
-          <button type="submit" class="primary">Apply Policies</button>
-          <button type="button" class="ghost">Schedule Change</button>
-        </div>
-      </form>
+      <div class="summary-block">
+        <p>{{ missing_feeds.system_policies }}</p>
+        <p class="form-helper">Policy values (session timeout, MFA, retention) are currently set via deployment configuration. Capture them in Supabase storage or a configuration management service to edit them here.</p>
+      </div>
     </article>
   </div>
 </section>
