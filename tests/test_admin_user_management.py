@@ -144,13 +144,14 @@ def test_admin_can_create_supabase_user(admin_app):
     )
 
     assert response.status_code == 200
+    assert b"has been created with the provided temporary password." in response.data
     stored = supabase.tables.get("app_users", [])
     assert len(stored) == 1
     user = stored[0]
     assert user["username"] == "analyst"
     assert user["display_name"] == "Ana Analyst"
     assert user["role"] == "ANALYST"
-    assert user.get("must_reset_password") is True
+    assert user.get("must_reset_password") in (None, False)
     assert check_password_hash(user["password_hash"], "s3cret")
 
 
