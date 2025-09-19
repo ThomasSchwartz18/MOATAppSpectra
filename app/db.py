@@ -196,29 +196,46 @@ def fetch_recent_moat(days: int = 7):
         return None, f"Failed to fetch recent MOAT data: {exc}"
 
 
-def fetch_distinct_defect_ids() -> tuple[list[str] | None, str | None]:
-    """Return unique defect identifiers from the ``defect`` table."""
+def fetch_defect_catalog() -> tuple[list[dict[str, str]] | None, str | None]:
+    """Return the list of known defects with identifiers and names."""
 
     supabase, error = _ensure_supabase_client()
     if error:
         return None, error
 
     try:
-        response = supabase.table("defect").select("id").execute()
+        response = supabase.table("defect").select("id,name").execute()
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to fetch defects: {exc}"
 
-    values = []
+    catalog: list[dict[str, str]] = []
+    seen: set[str] = set()
     for row in response.data or []:
-        value = row.get("id")
-        if value is None:
+        raw_id = row.get("id")
+        raw_name = row.get("name")
+        defect_id = str(raw_id).strip() if raw_id is not None else ""
+        defect_name = str(raw_name).strip() if raw_name is not None else ""
+        if not defect_id:
             continue
-        text = str(value).strip()
-        if text:
-            values.append(text)
+        normalized = defect_id.casefold()
+        if normalized in seen:
+            continue
+        seen.add(normalized)
+        catalog.append({"id": defect_id, "name": defect_name})
 
-    unique = sorted({text for text in values}, key=lambda item: item.lower())
-    return unique, None
+    catalog.sort(key=lambda item: item["id"].lower())
+    return catalog, None
+
+
+def fetch_distinct_defect_ids() -> tuple[list[str] | None, str | None]:
+    """Return unique defect identifiers from the ``defect`` table."""
+
+    catalog, error = fetch_defect_catalog()
+    if error:
+        return None, error
+
+    identifiers = [item["id"] for item in catalog or []]
+    return identifiers, None
 
 
 def insert_aoi_report(data: dict):

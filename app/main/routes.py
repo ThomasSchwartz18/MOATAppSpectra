@@ -37,6 +37,7 @@ from app.db import (
     delete_app_user,
     fetch_aoi_reports,
     fetch_combined_reports,
+    fetch_defect_catalog,
     fetch_distinct_defect_ids,
     fetch_app_user_credentials,
     fetch_app_users,
@@ -783,13 +784,28 @@ def _prepare_employee_aoi_record(
     return record, errors, sheet_label
 
 
+def _build_defect_response():
+    defects, error = fetch_defect_catalog()
+    payload = {'defects': defects or []}
+    if error:
+        payload['error'] = error
+    status = 200 if not error else 503
+    return payload, status
+
+
+@main_bp.route('/api/defects', methods=['GET'])
+def list_defects():
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    payload, status = _build_defect_response()
+    return jsonify(payload), status
+
+
 @main_bp.route('/employee/defects', methods=['GET'])
 @employee_portal_required
 def employee_list_defects():
-    defects, error = fetch_distinct_defect_ids()
-    if error:
-        return jsonify({'defects': [], 'error': error}), 503
-    return jsonify({'defects': defects})
+    payload, status = _build_defect_response()
+    return jsonify(payload), status
 
 
 @main_bp.route('/employee/aoi_reports', methods=['POST'])

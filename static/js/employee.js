@@ -69,23 +69,34 @@ function setupAoiArea(container) {
       }
       const payload = await response.json();
       const rawDefects = Array.isArray(payload && payload.defects) ? payload.defects : [];
-      const unique = Array.from(new Set(
-        rawDefects
-          .filter((value) => value !== null && value !== undefined)
-          .map((value) => String(value).trim())
-          .filter(Boolean)
-      ));
-      unique.sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+      const unique = [];
+      const seen = new Set();
+      rawDefects.forEach((item) => {
+        if (!item || typeof item !== 'object') return;
+        const rawId = item.id;
+        const rawName = item.name;
+        const id = rawId === undefined || rawId === null ? '' : String(rawId).trim();
+        const name = rawName === undefined || rawName === null ? '' : String(rawName).trim();
+        if (!id) return;
+        const key = id.toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        unique.push({ id, name });
+      });
+      unique.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' }));
       if (!unique.length) {
         setDefectPlaceholder('No defects available', true);
         return;
       }
       setDefectPlaceholder('Select defect', false);
       const fragment = document.createDocumentFragment();
-      unique.forEach((value) => {
+      unique.forEach(({ id, name }) => {
         const option = document.createElement('option');
-        option.value = value;
-        option.textContent = value;
+        option.value = id;
+        option.textContent = name ? `${id} — ${name}` : id;
+        if (name) {
+          option.dataset.defectName = name;
+        }
         fragment.appendChild(option);
       });
       defectSelect.appendChild(fragment);
