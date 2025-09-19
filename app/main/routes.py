@@ -37,6 +37,7 @@ from app.db import (
     delete_app_user,
     fetch_aoi_reports,
     fetch_combined_reports,
+    fetch_distinct_defect_ids,
     fetch_app_user_credentials,
     fetch_app_users,
     fetch_fi_reports,
@@ -745,6 +746,18 @@ def _prepare_employee_aoi_record(
             continue
         record[column] = str(number)
 
+    defect_value = (payload.get('defect_id') or '').strip()
+    if defect_value:
+        valid_defects, defect_error = fetch_distinct_defect_ids()
+        if defect_error:
+            errors['defect_id'] = 'Unable to validate defect selection. Please try again later.'
+        elif defect_value not in (valid_defects or []):
+            errors['defect_id'] = 'Select a valid defect.'
+        else:
+            record['Defect ID'] = defect_value
+    else:
+        errors['defect_id'] = 'Select a defect.'
+
     rev_value = (payload.get('rev') or '').strip()
     if rev_value:
         record['Rev'] = rev_value
@@ -768,6 +781,15 @@ def _prepare_employee_aoi_record(
         record['Additional Information'] = ' | '.join(additional_parts)
 
     return record, errors, sheet_label
+
+
+@main_bp.route('/employee/defects', methods=['GET'])
+@employee_portal_required
+def employee_list_defects():
+    defects, error = fetch_distinct_defect_ids()
+    if error:
+        return jsonify({'defects': [], 'error': error}), 503
+    return jsonify({'defects': defects})
 
 
 @main_bp.route('/employee/aoi_reports', methods=['POST'])
