@@ -304,9 +304,9 @@ document.addEventListener('DOMContentLoaded', () => {
       tracker.recordClick(eventName, context);
     });
 
-    window.addEventListener('beforeunload', () => {
-      tracker.end('page-unload', { useBeacon: true });
-    });
+    // Session tracking should only end on explicit sign-outs triggered via
+    // data-track-session-end="true" elements. Removing the beforeunload
+    // listener prevents refreshes from prematurely closing the session.
   }
 
   // Auto-hide navbar on scroll down; reveal on scroll up
