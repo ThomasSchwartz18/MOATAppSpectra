@@ -2,7 +2,7 @@ import os
 import json
 from pathlib import Path
 
-from flask import Flask, current_app
+from flask import Flask, current_app, session
 from supabase import create_client
 
 from .auth.routes import auth_bp
@@ -36,6 +36,15 @@ def create_app():
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
+
+    @app.context_processor
+    def inject_user_context():
+        username = session.get("username")
+        role = session.get("role") or username
+        return {
+            "username": username,
+            "user_role": role,
+        }
 
     return app
 

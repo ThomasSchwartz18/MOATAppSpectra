@@ -970,3 +970,236 @@ button {
 .analysis-bottom-right .preview-card { flex: 1 1 auto; min-height: 0; }
 
 /* Navbar auto-hide transition handled above */
+
+/* Employee portal */
+body.employee-layout {
+  background: radial-gradient(circle at top, #f3f7fa 0%, #e5edf4 100%);
+}
+
+body.employee-layout .content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 48px 16px;
+}
+
+.employee-portal {
+  width: 100%;
+}
+
+.employee-card {
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: var(--shadow-soft);
+  padding: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.employee-card__header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.employee-card__header h1 {
+  font-size: 1.75rem;
+}
+
+.employee-card__summary {
+  color: var(--ink-subtle);
+}
+
+.employee-card__logout {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: var(--button-bg);
+  color: var(--surface);
+  text-decoration: none;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.employee-card__logout:hover,
+.employee-card__logout:focus {
+  background: var(--accent-strong);
+}
+
+.employee-card__body {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.employee-selection label {
+  font-weight: 600;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.employee-selection select {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: var(--border-thin) solid var(--border);
+  background: var(--surface);
+  font-size: 1rem;
+}
+
+.employee-area-panel {
+  border-radius: 16px;
+  border: var(--border-thick) dashed var(--border-muted);
+  background: var(--muted-light);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.employee-area-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.employee-area-panel__header h2 {
+  font-size: 1.25rem;
+}
+
+.employee-back {
+  background: none;
+  border: none;
+  color: var(--accent-strong);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: none;
+}
+
+.employee-back:hover,
+.employee-back:focus {
+  text-decoration: underline;
+}
+
+.employee-area-message {
+  padding: 16px;
+  background: var(--surface);
+  border-radius: 12px;
+  border: var(--border-thin) solid var(--border);
+  color: var(--ink-subtle);
+}
+
+.employee-button-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.employee-button-group button {
+  padding: 14px 16px;
+  border-radius: 12px;
+  border: var(--border-thin) solid var(--border);
+  background: var(--surface);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.employee-button-group button:hover,
+.employee-button-group button:focus {
+  background: var(--hover-bg);
+  border-color: var(--accent);
+}
+
+.employee-aoi-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.employee-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.employee-field-grid {
+  display: flex;
+  gap: 16px;
+}
+
+.employee-field-grid label,
+.employee-field-full {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-weight: 600;
+}
+
+.employee-field-grid input,
+.employee-field-grid select,
+.employee-field-full textarea {
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: var(--border-thin) solid var(--border);
+  font-size: 1rem;
+  background: var(--surface);
+}
+
+.employee-submit {
+  align-self: flex-start;
+  padding: 12px 20px;
+  border-radius: 999px;
+  background: var(--button-bg);
+  color: var(--surface);
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.employee-submit:hover,
+.employee-submit:focus {
+  background: var(--accent-strong);
+}
+
+.employee-feedback {
+  min-height: 24px;
+  font-weight: 600;
+}
+
+.employee-feedback.is-success {
+  color: #0f8a5f;
+}
+
+.employee-feedback.is-error {
+  color: var(--danger);
+}
+
+@media (max-width: 720px) {
+  body.employee-layout .content {
+    padding: 32px 16px;
+  }
+
+  .employee-card {
+    padding: 24px;
+  }
+
+  .employee-field-grid {
+    flex-direction: column;
+  }
+}

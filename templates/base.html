@@ -6,7 +6,8 @@
   <title>MOAA</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body>
+<body class="{% if user_role == 'EMPLOYEE' %}employee-layout{% endif %}">
+  {% if user_role != 'EMPLOYEE' %}
   <header class="app-header">
     <nav class="navbar" role="navigation" aria-label="Primary">
       <div class="nav-left">
@@ -60,13 +61,14 @@
         <span class="user-text">Signed in as {{ username }}</span>
         {% endif %}
         <a class="nav-utility" href="#">Docs</a>
-        {% if username == 'ADMIN' %}
+        {% if user_role == 'ADMIN' %}
         <a class="nav-utility" href="{{ url_for('main.admin_panel') }}">Admin Console</a>
         {% endif %}
         <a class="nav-utility" href="{{ url_for('auth.logout') }}">Logout</a>
       </div>
     </nav>
   </header>
+  {% endif %}
   <main class="content" role="main">
     {% block content %}{% endblock %}
   </main>

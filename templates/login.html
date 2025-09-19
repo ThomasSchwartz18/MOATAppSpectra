@@ -13,6 +13,9 @@
       <select name="username" id="username">
         <option value="USER">USER</option>
         <option value="ADMIN">ADMIN</option>
+        {% if employee_enabled %}
+        <option value="EMPLOYEE">EMPLOYEE</option>
+        {% endif %}
       </select>
       <label for="password">Password</label>
       <input type="password" name="password" id="password">
