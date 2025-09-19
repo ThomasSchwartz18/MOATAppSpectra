@@ -10,8 +10,8 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 import app as app_module
 from app import create_app
 from app.main import routes
+from app.main.pdf_utils import PdfGenerationError, _REQUIRED_NATIVE_DEPS_MESSAGE
 from app.main.pdf_utils import PdfGenerationError
-
 
 @pytest.fixture
 def app_instance(monkeypatch):
@@ -31,6 +31,7 @@ def _mock_integrated_report(monkeypatch):
 
 def test_integrated_export_returns_dependency_error(app_instance, monkeypatch):
     _mock_integrated_report(monkeypatch)
+    message = _REQUIRED_NATIVE_DEPS_MESSAGE
     message = "Install Pango, GObject, and Cairo"
 
     def _raise_pdf_error(*args, **kwargs):
