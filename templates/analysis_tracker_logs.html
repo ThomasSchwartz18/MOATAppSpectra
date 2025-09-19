@@ -1,0 +1,570 @@
+{% extends 'base.html' %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/simple-datatables@9.0.0/dist/style.css">
+  <style>
+    .tracker-dashboard {
+      padding: 1.5rem;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .tracker-dashboard h1 {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .tracker-dashboard p.page-intro {
+      margin-bottom: 1.5rem;
+      color: #333;
+    }
+
+    .tracker-dashboard .filters {
+      display: grid;
+      gap: 0.75rem 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      margin-bottom: 1.5rem;
+      background: #f7f9fc;
+      border: 1px solid #dbe2ef;
+      border-radius: 8px;
+      padding: 1rem;
+    }
+
+    .tracker-dashboard .filters label {
+      display: flex;
+      flex-direction: column;
+      font-size: 0.85rem;
+      color: #4a4a4a;
+    }
+
+    .tracker-dashboard .filters input,
+    .tracker-dashboard .filters select {
+      margin-top: 0.25rem;
+      padding: 0.4rem 0.5rem;
+      border-radius: 4px;
+      border: 1px solid #cbd5e1;
+      font-size: 0.9rem;
+    }
+
+    .tracker-dashboard .filters button {
+      align-self: end;
+      padding: 0.55rem 0.9rem;
+      background: #1d4ed8;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .tracker-dashboard .filters button.secondary {
+      background: #64748b;
+      margin-left: 0.5rem;
+    }
+
+    .tracker-dashboard .stats-grid {
+      display: grid;
+      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      margin-bottom: 2rem;
+    }
+
+    .tracker-dashboard .stat-card {
+      background: #fff;
+      border: 1px solid #dbe2ef;
+      border-radius: 8px;
+      padding: 1rem;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    }
+
+    .tracker-dashboard .stat-card h3 {
+      margin: 0;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #475569;
+    }
+
+    .tracker-dashboard .stat-card strong {
+      display: block;
+      margin-top: 0.35rem;
+      font-size: 1.4rem;
+      color: #0f172a;
+    }
+
+    .tracker-dashboard .charts {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .tracker-dashboard .chart-card {
+      background: #fff;
+      border-radius: 8px;
+      border: 1px solid #dbe2ef;
+      padding: 1rem;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    }
+
+    .tracker-dashboard .chart-card h2 {
+      font-size: 1rem;
+      margin-bottom: 0.75rem;
+      color: #1f2937;
+    }
+
+    .tracker-dashboard table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1.5rem;
+      background: #fff;
+    }
+
+    .tracker-dashboard table thead {
+      background: #0f172a;
+      color: #fff;
+    }
+
+    .tracker-dashboard table th,
+    .tracker-dashboard table td {
+      padding: 0.65rem;
+      border: 1px solid #e2e8f0;
+      vertical-align: top;
+      font-size: 0.9rem;
+    }
+
+    .tracker-dashboard table tbody tr:nth-child(even) {
+      background: #f8fafc;
+    }
+
+    .tracker-dashboard table tbody tr.has-backtracking {
+      background: #fff4f4;
+    }
+
+    .tracker-dashboard .path {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+
+    .tracker-dashboard .path span {
+      background: #e2e8f0;
+      padding: 0.2rem 0.45rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+    }
+
+    .tracker-dashboard .path span.is-backtrack {
+      background: #fee2e2;
+      color: #b91c1c;
+      border: 1px solid #fca5a5;
+    }
+
+    .tracker-dashboard details summary {
+      cursor: pointer;
+      color: #1d4ed8;
+    }
+
+    .tracker-dashboard .backtracking-highlights {
+      margin-top: 2rem;
+    }
+
+    .tracker-dashboard .backtracking-highlights ul {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 0.75rem;
+    }
+
+    .tracker-dashboard .backtracking-highlights li {
+      border: 1px solid #fca5a5;
+      background: #fff1f2;
+      border-radius: 8px;
+      padding: 0.75rem;
+    }
+
+    .tracker-dashboard .backtracking-highlights h3 {
+      margin: 0 0 0.35rem;
+      font-size: 1rem;
+      color: #b91c1c;
+    }
+
+    .tracker-dashboard .table-section h2 {
+      font-size: 1.2rem;
+      margin: 1rem 0 0.5rem;
+      color: #1f2937;
+    }
+
+    @media (max-width: 768px) {
+      .tracker-dashboard {
+        padding: 1rem;
+      }
+
+      .tracker-dashboard table,
+      .tracker-dashboard table th,
+      .tracker-dashboard table td {
+        font-size: 0.8rem;
+      }
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div class="tracker-dashboard">
+    <h1>Application Tracker Logs</h1>
+    <p class="page-intro">Review recent application interaction sessions recorded by the in-app tracker. Use the filters to explore behaviour by role, event type, or backtracking activity.</p>
+
+    <form class="filters" method="get">
+      <label>
+        Role
+        <select name="role">
+          <option value="">All roles</option>
+          {% for option in role_options %}
+          <option value="{{ option }}" {% if filters.role == option %}selected{% endif %}>{{ option }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Event Type
+        <select name="event">
+          <option value="">All events</option>
+          {% for option in event_options %}
+          <option value="{{ option }}" {% if filters.event == option %}selected{% endif %}>{{ option }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Session / User Search
+        <input type="text" name="session" value="{{ filters.session }}" placeholder="Token, username or ID">
+      </label>
+      <label>
+        Backtracking
+        <select name="backtracking">
+          <option value="any" {% if filters.backtracking == 'any' %}selected{% endif %}>Any activity</option>
+          <option value="only" {% if filters.backtracking == 'only' %}selected{% endif %}>Backtracking only</option>
+          <option value="exclude" {% if filters.backtracking in ['exclude', 'none'] %}selected{% endif %}>Exclude backtracking</option>
+        </select>
+      </label>
+      <label>
+        Start (ISO date)
+        <input type="text" name="start" value="{{ filters.start }}" placeholder="YYYY-MM-DD or ISO timestamp">
+      </label>
+      <label>
+        End (ISO date)
+        <input type="text" name="end" value="{{ filters.end }}" placeholder="YYYY-MM-DD or ISO timestamp">
+      </label>
+      <label>
+        Session limit
+        <input type="number" min="10" max="250" step="10" name="limit" value="{{ filters.limit }}">
+      </label>
+      <div>
+        <button type="submit">Apply filters</button>
+        <button type="submit" name="reset" value="1" class="secondary" formnovalidate>Reset</button>
+      </div>
+    </form>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <h3>Sessions</h3>
+        <strong>{{ stats.total_sessions }}</strong>
+      </div>
+      <div class="stat-card">
+        <h3>Total Events</h3>
+        <strong>{{ stats.total_events }}</strong>
+      </div>
+      <div class="stat-card">
+        <h3>Navigation Events</h3>
+        <strong>{{ stats.total_navigation }}</strong>
+      </div>
+      <div class="stat-card">
+        <h3>Backtracking Events</h3>
+        <strong>{{ stats.total_backtracking }}</strong>
+      </div>
+      <div class="stat-card">
+        <h3>Average Session Duration</h3>
+        <strong>{{ stats.avg_duration }}</strong>
+      </div>
+    </div>
+
+    <section class="charts">
+      <div class="chart-card">
+        <h2>Session Duration vs Backtracking</h2>
+        <canvas id="sessionDurationChart" aria-label="Session duration vs backtracking chart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h2>Event Distribution</h2>
+        <canvas id="eventDistributionChart" aria-label="Event distribution chart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h2>Sessions by Role</h2>
+        <canvas id="roleBreakdownChart" aria-label="Session count by role"></canvas>
+      </div>
+    </section>
+
+    <section class="table-section">
+      <h2>Recent Sessions</h2>
+      {% if sessions %}
+      <table id="sessionTable">
+        <thead>
+          <tr>
+            <th>Session</th>
+            <th>User</th>
+            <th>Role</th>
+            <th>Started</th>
+            <th>Ended</th>
+            <th>Duration</th>
+            <th>Events</th>
+            <th>Navigation</th>
+            <th>Backtracking</th>
+            <th>Navigation Path</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for session in sessions %}
+          <tr class="{% if session.has_backtracking %}has-backtracking{% endif %}">
+            <td data-label="Session">{{ session.token }}</td>
+            <td data-label="User">{{ session.username or session.user_id or '—' }}</td>
+            <td data-label="Role">{{ session.role or '—' }}</td>
+            <td data-label="Started">{{ session.start_display or '—' }}</td>
+            <td data-label="Ended">{{ session.end_display or '—' }}</td>
+            <td data-label="Duration">{{ session.duration_label }}</td>
+            <td data-label="Events">{{ session.event_count }}</td>
+            <td data-label="Navigation">{{ session.navigation_count }}</td>
+            <td data-label="Backtracking">{{ session.backtracking_count }}</td>
+            <td data-label="Navigation Path">
+              <div class="path">
+                {% for entry in session.path %}
+                <span class="{% if entry.is_backtrack %}is-backtrack{% endif %}">
+                  {{ entry.label or entry.href or 'Navigate' }}
+                </span>
+                {% endfor %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p>No sessions matched the selected filters.</p>
+      {% endif %}
+    </section>
+
+    <section class="table-section">
+      <h2>Interaction Events{% if filters.event %} &ndash; {{ filters.event }}{% endif %}</h2>
+      {% if events %}
+      <table id="eventTable">
+        <thead>
+          <tr>
+            <th>Session</th>
+            <th>User</th>
+            <th>Role</th>
+            <th>Event</th>
+            <th>Timestamp</th>
+            <th>Target</th>
+            <th>Backtrack?</th>
+            <th>Context</th>
+            <th>Metadata</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for event in events %}
+          <tr class="{% if event.is_backtrack %}has-backtracking{% endif %}">
+            <td data-label="Session">{{ event.session_token }}</td>
+            <td data-label="User">{{ event.user }}</td>
+            <td data-label="Role">{{ event.role or '—' }}</td>
+            <td data-label="Event">{{ event.event }}</td>
+            <td data-label="Timestamp">{{ event.occurred }}</td>
+            <td data-label="Target">{{ event.label or event.href or '—' }}</td>
+            <td data-label="Backtrack?">{{ 'Yes' if event.is_backtrack else 'No' }}</td>
+            <td data-label="Context">
+              {% if event.context %}
+              <details>
+                <summary>View</summary>
+                <pre>{{ event.context | tojson(indent=2) }}</pre>
+              </details>
+              {% else %}
+              —
+              {% endif %}
+            </td>
+            <td data-label="Metadata">
+              {% if event.metadata %}
+              <details>
+                <summary>View</summary>
+                <pre>{{ event.metadata | tojson(indent=2) }}</pre>
+              </details>
+              {% else %}
+              —
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p>No interaction events matched the selected filters.</p>
+      {% endif %}
+    </section>
+
+    {% if backtracking_sessions %}
+    <section class="backtracking-highlights">
+      <h2>Highlighted Backtracking Activity</h2>
+      <ul>
+        {% for session in backtracking_sessions %}
+        <li>
+          <h3>{{ session.username or session.user_id or session.token }}</h3>
+          <p><strong>Session:</strong> {{ session.token }}</p>
+          <p><strong>Backtracking events:</strong> {{ session.backtracking_count }}</p>
+          <p><strong>Duration:</strong> {{ session.duration_label }}</p>
+          <ul>
+            {% for entry in session.backtracking_events %}
+            <li>{{ entry.occurred }} &mdash; {{ entry.label or entry.href or 'Navigate' }}</li>
+            {% endfor %}
+          </ul>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+    {% endif %}
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script src="https://cdn.jsdelivr.net/npm/simple-datatables@9.0.0/dist/umd/simple-datatables.min.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const sessionData = {{ chart_data | tojson }};
+      const eventSummary = {{ event_summary_data | tojson }};
+      const roleSummary = {{ role_breakdown_data | tojson }};
+
+      const durationCtx = document.getElementById('sessionDurationChart');
+      if (durationCtx && sessionData && sessionData.labels && sessionData.labels.length) {
+        const durationMinutes = (sessionData.durations || []).map((value) => {
+          const seconds = Number(value) || 0;
+          return Math.round((seconds / 60) * 10) / 10;
+        });
+        const backtracks = sessionData.backtracking || [];
+
+        new Chart(durationCtx, {
+          type: 'bar',
+          data: {
+            labels: sessionData.labels,
+            datasets: [
+              {
+                label: 'Session Duration (minutes)',
+                data: durationMinutes,
+                backgroundColor: '#2563eb',
+                borderColor: '#1d4ed8',
+                borderWidth: 1,
+                yAxisID: 'y',
+              },
+              {
+                label: 'Backtracking Events',
+                data: backtracks,
+                type: 'line',
+                borderColor: '#e11d48',
+                backgroundColor: 'rgba(225, 29, 72, 0.35)',
+                fill: false,
+                tension: 0.2,
+                yAxisID: 'y1',
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            scales: {
+              y: {
+                beginAtZero: true,
+                title: { display: true, text: 'Duration (minutes)' },
+              },
+              y1: {
+                beginAtZero: true,
+                position: 'right',
+                grid: { drawOnChartArea: false },
+                title: { display: true, text: 'Backtracking events' },
+              },
+              x: {
+                ticks: { autoSkip: false },
+              },
+            },
+          },
+        });
+      }
+
+      const eventCtx = document.getElementById('eventDistributionChart');
+      if (eventCtx && eventSummary && eventSummary.labels && eventSummary.labels.length) {
+        new Chart(eventCtx, {
+          type: 'bar',
+          data: {
+            labels: eventSummary.labels,
+            datasets: [
+              {
+                label: 'Event count',
+                data: eventSummary.counts,
+                backgroundColor: '#059669',
+                borderColor: '#047857',
+                borderWidth: 1,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            indexAxis: 'y',
+            scales: {
+              x: { beginAtZero: true },
+            },
+          },
+        });
+      }
+
+      const roleCtx = document.getElementById('roleBreakdownChart');
+      if (roleCtx && roleSummary && roleSummary.labels && roleSummary.labels.length) {
+        const palette = ['#1d4ed8', '#6366f1', '#0f766e', '#ea580c', '#facc15', '#e11d48'];
+        new Chart(roleCtx, {
+          type: 'doughnut',
+          data: {
+            labels: roleSummary.labels,
+            datasets: [
+              {
+                data: roleSummary.counts,
+                backgroundColor: roleSummary.labels.map((_, idx) => palette[idx % palette.length]),
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: 'bottom' },
+            },
+          },
+        });
+      }
+
+      if (window.simpleDatatables) {
+        const { DataTable } = window.simpleDatatables;
+        const sessionTable = document.querySelector('#sessionTable');
+        if (sessionTable) {
+          new DataTable(sessionTable, {
+            searchable: true,
+            fixedHeight: false,
+            perPage: 10,
+          });
+        }
+
+        const eventTable = document.querySelector('#eventTable');
+        if (eventTable) {
+          new DataTable(eventTable, {
+            searchable: true,
+            fixedHeight: false,
+            perPage: 15,
+          });
+        }
+      }
+    });
+  </script>
+{% endblock %}

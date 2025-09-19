@@ -17,6 +17,7 @@ import io
 import os
 from urllib.parse import urlparse
 import re
+import json
 from datetime import datetime, date, timezone
 from zoneinfo import ZoneInfo
 from openpyxl import load_workbook
@@ -64,6 +65,7 @@ from fi_utils import parse_fi_rejections
 
 # Helpers for AOI Grades analytics
 from collections import defaultdict, Counter
+from statistics import mean
 
 
 def _normalize_header(value: str | None) -> str:
@@ -3391,6 +3393,350 @@ def aoi_grades_page():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
     return render_template('aoi_grades.html', username=session.get('username'))
+
+
+@main_bp.route('/analysis/tracker-logs', methods=['GET'])
+@admin_required
+def analysis_tracker_logs():
+    tracker = _get_tracker()
+    args = request.args
+
+    if args.get('reset'):
+        return redirect(url_for('main.analysis_tracker_logs'))
+
+    tz_name = current_app.config.get('LOCAL_TIMEZONE', 'America/Chicago')
+    try:
+        local_zone = ZoneInfo(tz_name)
+    except Exception:  # pragma: no cover - fallback to UTC if tz not available
+        local_zone = timezone.utc
+
+    def _parse_timestamp(value):
+        if not value:
+            return None
+        cleaned = str(value).strip()
+        if cleaned.endswith('Z'):
+            cleaned = cleaned[:-1] + '+00:00'
+        try:
+            parsed = datetime.fromisoformat(cleaned)
+        except ValueError:
+            return None
+        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+    def _parse_date_arg(value, *, clamp_end: bool = False):
+        if not value:
+            return None
+        cleaned = str(value).strip()
+        try:
+            if len(cleaned) == 10:
+                dt = datetime.fromisoformat(cleaned)
+                if clamp_end:
+                    dt = dt.replace(hour=23, minute=59, second=59)
+            else:
+                dt = datetime.fromisoformat(cleaned)
+        except ValueError:
+            return None
+        return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+
+    def _format_timestamp(value):
+        if not value:
+            return None
+        try:
+            localized = value.astimezone(local_zone)
+        except Exception:
+            localized = value
+        return localized.strftime('%Y-%m-%d %H:%M:%S %Z')
+
+    def _format_duration(seconds):
+        if seconds is None:
+            return '--'
+        remaining = max(0, float(seconds))
+        hours = int(remaining // 3600)
+        minutes = int((remaining % 3600) // 60)
+        secs = remaining % 60
+        parts: list[str] = []
+        if hours:
+            parts.append(f"{hours}h")
+        if minutes:
+            parts.append(f"{minutes}m")
+        parts.append(f"{secs:.0f}s")
+        return ' '.join(parts)
+
+    def _loads(payload):
+        if not payload:
+            return None
+        try:
+            return json.loads(payload)
+        except Exception:
+            return None
+
+    limit = args.get('limit', type=int) or 50
+    limit = max(10, min(limit, 250))
+
+    role_filter = (args.get('role') or '').strip().upper() or None
+    event_filter = (args.get('event') or '').strip() or None
+    event_filter_lower = event_filter.lower() if event_filter else None
+    search_filter = (args.get('session') or '').strip()
+    backtracking_filter = (args.get('backtracking') or '').strip().lower() or 'any'
+    start_filter_input = (args.get('start') or '').strip()
+    end_filter_input = (args.get('end') or '').strip()
+
+    start_dt = _parse_date_arg(start_filter_input, clamp_end=False)
+    end_dt = _parse_date_arg(end_filter_input, clamp_end=True)
+
+    where_clauses: list[str] = []
+    params: list[str] = []
+    if role_filter:
+        where_clauses.append('user_role = ?')
+        params.append(role_filter)
+    if search_filter:
+        like = f"%{search_filter.lower()}%"
+        where_clauses.append(
+            '('
+            'LOWER(COALESCE(username, "")) LIKE ? OR '
+            'LOWER(COALESCE(user_id, "")) LIKE ? OR '
+            'LOWER(session_token) LIKE ?'
+            ')'
+        )
+        params.extend([like, like, like])
+    if start_dt:
+        where_clauses.append('datetime(start_time) >= datetime(?)')
+        params.append(start_dt.astimezone(timezone.utc).isoformat())
+    if end_dt:
+        where_clauses.append('datetime(COALESCE(end_time, start_time)) <= datetime(?)')
+        params.append(end_dt.astimezone(timezone.utc).isoformat())
+
+    query = (
+        'SELECT id, session_token, user_id, username, user_role, '
+        'start_time, end_time, duration_seconds '
+        'FROM sessions'
+    )
+    if where_clauses:
+        query += ' WHERE ' + ' AND '.join(where_clauses)
+    query += ' ORDER BY datetime(start_time) DESC LIMIT ?'
+    params.append(limit)
+
+    with tracker._connect() as conn:
+        session_rows = conn.execute(query, params).fetchall()
+
+        tokens = [row['session_token'] for row in session_rows]
+        event_rows = []
+        if tokens:
+            placeholders = ','.join('?' for _ in tokens)
+            event_query = (
+                'SELECT id, session_token, user_id, user_role, event_name, '
+                'context, metadata, occurred_at '
+                f'FROM click_events WHERE session_token IN ({placeholders}) '
+                'ORDER BY datetime(occurred_at) ASC, id ASC'
+            )
+            event_rows = conn.execute(event_query, tokens).fetchall()
+
+    role_options = sorted(
+        {row['user_role'] for row in session_rows if row['user_role']}
+    )
+    event_options = sorted({row['event_name'] for row in event_rows})
+
+    events_by_session: dict[str, list[dict]] = {token: [] for token in (tokens or [])}
+    for row in event_rows:
+        occurred_dt = _parse_timestamp(row['occurred_at'])
+        context_payload = _loads(row['context'])
+        metadata_payload = _loads(row['metadata'])
+        label = None
+        href = None
+        if isinstance(context_payload, dict):
+            label = (context_payload.get('text') or '').strip() or None
+            href = context_payload.get('href')
+        events_by_session.setdefault(row['session_token'], []).append(
+            {
+                'id': row['id'],
+                'name': row['event_name'],
+                'occurred': occurred_dt,
+                'occurred_display': _format_timestamp(occurred_dt) or row['occurred_at'],
+                'context': context_payload,
+                'metadata': metadata_payload,
+                'label': label,
+                'href': href,
+                'is_backtrack': False,
+            }
+        )
+
+    session_details: list[dict] = []
+    all_events: list[dict] = []
+    for row in session_rows:
+        token = row['session_token']
+        start_ts = _parse_timestamp(row['start_time'])
+        end_ts = _parse_timestamp(row['end_time'])
+        events = events_by_session.get(token, [])
+
+        navigation_events = [ev for ev in events if ev['name'].lower() == 'navigate']
+        seen_hrefs: set[str] = set()
+        backtracking_events: list[dict] = []
+        for event in navigation_events:
+            href = event.get('href')
+            if href:
+                if href in seen_hrefs:
+                    event['is_backtrack'] = True
+                    backtracking_events.append(event)
+                else:
+                    seen_hrefs.add(href)
+
+        raw_duration = row['duration_seconds']
+        try:
+            duration_seconds = float(raw_duration) if raw_duration is not None else None
+        except (TypeError, ValueError):
+            duration_seconds = None
+        if duration_seconds is None and start_ts:
+            reference_ts = end_ts
+            if reference_ts is None and events:
+                reference_ts = events[-1]['occurred']
+            if reference_ts:
+                try:
+                    duration_seconds = (reference_ts - start_ts).total_seconds()
+                except Exception:
+                    duration_seconds = None
+
+        duration_label = _format_duration(duration_seconds)
+        path = [
+            {
+                'href': event.get('href'),
+                'label': event.get('label'),
+                'occurred': event['occurred_display'],
+                'is_backtrack': event['is_backtrack'],
+            }
+            for event in navigation_events
+        ]
+
+        last_event_display = events[-1]['occurred_display'] if events else None
+        detail = {
+            'token': token,
+            'user_id': row['user_id'],
+            'username': row['username'],
+            'role': row['user_role'],
+            'start_display': _format_timestamp(start_ts),
+            'end_display': _format_timestamp(end_ts),
+            'duration_seconds': duration_seconds,
+            'duration_label': duration_label,
+            'event_count': len(events),
+            'navigation_count': len(navigation_events),
+            'backtracking_count': len(backtracking_events),
+            'has_backtracking': bool(backtracking_events),
+            'backtracking_events': [
+                {
+                    'href': event.get('href'),
+                    'label': event.get('label'),
+                    'occurred': event['occurred_display'],
+                }
+                for event in backtracking_events
+            ],
+            'path': path,
+            'last_event_display': last_event_display,
+            'events': events,
+        }
+        session_details.append(detail)
+
+        for event in events:
+            if event_filter_lower and event['name'].lower() != event_filter_lower:
+                continue
+            flattened = {
+                'session_token': token,
+                'user': row['username'] or row['user_id'] or 'Unknown',
+                'role': row['user_role'],
+                'event': event['name'],
+                'occurred': event['occurred_display'],
+                'href': event.get('href'),
+                'label': event.get('label'),
+                'is_backtrack': event['is_backtrack'],
+                'context': event['context'],
+                'metadata': event['metadata'],
+            }
+            all_events.append(flattened)
+
+    if backtracking_filter == 'only':
+        session_details = [s for s in session_details if s['has_backtracking']]
+    elif backtracking_filter in {'none', 'exclude'}:
+        session_details = [s for s in session_details if not s['has_backtracking']]
+
+    included_tokens = {detail['token'] for detail in session_details}
+    if included_tokens:
+        all_events = [
+            event for event in all_events if event['session_token'] in included_tokens
+        ]
+    else:
+        all_events = []
+
+    max_events = 400
+    if len(all_events) > max_events:
+        all_events = all_events[-max_events:]
+
+    total_events = sum(detail['event_count'] for detail in session_details)
+    total_navigation = sum(detail['navigation_count'] for detail in session_details)
+    total_backtracking = sum(detail['backtracking_count'] for detail in session_details)
+    duration_values = [
+        detail['duration_seconds']
+        for detail in session_details
+        if detail['duration_seconds'] is not None
+    ]
+    avg_duration = mean(duration_values) if duration_values else None
+
+    stats = {
+        'total_sessions': len(session_details),
+        'total_events': total_events,
+        'total_navigation': total_navigation,
+        'total_backtracking': total_backtracking,
+        'avg_duration': _format_duration(avg_duration)
+        if avg_duration is not None
+        else '--',
+    }
+
+    chart_data = {
+        'labels': [
+            (detail['username'] or detail['user_id'] or detail['token'])
+            for detail in session_details
+        ],
+        'durations': [
+            round(detail['duration_seconds'], 2) if detail['duration_seconds'] else 0
+            for detail in session_details
+        ],
+        'backtracking': [detail['backtracking_count'] for detail in session_details],
+        'navigation': [detail['navigation_count'] for detail in session_details],
+    }
+
+    event_counter = Counter(event['event'] for event in all_events) if all_events else Counter()
+    event_summary_data = {
+        'labels': [item[0] for item in event_counter.most_common()],
+        'counts': [item[1] for item in event_counter.most_common()],
+    }
+
+    role_counter = Counter(detail['role'] or 'Unknown' for detail in session_details)
+    role_breakdown_data = {
+        'labels': [item[0] for item in role_counter.most_common()],
+        'counts': [item[1] for item in role_counter.most_common()],
+    }
+
+    filters = {
+        'role': role_filter,
+        'event': event_filter,
+        'session': search_filter,
+        'backtracking': backtracking_filter,
+        'start': start_filter_input,
+        'end': end_filter_input,
+        'limit': limit,
+    }
+
+    backtracking_sessions = [s for s in session_details if s['has_backtracking']]
+
+    return render_template(
+        'analysis_tracker_logs.html',
+        sessions=session_details,
+        events=all_events,
+        stats=stats,
+        filters=filters,
+        role_options=role_options,
+        event_options=event_options,
+        chart_data=chart_data,
+        event_summary_data=event_summary_data,
+        role_breakdown_data=role_breakdown_data,
+        backtracking_sessions=backtracking_sessions,
+    )
 
 
 @main_bp.route('/analysis/aoi', methods=['GET'])
