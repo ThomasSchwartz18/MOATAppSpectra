@@ -14,31 +14,4 @@
         <p><b>questions?:</b> &lt;{{ contact }}&gt;</p>
         <p>{{ confidentiality }}</p>
     </div>
-    {% if show_summary %}
-    <div class="summary section-card">
-        <h2>Summary</h2>
-        <p class="section-desc">Provides key metrics from the reporting period.</p>
-        <p><strong>Date range:</strong> {{ start }} - {{ end }}</p>
-        <p><strong>Average yield:</strong> {{ yieldSummary.avg|round(2) }}%</p>
-        <p><strong>Total boards:</strong> {{ operatorSummary.totalBoards }}</p>
-        <p><strong>Average false calls/board:</strong> {{ modelSummary.avgFalseCalls|round(2) }}</p>
-    </div>
-    <div class="summary-break"></div>
-    <div class="toc section-card">
-        <h2>Table of Contents</h2>
-        <ol>
-            <li><a href="#yield-trend">Yield Trend</a></li>
-            <li><a href="#operator-reject">Operator Reject</a></li>
-            <li><a href="#model-false-calls">Model False Calls</a></li>
-            <li><a href="#fc-vs-ng-rate">FC vs NG Rate</a></li>
-            <li><a href="#fc-ng-ratio">FC/NG Ratio</a></li>
-            <li><a href="#defect-intelligence">Defect Intelligence</a></li>
-            <li><a href="#operator-reliability">Operator Reliability</a></li>
-            <li><a href="#operator-production">Operator Production</a></li>
-            <li><a href="#low-yield-assemblies">Low Yield Assemblies</a></li>
-            <li><a href="#capa-action-register">CAPA / Action Register</a></li>
-            <li><a href="#appendix">Appendix</a></li>
-        </ol>
-    </div>
-    {% endif %}
 </section>

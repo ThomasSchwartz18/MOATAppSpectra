@@ -1,9 +1,63 @@
-<div class="summary-break"></div>
-<div class="toc section-card">
-    <h2>Table of Contents</h2>
-    <ol>
-        <li><a href="#shift-summary">Shift Summary</a></li>
-        <li><a href="#assembly-history">Assembly Historical Yield</a></li>
-    </ol>
-</div>
+<section class="report-section summary-page avoid-break{% if show_cover %} summary-after-cover{% endif %}">
+    <div class="summary section-card">
+        <h2>1st Shift Summary</h2>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Program</th>
+                    <th>Assembly</th>
+                    <th>Job Number</th>
+                    <th>Quantity Inspected</th>
+                    <th>Quantity Rejected</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in shift1 %}
+                <tr>
+                    <td>{{ row.operator }}</td>
+                    <td>{{ row.program }}</td>
+                    <td>{{ row.assembly }}</td>
+                    <td>{{ row.job }}</td>
+                    <td>{{ row.inspected }}</td>
+                    <td>{{ row.rejected }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
 
+        <h2>2nd Shift Summary</h2>
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Operator</th>
+                    <th>Program</th>
+                    <th>Assembly</th>
+                    <th>Job Number</th>
+                    <th>Quantity Inspected</th>
+                    <th>Quantity Rejected</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in shift2 %}
+                <tr>
+                    <td>{{ row.operator }}</td>
+                    <td>{{ row.program }}</td>
+                    <td>{{ row.assembly }}</td>
+                    <td>{{ row.job }}</td>
+                    <td>{{ row.inspected }}</td>
+                    <td>{{ row.rejected }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="summary-break"></div>
+    <div class="toc section-card">
+        <h2>Table of Contents</h2>
+        <ol>
+            <li><a href="#shift-summary">Shift Summary</a></li>
+            <li><a href="#assembly-history">Assembly Historical Yield</a></li>
+        </ol>
+    </div>
+</section>

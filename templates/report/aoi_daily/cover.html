@@ -14,46 +14,5 @@
         <p><b>questions?:</b> &lt;{{ contact }}&gt;</p>
         <p>{{ confidentiality }}</p>
     </div>
-
-    <div class="summary section-card">
-        <h2>1st Shift Summary</h2>
-        <table class="data-table">
-            <thead>
-                <tr><th>Operator</th><th>Program</th><th>Assembly</th><th>Job Number</th><th>Quantity Inspected</th><th>Quantity Rejected</th></tr>
-            </thead>
-            <tbody>
-            {% for row in shift1 %}
-                <tr>
-                    <td>{{ row.operator }}</td>
-                    <td>{{ row.program }}</td>
-                    <td>{{ row.assembly }}</td>
-                    <td>{{ row.job }}</td>
-                    <td>{{ row.inspected }}</td>
-                    <td>{{ row.rejected }}</td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-
-        <h2>2nd Shift Summary</h2>
-        <table class="data-table">
-            <thead>
-                <tr><th>Operator</th><th>Program</th><th>Assembly</th><th>Job Number</th><th>Quantity Inspected</th><th>Quantity Rejected</th></tr>
-            </thead>
-            <tbody>
-            {% for row in shift2 %}
-                <tr>
-                    <td>{{ row.operator }}</td>
-                    <td>{{ row.program }}</td>
-                    <td>{{ row.assembly }}</td>
-                    <td>{{ row.job }}</td>
-                    <td>{{ row.inspected }}</td>
-                    <td>{{ row.rejected }}</td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-        {% include 'report/aoi_daily/summary_toc.html' %}
-    </div>
 </section>
 

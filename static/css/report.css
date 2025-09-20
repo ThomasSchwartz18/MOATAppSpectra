@@ -391,6 +391,10 @@ pre,
         page-break-after: always;
     }
 
+    .summary-after-cover {
+        page-break-before: always;
+    }
+
     .combined-section {
         page-break-after: auto;
     }
