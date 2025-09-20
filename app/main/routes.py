@@ -1204,6 +1204,29 @@ def submit_bug_report():
     attachment_paths: list[str] = []
 
     reporter_display_name = user.get('username')
+    reporter_auth_uuid: str | None = None
+
+    username = user.get('username')
+    if username:
+        supabase_account, fetch_error = fetch_app_user_credentials(username)
+        if fetch_error:  # pragma: no cover - logging only
+            current_app.logger.warning(
+                "Failed to load Supabase account for %s: %s", username, fetch_error
+            )
+        if supabase_account:
+            reporter_display_name = (
+                supabase_account.get('display_name') or reporter_display_name
+            )
+            for key in (
+                'auth_user_id',
+                'auth_user_uuid',
+                'auth_user',
+                'auth_uuid',
+            ):
+                candidate = supabase_account.get(key)
+                if candidate:
+                    reporter_auth_uuid = str(candidate)
+                    break
 
     for file_storage in request.files.getlist('attachments'):
         if not file_storage or not file_storage.filename:
@@ -1221,9 +1244,11 @@ def submit_bug_report():
         'description': description,
         'priority': priority,
         'attachments': attachment_paths,
-        'reporter_id': user.get('user_id'),
         'status': payload.get('status') or 'open',
     }
+
+    if reporter_auth_uuid:
+        record['reporter_id'] = reporter_auth_uuid
 
     created, error = insert_bug_report(record)
     if error:
