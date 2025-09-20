@@ -150,3 +150,48 @@ def test_bug_report_omits_reporter_id_for_orphaned_account(
     assert "reporter_id" not in payload
     assert payload["reporter_display_name"] == "Ophelia Ops"
     assert "Skipping reporter_id" in caplog.text
+
+
+def test_bug_report_falls_back_to_session_user_id(app_client, monkeypatch):
+    app, client = app_client
+
+    recorded = {}
+
+    def fake_insert(record):
+        recorded["record"] = record
+        stored = dict(record)
+        stored.setdefault("id", 4)
+        return [stored], None
+
+    def fake_fetch(username):
+        recorded["fetched_username"] = username
+        return {
+            "id": 1234,
+            "username": username,
+            "display_name": "Sasha Session",
+            "auth_user_id": None,
+        }, None
+
+    monkeypatch.setattr(routes_module, "insert_bug_report", fake_insert)
+    monkeypatch.setattr(routes_module, "fetch_app_user_credentials", fake_fetch)
+
+    with client.session_transaction() as session:
+        session["username"] = "sessioned"
+        session["user_id"] = 4321
+
+    response = client.post(
+        "/bug-reports",
+        json={
+            "title": "Feature glitch",
+            "description": "UI freezes intermittently",
+        },
+    )
+
+    assert response.status_code == 201
+    assert recorded["fetched_username"] == "sessioned"
+    inserted_record = recorded["record"]
+    assert inserted_record["reporter_id"] == "4321"
+
+    payload = response.get_json()
+    assert payload["reporter_id"] == "4321"
+    assert payload["reporter_display_name"] == "Sasha Session"

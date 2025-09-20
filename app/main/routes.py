@@ -1203,6 +1203,11 @@ def submit_bug_report():
         'status': payload.get('status') or 'open',
     }
 
+    if reporter_identifier is None:
+        session_user_id = user.get('user_id')
+        if session_user_id not in (None, ''):
+            reporter_identifier = str(session_user_id)
+
     if reporter_identifier is not None:
         record['reporter_id'] = str(reporter_identifier)
 
