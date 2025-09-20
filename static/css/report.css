@@ -16,9 +16,9 @@
     --muted: #e9edf5;
     --muted-light: #f3f6fb;
     --muted-dark: #d8deeb;
-    --accent: #0d3b66;
-    --accent-strong: #06284a;
-    --accent-soft: #c5d6ea;
+    --accent: #0d9ba8;
+    --accent-strong: #0b6b74;
+    --accent-soft: #d3f0f2;
     --border: #d0d7de;
     --border-muted: #e2e8f0;
     --border-light: #f1f5f9;
@@ -105,6 +105,11 @@ header {
 header img {
     height: 48px;
     margin-right: 14px;
+}
+
+header h1 {
+    color: #fff;
+    border-bottom-color: rgba(255, 255, 255, 0.4);
 }
 
 .company-logo-pdf {
