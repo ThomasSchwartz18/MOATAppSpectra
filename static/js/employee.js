@@ -26,6 +26,263 @@ function formatErrors(errors) {
   return '';
 }
 
+function setupInspectionWizard(form) {
+  if (!form) return null;
+
+  const steps = Array.from(form.querySelectorAll('[data-step]'));
+  if (!steps.length) return null;
+
+  const progress = form.querySelector('[data-progress]');
+  const progressBar = progress ? progress.querySelector('[data-progress-bar]') : null;
+  const progressCurrent = progress ? progress.querySelector('[data-progress-current]') : null;
+  const progressTotal = progress ? progress.querySelector('[data-progress-total]') : null;
+  const stepGroups = Array.from(form.querySelectorAll('[data-step-group]'));
+  const finishElements = Array.from(form.querySelectorAll('[data-step-finish]'));
+
+  const totalSteps = steps.length;
+  let visibleIndex = 0;
+
+  if (progressTotal) {
+    progressTotal.textContent = String(totalSteps);
+  }
+
+  function clampVisibleIndex() {
+    if (!steps.length) {
+      visibleIndex = 0;
+      return;
+    }
+    if (visibleIndex < 0) {
+      visibleIndex = 0;
+    } else if (visibleIndex > steps.length - 1) {
+      visibleIndex = steps.length - 1;
+    }
+  }
+
+  function applyVisibility() {
+    clampVisibleIndex();
+    steps.forEach((step, index) => {
+      const isVisible = index <= visibleIndex;
+      if (isVisible) {
+        step.hidden = false;
+        step.classList.add('is-visible');
+      } else {
+        step.hidden = true;
+        step.classList.remove('is-visible');
+        delete step.dataset.completed;
+      }
+    });
+
+    stepGroups.forEach((group) => {
+      const hasVisibleStep = Array.from(group.querySelectorAll('[data-step]')).some((step) => !step.hidden);
+      group.hidden = !hasVisibleStep;
+    });
+
+    finishElements.forEach((element) => {
+      element.hidden = visibleIndex < steps.length - 1;
+    });
+  }
+
+  function getActiveIndex() {
+    const firstIncomplete = steps.findIndex((step) => step.dataset.completed === 'true' ? false : true);
+    let index = firstIncomplete === -1 ? steps.length - 1 : firstIncomplete;
+    if (index > visibleIndex) {
+      index = visibleIndex;
+    }
+    if (index < 0) {
+      index = 0;
+    }
+    return index;
+  }
+
+  function updateProgress() {
+    const completedCount = steps.reduce((total, step) => (
+      total + (step.dataset.completed === 'true' ? 1 : 0)
+    ), 0);
+
+    const activeIndex = getActiveIndex();
+
+    if (progressCurrent) {
+      progressCurrent.textContent = String(activeIndex + 1);
+    }
+
+    if (progressTotal) {
+      progressTotal.textContent = String(totalSteps);
+    }
+
+    if (progressBar) {
+      const percent = totalSteps === 0 ? 0 : Math.min(100, Math.max(0, (completedCount / totalSteps) * 100));
+      progressBar.style.width = `${percent}%`;
+      progressBar.dataset.progressPercent = String(percent);
+    }
+
+    if (completedCount >= steps.length) {
+      steps.forEach((step) => {
+        step.dataset.state = 'complete';
+      });
+      return;
+    }
+
+    steps.forEach((step, index) => {
+      let state = 'upcoming';
+      if (index < activeIndex) {
+        state = 'complete';
+      } else if (index === activeIndex) {
+        state = 'active';
+      }
+      step.dataset.state = state;
+    });
+  }
+
+  function isStepComplete(step) {
+    const input = step.querySelector('input, select, textarea');
+    if (!input) return true;
+    if (input.disabled) return false;
+
+    const isOptional = step.hasAttribute('data-step-optional');
+
+    if (input.tagName === 'SELECT') {
+      return Boolean(input.value);
+    }
+
+    const type = input.type;
+
+    if (type === 'number') {
+      const rawValue = input.value;
+      if (!rawValue) {
+        return !input.required && (isOptional ? input.dataset.stepTouched === 'true' : true);
+      }
+      const parsed = Number(rawValue);
+      if (Number.isNaN(parsed)) return false;
+      if (input.min !== '' && !Number.isNaN(Number(input.min)) && parsed < Number(input.min)) {
+        return false;
+      }
+      if (input.max !== '' && !Number.isNaN(Number(input.max)) && parsed > Number(input.max)) {
+        return false;
+      }
+      return true;
+    }
+
+    if (type === 'date' || type === 'time') {
+      if (!input.value) {
+        return !input.required && (isOptional ? input.dataset.stepTouched === 'true' : true);
+      }
+      return true;
+    }
+
+    if (type === 'checkbox' || type === 'radio') {
+      if (input.required) {
+        return input.checked;
+      }
+      if (isOptional) {
+        return input.checked || input.dataset.stepTouched === 'true';
+      }
+      return true;
+    }
+
+    const value = input.value ? input.value.trim() : '';
+
+    if (input.required) {
+      return value.length > 0;
+    }
+
+    if (isOptional) {
+      return value.length > 0 || input.dataset.stepTouched === 'true';
+    }
+
+    return true;
+  }
+
+  function evaluateStep(stepIndex) {
+    const step = steps[stepIndex];
+    if (!step) return;
+
+    const completed = isStepComplete(step);
+
+    if (completed) {
+      step.dataset.completed = 'true';
+      if (stepIndex < steps.length - 1) {
+        visibleIndex = Math.max(visibleIndex, stepIndex + 1);
+        const nextIndex = stepIndex + 1;
+        const nextStep = steps[nextIndex];
+        if (nextStep && isStepComplete(nextStep)) {
+          evaluateStep(nextIndex);
+          return;
+        }
+      }
+    } else {
+      delete step.dataset.completed;
+      visibleIndex = Math.min(visibleIndex, stepIndex);
+      for (let index = stepIndex + 1; index < steps.length; index += 1) {
+        delete steps[index].dataset.completed;
+      }
+    }
+
+    applyVisibility();
+    updateProgress();
+  }
+
+  function resetWizard({ focus = false } = {}) {
+    visibleIndex = 0;
+    steps.forEach((step, index) => {
+      delete step.dataset.completed;
+      step.dataset.state = index === 0 ? 'active' : 'upcoming';
+      const input = step.querySelector('input, select, textarea');
+      if (input && input.dataset) {
+        delete input.dataset.stepTouched;
+      }
+    });
+    applyVisibility();
+    updateProgress();
+    if (focus) {
+      focusActiveStep();
+    }
+  }
+
+  function focusActiveStep() {
+    const activeIndex = getActiveIndex();
+    const targetStep = steps[activeIndex];
+    if (!targetStep) return;
+    const input = targetStep.querySelector('input, select, textarea');
+    if (input && typeof input.focus === 'function') {
+      const raf = typeof window !== 'undefined' && typeof window.requestAnimationFrame === 'function'
+        ? window.requestAnimationFrame.bind(window)
+        : (fn) => setTimeout(fn, 0);
+      raf(() => {
+        input.focus();
+      });
+    }
+  }
+
+  steps.forEach((step, index) => {
+    const input = step.querySelector('input, select, textarea');
+    if (!input) return;
+
+    const handleInteraction = () => {
+      if (step.hasAttribute('data-step-optional')) {
+        input.dataset.stepTouched = 'true';
+      }
+      evaluateStep(index);
+    };
+
+    input.addEventListener('input', handleInteraction);
+    input.addEventListener('change', handleInteraction);
+    input.addEventListener('blur', handleInteraction);
+  });
+
+  applyVisibility();
+  updateProgress();
+
+  return {
+    reset: resetWizard,
+    focus: focusActiveStep,
+    evaluate: () => {
+      steps.forEach((_, index) => {
+        evaluateStep(index);
+      });
+    },
+  };
+}
+
 function setupAoiArea(container) {
   const picker = container.querySelector('[data-aoi-picker]');
   const sheetPanel = container.querySelector('[data-sheet-panel]');
@@ -36,6 +293,7 @@ function setupAoiArea(container) {
   const backButton = container.querySelector('[data-action="back-to-picker"]');
   const sheetButtons = picker ? picker.querySelectorAll('[data-sheet]') : [];
   const defectSelect = container.querySelector('[data-defect-select]');
+  const wizard = setupInspectionWizard(sheetForm);
 
   if (!picker || !sheetPanel || !sheetTitle || !sheetForm || !feedback || !backButton) {
     return;
@@ -170,6 +428,9 @@ function setupAoiArea(container) {
       sheetForm.reset();
       resetDefectSelection();
       setFeedback(feedback, '');
+      if (wizard) {
+        wizard.reset({ focus: true });
+      }
     });
   });
 
@@ -187,6 +448,9 @@ function setupAoiArea(container) {
     if (sheetSubtitle) {
       sheetSubtitle.textContent = '';
       sheetSubtitle.hidden = true;
+    }
+    if (wizard) {
+      wizard.reset();
     }
   });
 
@@ -234,9 +498,8 @@ function setupAoiArea(container) {
       setFeedback(feedback, successMessage, 'success');
       sheetForm.reset();
       resetDefectSelection();
-      const dateField = sheetForm.querySelector('[name="date"]');
-      if (dateField) {
-        dateField.focus();
+      if (wizard) {
+        wizard.reset({ focus: true });
       }
     } catch (error) {
       setFeedback(feedback, 'Unable to submit inspection at this time.', 'error');

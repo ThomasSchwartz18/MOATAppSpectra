@@ -50,91 +50,115 @@
         <h3 class="inspection-sheet__heading" data-sheet-title></h3>
         <p class="inspection-sheet__subheading" data-sheet-subtitle hidden></p>
         <form class="inspection-sheet" data-sheet-form novalidate>
-          <fieldset class="inspection-sheet__section inspection-sheet__section--info">
-            <legend>Inspection Information</legend>
-            <div class="inspection-sheet__grid inspection-sheet__grid--three">
-              <label class="inspection-field">
-                <span class="inspection-field__label">Date</span>
-                <input type="date" name="date" required>
-              </label>
-              <label class="inspection-field">
-                <span class="inspection-field__label">Shift</span>
-                <select name="shift" required>
-                  <option value="" disabled selected>Select shift</option>
-                  <option value="1st">1st</option>
-                  <option value="2nd">2nd</option>
-                  <option value="3rd">3rd</option>
-                  <option value="Weekend">Weekend</option>
-                  <option value="Other">Other</option>
-                </select>
-              </label>
-              <label class="inspection-field">
-                <span class="inspection-field__label">Operator</span>
-                <input type="text" name="operator" required>
-              </label>
+          <div class="inspection-progress" data-progress>
+            <div class="inspection-progress__track">
+              <div class="inspection-progress__bar" data-progress-bar></div>
             </div>
-          </fieldset>
+            <p class="inspection-progress__status">
+              Step <span data-progress-current>1</span> of <span data-progress-total>1</span>
+            </p>
+          </div>
 
-          <fieldset class="inspection-sheet__section">
-            <legend>Product Details</legend>
-            <div class="inspection-sheet__grid inspection-sheet__grid--two">
-              <label class="inspection-field">
-                <span class="inspection-field__label">Customer</span>
-                <input type="text" name="customer" required>
-              </label>
-              <label class="inspection-field">
-                <span class="inspection-field__label">Program</span>
-                <input type="text" name="program" required>
-              </label>
-            </div>
-            <div class="inspection-sheet__grid inspection-sheet__grid--two">
-              <label class="inspection-field">
-                <span class="inspection-field__label">Assembly</span>
-                <input type="text" name="assembly" required>
-              </label>
-              <label class="inspection-field">
-                <span class="inspection-field__label">Revision</span>
-                <input type="text" name="rev" placeholder="Optional">
-              </label>
-            </div>
-            <div class="inspection-sheet__grid inspection-sheet__grid--two">
-              <label class="inspection-field">
-                <span class="inspection-field__label">Job Number</span>
-                <input type="text" name="job_number" required>
-              </label>
-              <span class="inspection-field inspection-field--placeholder" aria-hidden="true"></span>
-            </div>
-          </fieldset>
+          <div class="inspection-steps" data-step-list>
+            <fieldset class="inspection-sheet__section inspection-sheet__section--info" data-step-group>
+              <legend>Inspection Information</legend>
+              <div class="inspection-step" data-step data-step-name="date">
+                <label class="inspection-field">
+                  <span class="inspection-field__label">Date</span>
+                  <input type="date" name="date" required>
+                </label>
+              </div>
+              <div class="inspection-step" data-step data-step-name="shift">
+                <label class="inspection-field">
+                  <span class="inspection-field__label">Shift</span>
+                  <select name="shift" required>
+                    <option value="" disabled selected>Select shift</option>
+                    <option value="1st">1st</option>
+                    <option value="2nd">2nd</option>
+                    <option value="3rd">3rd</option>
+                    <option value="Weekend">Weekend</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </label>
+              </div>
+              <div class="inspection-step" data-step data-step-name="operator">
+                <label class="inspection-field">
+                  <span class="inspection-field__label">Operator</span>
+                  <input type="text" name="operator" required>
+                </label>
+              </div>
+            </fieldset>
 
-          <fieldset class="inspection-sheet__section inspection-sheet__section--results">
-            <legend>Inspection Results</legend>
-            <div class="inspection-sheet__grid inspection-sheet__grid--two">
-              <label class="inspection-field">
-                <span class="inspection-field__label">Quantity Inspected</span>
-                <input type="number" name="quantity_inspected" min="0" step="1" required>
-              </label>
-              <label class="inspection-field">
-                <span class="inspection-field__label">Quantity Rejected</span>
-                <input type="number" name="quantity_rejected" min="0" step="1" required>
-              </label>
-            </div>
-            <label class="inspection-field inspection-field--full">
-              <span class="inspection-field__label">Defect</span>
-              <select name="defect_id" data-defect-select required disabled>
-                <option value="" disabled selected>Loading defects...</option>
-              </select>
-            </label>
-          </fieldset>
+            <fieldset class="inspection-sheet__section" data-step-group>
+              <legend>Product Details</legend>
+              <div class="inspection-step" data-step data-step-name="customer">
+                <label class="inspection-field">
+                  <span class="inspection-field__label">Customer</span>
+                  <input type="text" name="customer" required>
+                </label>
+              </div>
+              <div class="inspection-step" data-step data-step-name="program">
+                <label class="inspection-field">
+                  <span class="inspection-field__label">Program</span>
+                  <input type="text" name="program" required>
+                </label>
+              </div>
+              <div class="inspection-step" data-step data-step-name="assembly">
+                <label class="inspection-field">
+                  <span class="inspection-field__label">Assembly</span>
+                  <input type="text" name="assembly" required>
+                </label>
+              </div>
+              <div class="inspection-step" data-step data-step-name="revision" data-step-optional>
+                <label class="inspection-field">
+                  <span class="inspection-field__label">Revision</span>
+                  <input type="text" name="rev" placeholder="Optional">
+                </label>
+              </div>
+              <div class="inspection-step" data-step data-step-name="job-number">
+                <label class="inspection-field">
+                  <span class="inspection-field__label">Job Number</span>
+                  <input type="text" name="job_number" required>
+                </label>
+              </div>
+            </fieldset>
 
-          <fieldset class="inspection-sheet__section inspection-sheet__section--notes">
-            <legend>Notes</legend>
-            <label class="inspection-field inspection-field--full">
-              <span class="inspection-field__label">Additional Information</span>
-              <textarea name="notes" rows="3" placeholder="Optional notes"></textarea>
-            </label>
-          </fieldset>
+            <fieldset class="inspection-sheet__section inspection-sheet__section--results" data-step-group>
+              <legend>Inspection Results</legend>
+              <div class="inspection-step" data-step data-step-name="quantity-inspected">
+                <label class="inspection-field">
+                  <span class="inspection-field__label">Quantity Inspected</span>
+                  <input type="number" name="quantity_inspected" min="0" step="1" required>
+                </label>
+              </div>
+              <div class="inspection-step" data-step data-step-name="quantity-rejected">
+                <label class="inspection-field">
+                  <span class="inspection-field__label">Quantity Rejected</span>
+                  <input type="number" name="quantity_rejected" min="0" step="1" required>
+                </label>
+              </div>
+              <div class="inspection-step" data-step data-step-name="defect">
+                <label class="inspection-field inspection-field--full">
+                  <span class="inspection-field__label">Defect</span>
+                  <select name="defect_id" data-defect-select required disabled>
+                    <option value="" disabled selected>Loading defects...</option>
+                  </select>
+                </label>
+              </div>
+            </fieldset>
 
-          <section class="inspection-sheet__signoff" aria-label="Inspection sign-off">
+            <fieldset class="inspection-sheet__section inspection-sheet__section--notes" data-step-group>
+              <legend>Notes</legend>
+              <div class="inspection-step" data-step data-step-name="notes" data-step-optional>
+                <label class="inspection-field inspection-field--full">
+                  <span class="inspection-field__label">Additional Information</span>
+                  <textarea name="notes" rows="3" placeholder="Optional notes"></textarea>
+                </label>
+              </div>
+            </fieldset>
+          </div>
+
+          <section class="inspection-sheet__signoff" aria-label="Inspection sign-off" data-step-finish hidden>
             <div class="inspection-signature">
               <span class="inspection-signature__label">Operator Signature</span>
               <span class="inspection-signature__line" aria-hidden="true"></span>
@@ -147,7 +171,7 @@
             </div>
           </section>
 
-          <div class="inspection-sheet__actions">
+          <div class="inspection-sheet__actions" data-step-finish hidden>
             <button type="submit" class="inspection-submit">Submit inspection</button>
           </div>
           <div class="inspection-sheet__feedback employee-feedback" role="alert" aria-live="polite"></div>
