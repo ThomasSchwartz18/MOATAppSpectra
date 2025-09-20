@@ -1201,6 +1201,7 @@ def submit_bug_report():
         'description': description,
         'priority': priority,
         'status': payload.get('status') or 'open',
+        'reporter_name': reporter_display_name,
     }
 
     if reporter_identifier is None:
