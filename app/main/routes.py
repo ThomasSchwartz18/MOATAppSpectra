@@ -11,6 +11,7 @@ from flask import (
     send_file,
     flash,
     g,
+    make_response,
 )
 from functools import wraps
 import csv
@@ -1270,9 +1271,16 @@ def update_bug_report(report_id: int):
 
     updated, error = update_bug_report_status(report_id, updates)
     if error:
-        if 'No updates supplied' in error:
-            abort(400, description=error)
-        abort(503, description=error)
+        error_message = str(error)
+        status_code = 400 if 'No updates supplied' in error_message else 503
+        current_app.logger.error(
+            'Failed to update bug report %s: %s', report_id, error_message
+        )
+        payload = {
+            'error': 'update_failed',
+            'description': error_message,
+        }
+        return make_response(jsonify(payload), status_code)
 
     if not updated:
         abort(404, description='Bug report not found.')

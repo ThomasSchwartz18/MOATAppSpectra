@@ -1110,14 +1110,40 @@
 
             if (!response.ok) {
               let message = 'Failed to update bug report.';
+              let parsed;
               try {
-                const data = await response.json();
-                if (data && data.description) {
-                  message = data.description;
-                }
+                parsed = await response.clone().json();
               } catch (error) {
-                // Response was not JSON; ignore.
+                try {
+                  const text = await response.text();
+                  if (text) {
+                    message = text;
+                  }
+                } catch (_) {
+                  // Ignore fallback errors.
+                }
+                throw new Error(message);
               }
+
+              if (parsed && typeof parsed === 'object') {
+                if (parsed.description) {
+                  message = parsed.description;
+                } else if (parsed.error) {
+                  message = parsed.error;
+                } else if (parsed.detail) {
+                  message = parsed.detail;
+                } else {
+                  try {
+                    const text = await response.text();
+                    if (text) {
+                      message = text;
+                    }
+                  } catch (_) {
+                    // Ignore fallback errors.
+                  }
+                }
+              }
+
               throw new Error(message);
             }
 
