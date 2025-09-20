@@ -1,5 +1,5 @@
-from datetime import datetime, timedelta
-from typing import Any, Tuple
+from datetime import datetime, timedelta, timezone
+from typing import Any, Iterable, Tuple
 
 from flask import current_app
 
@@ -108,6 +108,26 @@ def insert_app_user(record: dict) -> tuple[list[dict] | None, str | None]:
         return None, f"Failed to create user: {exc}"
 
 
+def insert_bug_report(record: dict) -> tuple[list[dict] | None, str | None]:
+    """Insert a bug report into the ``bug_reports`` table."""
+
+    supabase, error = _ensure_supabase_client()
+    if error:
+        return None, error
+
+    payload = dict(record)
+    payload["updated_at"] = datetime.now(timezone.utc).isoformat()
+    attachments = payload.get("attachments")
+    if attachments is not None and not isinstance(attachments, list):
+        payload["attachments"] = list(attachments)
+
+    try:
+        response = supabase.table("bug_reports").insert(payload).execute()
+        return response.data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to create bug report: {exc}"
+
+
 def delete_app_user(user_id: str) -> tuple[list[dict] | None, str | None]:
     """Delete the Supabase user identified by ``user_id``."""
 
@@ -120,6 +140,59 @@ def delete_app_user(user_id: str) -> tuple[list[dict] | None, str | None]:
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to delete user: {exc}"
+
+
+def fetch_bug_reports(
+    filters: dict[str, Any] | None = None,
+) -> tuple[list[dict] | None, str | None]:
+    """Return bug reports optionally filtered by column equality."""
+
+    supabase, error = _ensure_supabase_client()
+    if error:
+        return None, error
+
+    try:
+        query = supabase.table("bug_reports").select("*")
+        filters = filters or {}
+        for key, value in filters.items():
+            if value is None:
+                continue
+            query = query.eq(key, value)
+        response = query.order("created_at", desc=True).execute()
+        return response.data or [], None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to fetch bug reports: {exc}"
+
+
+def update_bug_report_status(
+    report_id: int | str,
+    updates: dict[str, Any],
+) -> tuple[list[dict] | None, str | None]:
+    """Update the status or metadata of a bug report."""
+
+    if not updates:
+        return None, "No updates supplied"
+
+    supabase, error = _ensure_supabase_client()
+    if error:
+        return None, error
+
+    payload = dict(updates)
+    attachments: Iterable[str] | None = payload.get("attachments")
+    if attachments is not None and not isinstance(attachments, list):
+        payload["attachments"] = list(attachments)
+    payload["updated_at"] = datetime.now(timezone.utc).isoformat()
+
+    try:
+        response = (
+            supabase.table("bug_reports")
+            .update(payload)
+            .eq("id", report_id)
+            .execute()
+        )
+        return response.data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to update bug report: {exc}"
 
 
 def fetch_aoi_reports():

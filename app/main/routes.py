@@ -25,6 +25,8 @@ import xlrd
 import base64
 import math
 from werkzeug.security import generate_password_hash
+from werkzeug.utils import secure_filename
+from uuid import uuid4
 try:
     import matplotlib
     matplotlib.use('Agg')
@@ -56,9 +58,12 @@ from app.db import (
     insert_aoi_report,
     insert_aoi_reports_bulk,
     insert_app_user,
+    insert_bug_report,
     insert_fi_report,
     insert_moat,
     insert_moat_bulk,
+    fetch_bug_reports,
+    update_bug_report_status,
 )
 
 from app.grades import calculate_aoi_grades
@@ -413,6 +418,77 @@ admin_required = _role_required({'ADMIN'})
 employee_portal_required = _role_required({'EMPLOYEE', 'ADMIN'})
 
 
+def _require_authenticated_user() -> dict[str, str | None]:
+    """Return the current session user or abort if unauthenticated."""
+
+    if "username" not in session:
+        abort(401, description="Authentication required")
+    return {
+        "user_id": session.get("user_id"),
+        "username": session.get("username"),
+        "role": session.get("role") or session.get("username"),
+    }
+
+
+def _bug_report_bucket() -> str:
+    return current_app.config.get("BUG_REPORT_BUCKET", "bug-report-attachments")
+
+
+def _upload_bug_report_attachment(file_storage) -> dict[str, str | None]:
+    """Persist an uploaded file to Supabase storage and return metadata."""
+
+    if not file_storage or not getattr(file_storage, "filename", None):
+        raise RuntimeError("Attachment missing filename")
+
+    supabase = current_app.config.get("SUPABASE")
+    if not supabase:
+        raise RuntimeError("Supabase client is not configured")
+
+    original_name = file_storage.filename or "attachment"
+    safe_name = secure_filename(original_name) or "attachment"
+    timestamp = datetime.utcnow().strftime("%Y/%m/%d")
+    storage_key = f"{timestamp}/{uuid4().hex}_{safe_name}"
+    bucket = _bug_report_bucket()
+
+    try:
+        file_storage.stream.seek(0)
+        file_bytes = file_storage.read()
+    except Exception as exc:  # pragma: no cover - defensive
+        raise RuntimeError(f"Failed to read attachment: {exc}") from exc
+
+    options = {"content-type": file_storage.mimetype or "application/octet-stream"}
+
+    try:
+        supabase.storage.from_(bucket).upload(storage_key, file_bytes, options)
+    except Exception as exc:  # pragma: no cover - network errors
+        raise RuntimeError(
+            f"Failed to upload attachment to Supabase storage: {exc}"
+        ) from exc
+
+    public_url = None
+    try:
+        public_url = supabase.storage.from_(bucket).get_public_url(storage_key)
+    except Exception:  # pragma: no cover - public URL failures are non-fatal
+        public_url = None
+
+    return {
+        "bucket": bucket,
+        "path": storage_key,
+        "name": original_name,
+        "content_type": file_storage.mimetype,
+        "public_url": public_url,
+    }
+
+
+def _format_bug_report_response(
+    record: dict | None, attachment_meta: list[dict] | None = None
+) -> dict:
+    response = dict(record or {})
+    if attachment_meta:
+        response["attachment_metadata"] = attachment_meta
+    return response
+
+
 USER_ROLE_LABELS = {
     "ADMIN": "Administrator",
     "USER": "Standard User",
@@ -686,6 +762,107 @@ def add_aoi_report():
     if error:
         abort(500, description=error)
     return jsonify(data), 201
+
+
+@main_bp.route('/bug-reports', methods=['POST'])
+def submit_bug_report():
+    user = _require_authenticated_user()
+
+    if request.is_json:
+        payload = request.get_json() or {}
+    else:
+        payload = request.form.to_dict()
+
+    title = (payload.get('title') or '').strip()
+    description = (payload.get('description') or '').strip()
+    priority = (payload.get('priority') or '').strip() or None
+
+    if not title or not description:
+        abort(400, description='Both title and description are required.')
+
+    attachment_metadata: list[dict] = []
+    attachment_paths: list[str] = []
+
+    for file_storage in request.files.getlist('attachments'):
+        if not file_storage or not file_storage.filename:
+            continue
+        try:
+            uploaded = _upload_bug_report_attachment(file_storage)
+        except RuntimeError as exc:
+            abort(503, description=str(exc))
+        attachment_metadata.append(uploaded)
+        if uploaded.get('path'):
+            attachment_paths.append(uploaded['path'])
+
+    record = {
+        'title': title,
+        'description': description,
+        'priority': priority,
+        'attachments': attachment_paths,
+        'reporter_id': user.get('user_id'),
+        'reporter_name': user.get('username'),
+        'status': payload.get('status') or 'open',
+    }
+
+    created, error = insert_bug_report(record)
+    if error:
+        abort(503, description=error)
+    if not created:
+        abort(500, description='Bug report could not be created.')
+
+    response_body = _format_bug_report_response(created[0], attachment_metadata)
+    return jsonify(response_body), 201
+
+
+@main_bp.route('/admin/bug-reports', methods=['GET'])
+@admin_required
+def list_bug_reports():
+    status_filter = request.args.get('status')
+    assignee_filter = request.args.get('assignee_id')
+
+    filters = {}
+    if status_filter:
+        filters['status'] = status_filter
+    if assignee_filter:
+        filters['assignee_id'] = assignee_filter
+
+    reports, error = fetch_bug_reports(filters or None)
+    if error:
+        abort(503, description=error)
+
+    return jsonify({'bug_reports': reports or []})
+
+
+@main_bp.route('/admin/bug-reports/<int:report_id>', methods=['PATCH'])
+@admin_required
+def update_bug_report(report_id: int):
+    payload = request.get_json(silent=True) or {}
+
+    allowed_fields = {'status', 'assignee_id', 'priority'}
+    updates = {key: value for key, value in payload.items() if key in allowed_fields and value is not None}
+
+    if 'attachments' in payload:
+        attachments = payload['attachments']
+        if attachments is None:
+            updates['attachments'] = []
+        elif isinstance(attachments, list) and all(isinstance(item, str) for item in attachments):
+            updates['attachments'] = attachments
+        else:
+            abort(400, description='Attachments must be provided as a list of storage paths.')
+
+    if not updates:
+        abort(400, description='No valid fields to update.')
+
+    updated, error = update_bug_report_status(report_id, updates)
+    if error:
+        if 'No updates supplied' in error:
+            abort(400, description=error)
+        abort(503, description=error)
+
+    if not updated:
+        abort(404, description='Bug report not found.')
+
+    return jsonify({'bug_report': updated[0]})
 
 
 def _normalize_employee_date(value: str | None) -> str | None:

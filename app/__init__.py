@@ -24,6 +24,9 @@ def create_app():
     )
     app.config["SUPABASE"] = supabase
     app.config["SUPABASE_URL"] = os.environ["SUPABASE_URL"]
+    app.config["BUG_REPORT_BUCKET"] = os.environ.get(
+        "BUG_REPORT_BUCKET", "bug-report-attachments"
+    )
 
     phrases_path = (
         os.environ.get("NON_AOI_PHRASES_FILE")
