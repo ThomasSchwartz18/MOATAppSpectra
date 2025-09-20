@@ -674,12 +674,50 @@ def _upload_bug_report_attachment(file_storage) -> dict[str, str | None]:
     }
 
 
+def _resolve_user_display_name(
+    user_id: object,
+    user_lookup: dict[str, dict] | None = None,
+    fallback: str | None = None,
+) -> str | None:
+    """Return a human friendly display name for the given Supabase user ID."""
+
+    if user_id in (None, ""):
+        return fallback
+
+    lookup_key = str(user_id)
+    if user_lookup:
+        user_record = user_lookup.get(lookup_key) or user_lookup.get(user_id)
+        if user_record:
+            for candidate_key in ("label", "display_name", "username"):
+                candidate_value = user_record.get(candidate_key)
+                if candidate_value:
+                    return candidate_value
+
+    if fallback:
+        return fallback
+
+    return lookup_key
+
+
 def _format_bug_report_response(
-    record: dict | None, attachment_meta: list[dict] | None = None
+    record: dict | None,
+    attachment_meta: list[dict] | None = None,
+    assignable_lookup: dict[str, dict] | None = None,
+    reporter_display_name: str | None = None,
 ) -> dict:
     response = dict(record or {})
     if attachment_meta:
         response["attachment_metadata"] = attachment_meta
+
+    resolved_reporter = _resolve_user_display_name(
+        response.get("reporter_id"),
+        assignable_lookup,
+        reporter_display_name or response.get("reporter_name"),
+    )
+
+    response["reporter"] = resolved_reporter
+    response["reporter_display_name"] = resolved_reporter
+
     return response
 
 
@@ -1165,6 +1203,8 @@ def submit_bug_report():
     attachment_metadata: list[dict] = []
     attachment_paths: list[str] = []
 
+    reporter_display_name = user.get('username')
+
     for file_storage in request.files.getlist('attachments'):
         if not file_storage or not file_storage.filename:
             continue
@@ -1182,7 +1222,6 @@ def submit_bug_report():
         'priority': priority,
         'attachments': attachment_paths,
         'reporter_id': user.get('user_id'),
-        'reporter_name': user.get('username'),
         'status': payload.get('status') or 'open',
     }
 
@@ -1192,7 +1231,11 @@ def submit_bug_report():
     if not created:
         abort(500, description='Bug report could not be created.')
 
-    response_body = _format_bug_report_response(created[0], attachment_metadata)
+    response_body = _format_bug_report_response(
+        created[0],
+        attachment_metadata,
+        reporter_display_name=reporter_display_name,
+    )
     return jsonify(response_body), 201
 
 
@@ -4423,7 +4466,12 @@ def analysis_tracker_logs():
             }
         )
 
-    assignable_lookup = {user['id']: user for user in assignable_users}
+    assignable_lookup: dict[str, dict] = {}
+    for user in assignable_users:
+        user_id = user.get('id')
+        if user_id is None:
+            continue
+        assignable_lookup[str(user_id)] = user
 
     status_counter: Counter[str] = Counter()
     bucket = _bug_report_bucket()
@@ -4458,6 +4506,13 @@ def analysis_tracker_logs():
         assignee_id_str = str(assignee_id) if assignee_id not in (None, '') else ''
         assignee_label = record.get('assignee_name') or assignable_lookup.get(assignee_id_str, {}).get('label')
 
+        reporter_id = record.get('reporter_id')
+        reporter_label = _resolve_user_display_name(
+            reporter_id,
+            assignable_lookup,
+            record.get('reporter_name'),
+        )
+
         formatted_bug_reports.append(
             {
                 'id': record.get('id'),
@@ -4466,8 +4521,9 @@ def analysis_tracker_logs():
                 'priority': record.get('priority') or 'Unspecified',
                 'status': status_value,
                 'status_label': status_value.replace('_', ' ').title(),
-                'reporter': record.get('reporter_name') or record.get('reporter_id'),
-                'reporter_id': record.get('reporter_id'),
+                'reporter': reporter_label,
+                'reporter_display_name': reporter_label,
+                'reporter_id': reporter_id,
                 'assignee_id': assignee_id_str,
                 'assignee_label': assignee_label or 'Unassigned',
                 'assignee_token': assignee_id_str or 'unassigned',
