@@ -200,6 +200,35 @@ def test_bug_report_falls_back_to_session_user_id(app_client, monkeypatch):
     assert payload["reporter_display_name"] == "Sasha Session"
 
 
+def test_bug_report_endpoint_supports_underscored_path(app_client, monkeypatch):
+    app, client = app_client
+
+    recorded = {}
+
+    def fake_insert(record):
+        recorded["record"] = record
+        stored = dict(record)
+        stored.setdefault("id", 5)
+        return [stored], None
+
+    monkeypatch.setattr(routes_module, "insert_bug_report", fake_insert)
+    monkeypatch.setattr(routes_module, "fetch_app_user_credentials", lambda username: (None, None))
+
+    with client.session_transaction() as session:
+        session["username"] = "alias-user"
+
+    response = client.post(
+        "/bug_reports",
+        json={
+            "title": "Underscore endpoint",
+            "description": "Legacy clients submit to bug_reports.",
+        },
+    )
+
+    assert response.status_code == 201
+    assert recorded["record"]["title"] == "Underscore endpoint"
+
+
 def test_admin_bug_report_view_shows_reporter_name(app_client, monkeypatch):
     app, client = app_client
 
