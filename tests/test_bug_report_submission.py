@@ -24,7 +24,7 @@ def app_client(monkeypatch):
     return app, client
 
 
-def test_bug_report_prefers_auth_user_id_for_supabase_user(app_client, monkeypatch):
+def test_bug_report_uses_supabase_account_id(app_client, monkeypatch):
     app, client = app_client
 
     recorded = {}
@@ -60,11 +60,11 @@ def test_bug_report_prefers_auth_user_id_for_supabase_user(app_client, monkeypat
     assert response.status_code == 201
     assert recorded["fetched_username"] == "analyst"
     inserted_record = recorded["record"]
-    assert inserted_record["reporter_id"] == "00000000-0000-0000-0000-000000000123"
+    assert inserted_record["reporter_id"] == "9876"
     assert inserted_record["reporter_name"] == "Ana Analyst"
 
     payload = response.get_json()
-    assert payload["reporter_id"] == "00000000-0000-0000-0000-000000000123"
+    assert payload["reporter_id"] == "9876"
     assert payload["reporter_display_name"] == "Ana Analyst"
 
 
@@ -106,8 +106,8 @@ def test_bug_report_omits_reporter_id_for_environment_user(app_client, monkeypat
     assert payload["reporter_display_name"] == "ADMIN"
 
 
-def test_bug_report_omits_reporter_id_for_orphaned_account(
-    app_client, monkeypatch, caplog
+def test_bug_report_uses_supabase_id_for_orphaned_account(
+    app_client, monkeypatch
 ):
     app, client = app_client
 
@@ -135,25 +135,23 @@ def test_bug_report_omits_reporter_id_for_orphaned_account(
     with client.session_transaction() as session:
         session["username"] = "orphaned"
 
-    with caplog.at_level("INFO"):
-        response = client.post(
-            "/bug-reports",
-            json={
-                "title": "Missing auth",
-                "description": "Account removed from auth.users",
-            },
-        )
+    response = client.post(
+        "/bug-reports",
+        json={
+            "title": "Missing auth",
+            "description": "Account removed from auth.users",
+        },
+    )
 
     assert response.status_code == 201
     assert recorded["fetched_username"] == "orphaned"
     inserted_record = recorded["record"]
-    assert "reporter_id" not in inserted_record
+    assert inserted_record["reporter_id"] == "777"
     assert inserted_record["reporter_name"] == "Ophelia Ops"
 
     payload = response.get_json()
-    assert "reporter_id" not in payload
+    assert payload["reporter_id"] == "777"
     assert payload["reporter_display_name"] == "Ophelia Ops"
-    assert "Skipping reporter_id" in caplog.text
 
 
 def test_bug_report_falls_back_to_session_user_id(app_client, monkeypatch):
@@ -170,7 +168,7 @@ def test_bug_report_falls_back_to_session_user_id(app_client, monkeypatch):
     def fake_fetch(username):
         recorded["fetched_username"] = username
         return {
-            "id": 1234,
+            "id": None,
             "username": username,
             "display_name": "Sasha Session",
             "auth_user_id": None,

@@ -1154,6 +1154,7 @@ def submit_bug_report():
 
     reporter_display_name = user.get('username')
     reporter_identifier: str | None = None
+    reporter_auth_identifier: str | None = None
 
     username = user.get('username')
     if username:
@@ -1166,35 +1167,34 @@ def submit_bug_report():
             reporter_display_name = (
                 supabase_account.get('display_name') or reporter_display_name
             )
+
+            account_identifier = supabase_account.get('id')
+            if account_identifier not in (None, ''):
+                reporter_identifier = str(account_identifier)
+
             auth_user_id = supabase_account.get('auth_user_id')
             if auth_user_id:
-                reporter_identifier = str(auth_user_id)
+                reporter_auth_identifier = str(auth_user_id)
             else:
                 # Some records hydrate the linked auth.users row under ``auth_user``.
                 auth_user = supabase_account.get('auth_user')
                 if isinstance(auth_user, dict):
                     linked_id = auth_user.get('id') or auth_user.get('uuid')
                     if linked_id:
-                        reporter_identifier = str(linked_id)
+                        reporter_auth_identifier = str(linked_id)
 
-            if not reporter_identifier:
+            if not reporter_auth_identifier:
                 for key in (
                     'auth_user_uuid',
                     'auth_uuid',
                 ):
                     candidate = supabase_account.get(key)
                     if candidate:
-                        reporter_identifier = str(candidate)
+                        reporter_auth_identifier = str(candidate)
                         break
 
-            if not reporter_identifier:
-                # Environment-only accounts or orphaned Supabase rows are not linked
-                # to auth.users and therefore cannot be referenced safely. Skip
-                # storing a reporter_id to avoid persisting a dangling foreign key.
-                current_app.logger.info(
-                    'Skipping reporter_id for %s because no linked auth user was found.',
-                    username,
-                )
+            if reporter_identifier is None and reporter_auth_identifier is not None:
+                reporter_identifier = reporter_auth_identifier
 
     record = {
         'title': title,
