@@ -119,3 +119,22 @@ The fallback runner also honours `app.config["WKHTMLTOPDF_CMD"]` if you prefer
 to configure the command within the Flask application. With the binary
 configured, PDF generation will transparently switch to wkhtmltopdf whenever
 WeasyPrint fails to load.
+
+### macOS Chromium fallback
+On macOS machines where both WeasyPrint and wkhtmltopdf are unavailable, the
+application falls back to a headless Chromium renderer powered by
+[`pyppeteer`](https://github.com/pyppeteer/pyppeteer). To enable this helper:
+
+1. Install the Python dependency:
+   ```bash
+   pip install pyppeteer
+   ```
+2. Download a compatible Chromium binary (pyppeteer can handle this step):
+   ```bash
+   python -m pyppeteer install
+   ```
+
+The macOS helper runs only when both of the other backends fail, so Linux and
+Windows environments are unaffected. If PDF generation continues to raise
+errors, verify that Chromium launches correctly in headless mode and consult the
+console output for additional details.

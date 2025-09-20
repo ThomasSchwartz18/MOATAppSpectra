@@ -130,3 +130,73 @@ def test_render_html_to_pdf_raises_when_fallback_fails(monkeypatch):
     message = str(excinfo.value)
     assert "primary failure" in message
     assert "fallback failure" in message
+
+
+def test_render_html_to_pdf_uses_macos_chromium_fallback(monkeypatch):
+    def failing_weasyprint(html: str, base_url: str | None = None) -> bytes:
+        raise pdf_utils.PdfGenerationError("weasy fail")
+
+    def failing_fallback(html: str, base_url: str | None = None) -> bytes:
+        raise pdf_utils.PdfGenerationError("wkhtml fail")
+
+    def successful_macos(html: str, base_url: str | None = None) -> bytes:
+        assert html == "<p>Hello</p>"
+        assert base_url == "http://example.com/"
+        return b"mac-pdf"
+
+    monkeypatch.setattr(pdf_utils.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(
+        pdf_utils, "_render_html_to_pdf_with_weasyprint", failing_weasyprint
+    )
+    monkeypatch.setattr(
+        pdf_utils, "_render_html_to_pdf_with_wkhtmltopdf", failing_fallback
+    )
+
+    from app.main import pdf_utils_macos
+
+    monkeypatch.setattr(
+        pdf_utils_macos,
+        "render_html_to_pdf_with_macos_fallback",
+        successful_macos,
+    )
+
+    result = pdf_utils.render_html_to_pdf(
+        "<p>Hello</p>", base_url="http://example.com/"
+    )
+
+    assert result == b"mac-pdf"
+
+
+def test_render_html_to_pdf_raises_when_macos_fallback_fails(monkeypatch):
+    def failing_weasyprint(html: str, base_url: str | None = None) -> bytes:
+        raise pdf_utils.PdfGenerationError("weasy fail")
+
+    def failing_fallback(html: str, base_url: str | None = None) -> bytes:
+        raise pdf_utils.PdfGenerationError("wkhtml fail")
+
+    def failing_macos(html: str, base_url: str | None = None) -> bytes:
+        raise pdf_utils.PdfGenerationError("mac fail")
+
+    monkeypatch.setattr(pdf_utils.platform, "system", lambda: "Darwin")
+    monkeypatch.setattr(
+        pdf_utils, "_render_html_to_pdf_with_weasyprint", failing_weasyprint
+    )
+    monkeypatch.setattr(
+        pdf_utils, "_render_html_to_pdf_with_wkhtmltopdf", failing_fallback
+    )
+
+    from app.main import pdf_utils_macos
+
+    monkeypatch.setattr(
+        pdf_utils_macos,
+        "render_html_to_pdf_with_macos_fallback",
+        failing_macos,
+    )
+
+    with pytest.raises(pdf_utils.PdfGenerationError) as excinfo:
+        pdf_utils.render_html_to_pdf("<p>Hello</p>")
+
+    message = str(excinfo.value)
+    assert "weasy fail" in message
+    assert "wkhtml fail" in message
+    assert "mac fail" in message

@@ -232,11 +232,28 @@ def render_html_to_pdf(html: str, base_url: str | None = None) -> bytes:
     except PdfGenerationError as exc:
         weasyprint_error = exc
 
+    wkhtmltopdf_error: PdfGenerationError | None = None
     try:
         return _render_html_to_pdf_with_wkhtmltopdf(html, base_url=base_url)
     except PdfGenerationError as exc:
-        messages: list[str] = []
-        if weasyprint_error is not None:
-            messages.append(str(weasyprint_error))
-        messages.append(str(exc))
-        raise PdfGenerationError(" ".join(messages)) from exc
+        wkhtmltopdf_error = exc
+
+    macos_error: PdfGenerationError | None = None
+    if platform.system() == "Darwin":
+        try:
+            from .pdf_utils_macos import render_html_to_pdf_with_macos_fallback
+
+            return render_html_to_pdf_with_macos_fallback(html, base_url=base_url)
+        except PdfGenerationError as exc:
+            macos_error = exc
+
+    messages: list[str] = []
+    if weasyprint_error is not None:
+        messages.append(str(weasyprint_error))
+    if wkhtmltopdf_error is not None:
+        messages.append(str(wkhtmltopdf_error))
+    if macos_error is not None:
+        messages.append(str(macos_error))
+
+    errors_to_chain = macos_error or wkhtmltopdf_error or weasyprint_error
+    raise PdfGenerationError(" ".join(messages)) from errors_to_chain
