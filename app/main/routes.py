@@ -26,8 +26,6 @@ import xlrd
 import base64
 import math
 from werkzeug.security import generate_password_hash
-from werkzeug.utils import secure_filename
-from uuid import uuid4
 try:
     import matplotlib
     matplotlib.use('Agg')
@@ -628,52 +626,6 @@ def _bug_report_bucket() -> str:
     return current_app.config.get("BUG_REPORT_BUCKET", "bug-report-attachments")
 
 
-def _upload_bug_report_attachment(file_storage) -> dict[str, str | None]:
-    """Persist an uploaded file to Supabase storage and return metadata."""
-
-    if not file_storage or not getattr(file_storage, "filename", None):
-        raise RuntimeError("Attachment missing filename")
-
-    supabase = current_app.config.get("SUPABASE")
-    if not supabase:
-        raise RuntimeError("Supabase client is not configured")
-
-    original_name = file_storage.filename or "attachment"
-    safe_name = secure_filename(original_name) or "attachment"
-    timestamp = datetime.utcnow().strftime("%Y/%m/%d")
-    storage_key = f"{timestamp}/{uuid4().hex}_{safe_name}"
-    bucket = _bug_report_bucket()
-
-    try:
-        file_storage.stream.seek(0)
-        file_bytes = file_storage.read()
-    except Exception as exc:  # pragma: no cover - defensive
-        raise RuntimeError(f"Failed to read attachment: {exc}") from exc
-
-    options = {"content-type": file_storage.mimetype or "application/octet-stream"}
-
-    try:
-        supabase.storage.from_(bucket).upload(storage_key, file_bytes, options)
-    except Exception as exc:  # pragma: no cover - network errors
-        raise RuntimeError(
-            f"Failed to upload attachment to Supabase storage: {exc}"
-        ) from exc
-
-    public_url = None
-    try:
-        public_url = supabase.storage.from_(bucket).get_public_url(storage_key)
-    except Exception:  # pragma: no cover - public URL failures are non-fatal
-        public_url = None
-
-    return {
-        "bucket": bucket,
-        "path": storage_key,
-        "name": original_name,
-        "content_type": file_storage.mimetype,
-        "public_url": public_url,
-    }
-
-
 def _resolve_user_display_name(
     user_id: object,
     user_lookup: dict[str, dict] | None = None,
@@ -1200,9 +1152,6 @@ def submit_bug_report():
     if not title or not description:
         abort(400, description='Both title and description are required.')
 
-    attachment_metadata: list[dict] = []
-    attachment_paths: list[str] = []
-
     reporter_display_name = user.get('username')
     reporter_identifier: str | None = None
 
@@ -1247,22 +1196,10 @@ def submit_bug_report():
                     username,
                 )
 
-    for file_storage in request.files.getlist('attachments'):
-        if not file_storage or not file_storage.filename:
-            continue
-        try:
-            uploaded = _upload_bug_report_attachment(file_storage)
-        except RuntimeError as exc:
-            abort(503, description=str(exc))
-        attachment_metadata.append(uploaded)
-        if uploaded.get('path'):
-            attachment_paths.append(uploaded['path'])
-
     record = {
         'title': title,
         'description': description,
         'priority': priority,
-        'attachments': attachment_paths,
         'status': payload.get('status') or 'open',
     }
 
@@ -1277,7 +1214,6 @@ def submit_bug_report():
 
     response_body = _format_bug_report_response(
         created[0],
-        attachment_metadata,
         reporter_display_name=reporter_display_name,
     )
     return jsonify(response_body), 201
