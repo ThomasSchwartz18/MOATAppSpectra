@@ -25,6 +25,11 @@ _FALLBACK_DEPENDENCY_MESSAGE = (
     "README for instructions)."
 )
 
+_MAC_UNSUPPORTED_MESSAGE = (
+    "Unable to generate PDF exports on macOS. PDF generation is supported only on "
+    "Linux or Windows hosts."
+)
+
 
 _MAC_LIBRARY_ALIASES: dict[str, tuple[str, ...]] = {
     "libgobject-2.0-0": ("libgobject-2.0.dylib", "libgobject-2.0.0.dylib", "gobject-2.0"),
@@ -226,6 +231,9 @@ def _render_html_to_pdf_with_wkhtmltopdf(
 def render_html_to_pdf(html: str, base_url: str | None = None) -> bytes:
     """Render HTML content to PDF bytes using WeasyPrint."""
 
+    if platform.system() == "Darwin":
+        raise PdfGenerationError(_MAC_UNSUPPORTED_MESSAGE)
+
     weasyprint_error: PdfGenerationError | None = None
     try:
         return _render_html_to_pdf_with_weasyprint(html, base_url=base_url)
@@ -238,22 +246,11 @@ def render_html_to_pdf(html: str, base_url: str | None = None) -> bytes:
     except PdfGenerationError as exc:
         wkhtmltopdf_error = exc
 
-    macos_error: PdfGenerationError | None = None
-    if platform.system() == "Darwin":
-        try:
-            from .pdf_utils_macos import render_html_to_pdf_with_macos_fallback
-
-            return render_html_to_pdf_with_macos_fallback(html, base_url=base_url)
-        except PdfGenerationError as exc:
-            macos_error = exc
-
     messages: list[str] = []
     if weasyprint_error is not None:
         messages.append(str(weasyprint_error))
     if wkhtmltopdf_error is not None:
         messages.append(str(wkhtmltopdf_error))
-    if macos_error is not None:
-        messages.append(str(macos_error))
 
-    errors_to_chain = macos_error or wkhtmltopdf_error or weasyprint_error
+    errors_to_chain = wkhtmltopdf_error or weasyprint_error
     raise PdfGenerationError(" ".join(messages)) from errors_to_chain
