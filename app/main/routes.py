@@ -710,7 +710,7 @@ TRACKED_SUPABASE_TABLES = {
     "combined_reports": "Joined AOI/FI views surfaced in integrated analytics.",
     "app_users": "Application login accounts managed from this console.",
     "bug_reports": "In-app feedback collected to triage feature issues and bugs.",
-    "defect": "Defect catalog entries referenced when analysing bug submissions.",
+    "defects": "Defect catalog entries referenced when analysing bug submissions.",
 }
 
 

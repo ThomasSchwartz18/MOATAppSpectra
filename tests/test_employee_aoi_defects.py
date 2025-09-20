@@ -59,7 +59,7 @@ def _login_employee(client):
 
 def test_employee_defect_endpoint_returns_unique_ids(employee_app):
     app, supabase = employee_app
-    supabase.tables['defect'] = [
+    supabase.tables['defects'] = [
         {'id': 'DEF-2', 'name': 'Solder Bridge'},
         {'id': 'DEF-1', 'name': 'Component Shift'},
         {'id': 'DEF-2', 'name': 'Solder Bridge'},

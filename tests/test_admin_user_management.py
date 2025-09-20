@@ -154,7 +154,7 @@ def test_admin_overview_lists_tracked_tables(admin_app):
             "aoi_reports": [],
             "fi_reports": [],
             "bug_reports": [],
-            "defect": [],
+            "defects": [],
         }
     )
 
@@ -167,7 +167,7 @@ def test_admin_overview_lists_tracked_tables(admin_app):
     overview = context["overview"]
     table_names = [table_info["name"] for table_info in overview["tracked_tables"]]
     assert "bug_reports" in table_names
-    assert "defect" in table_names
+    assert "defects" in table_names
 
 
 def test_admin_can_create_supabase_user(admin_app):
