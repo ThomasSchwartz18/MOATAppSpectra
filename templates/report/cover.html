@@ -8,11 +8,12 @@
     </header>
     <br />
     <div class="report-details">
-        <p><b>report_range:</b> {{ start }} - {{ end }}</p>
-        <p><b>generated_at:</b> {{ generated_at }}</p>
-        <p>{{ report_id }}</p>
-        <p><b>report author:</b> Thomas Schwartz</p>
-        <p><b>questions?:</b> &lt;{{ contact }}&gt;</p>
-        <p>{{ confidentiality }}</p>
+        <p>
+            <b>report_range:</b> {{ start }} - {{ end }}
+            &nbsp;•&nbsp;
+            <b>generated_at:</b> {{ generated_at }}
+            {% if report_id %}&nbsp;•&nbsp;{{ report_id }}{% endif %}
+            {% if confidentiality %}&nbsp;•&nbsp;{{ confidentiality }}{% endif %}
+        </p>
     </div>
 </section>
