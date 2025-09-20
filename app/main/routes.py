@@ -620,12 +620,6 @@ def _require_authenticated_user() -> dict[str, str | None]:
         "username": session.get("username"),
         "role": session.get("role") or session.get("username"),
     }
-
-
-def _bug_report_bucket() -> str:
-    return current_app.config.get("BUG_REPORT_BUCKET", "bug-report-attachments")
-
-
 def _resolve_user_display_name(
     user_id: object,
     user_lookup: dict[str, dict] | None = None,
@@ -653,13 +647,10 @@ def _resolve_user_display_name(
 
 def _format_bug_report_response(
     record: dict | None,
-    attachment_meta: list[dict] | None = None,
     assignable_lookup: dict[str, dict] | None = None,
     reporter_display_name: str | None = None,
 ) -> dict:
     response = dict(record or {})
-    if attachment_meta:
-        response["attachment_metadata"] = attachment_meta
 
     resolved_reporter = _resolve_user_display_name(
         response.get("reporter_id"),
@@ -1273,15 +1264,6 @@ def update_bug_report(report_id: int):
         if isinstance(notes_value, str):
             notes_value = notes_value.strip()
         updates['notes'] = notes_value or None
-
-    if 'attachments' in payload:
-        attachments = payload['attachments']
-        if attachments is None:
-            updates['attachments'] = []
-        elif isinstance(attachments, list) and all(isinstance(item, str) for item in attachments):
-            updates['attachments'] = attachments
-        else:
-            abort(400, description='Attachments must be provided as a list of storage paths.')
 
     if not updates:
         abort(400, description='No valid fields to update.')
@@ -4460,21 +4442,6 @@ def analysis_tracker_logs():
         assignable_lookup[str(user_id)] = user
 
     status_counter: Counter[str] = Counter()
-    bucket = _bug_report_bucket()
-    supabase_client = current_app.config.get('SUPABASE')
-
-    def _attachment_link(path: str | None) -> dict[str, str | None]:
-        if not path:
-            return {'path': None, 'url': None, 'name': None}
-        public_url = None
-        if supabase_client is not None:
-            try:
-                public_url = supabase_client.storage.from_(bucket).get_public_url(path)
-            except Exception:  # pragma: no cover - public URL failures are non-fatal
-                public_url = None
-        filename = os.path.basename(path) if path else None
-        return {'path': path, 'url': public_url, 'name': filename or path}
-
     formatted_bug_reports: list[dict] = []
     for record in bug_reports_raw or []:
         status_value = (record.get('status') or 'open').strip().lower()
@@ -4482,11 +4449,6 @@ def analysis_tracker_logs():
 
         created_at = _parse_timestamp(record.get('created_at'))
         updated_at = _parse_timestamp(record.get('updated_at'))
-
-        attachments_raw = record.get('attachments') or []
-        attachments: list[dict[str, str | None]] = []
-        if isinstance(attachments_raw, list):
-            attachments = [_attachment_link(item) for item in attachments_raw]
 
         assignee_id = record.get('assignee_id')
         assignee_id_str = str(assignee_id) if assignee_id not in (None, '') else ''
@@ -4518,7 +4480,6 @@ def analysis_tracker_logs():
                 'created_display': _format_timestamp(created_at) or '—',
                 'updated_at': updated_at,
                 'updated_display': _format_timestamp(updated_at) or '—',
-                'attachments': attachments,
                 'raw': record,
             }
         )

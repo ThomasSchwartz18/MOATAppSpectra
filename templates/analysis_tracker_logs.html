@@ -293,29 +293,6 @@
       margin-top: 0.5rem;
     }
 
-    .bug-attachments {
-      list-style: none;
-      padding: 0;
-      margin: 0.5rem 0 0;
-      display: grid;
-      gap: 0.35rem;
-    }
-
-    .bug-attachments li {
-      font-size: 0.85rem;
-      color: #475569;
-    }
-
-    .bug-attachments a {
-      color: #1d4ed8;
-      text-decoration: none;
-    }
-
-    .bug-attachments a:hover,
-    .bug-attachments a:focus {
-      text-decoration: underline;
-    }
-
     .bug-filter-form {
       display: flex;
       flex-wrap: wrap;
@@ -708,7 +685,7 @@
         <section class="tab-panel" role="tabpanel" data-tab-panel="bug-reports" aria-hidden="true">
           <header>
             <h2>Bug Reports</h2>
-            <p>Monitor issues submitted by users, review attachments, and coordinate follow-up directly from this dashboard.</p>
+            <p>Monitor issues submitted by users and coordinate follow-up directly from this dashboard.</p>
           </header>
 
           {% if bug_reports_error %}
@@ -809,25 +786,7 @@
                         <summary>Additional details</summary>
                         <p><strong>Reporter:</strong> {{ report.reporter or 'Unknown' }}</p>
                         <p><strong>Notes:</strong> {{ report.notes or '—' }}</p>
-                        {% if report.attachments %}
-                        <h4>Attachments</h4>
-                        <ul class="bug-attachments">
-                          {% for attachment in report.attachments %}
-                          <li>
-                            {% if attachment.url %}
-                            <a href="{{ attachment.url }}" target="_blank" rel="noopener">{{ attachment.name }}</a>
-                            {% else %}
-                            <span>{{ attachment.name }}</span>
-                            {% endif %}
-                            {% if attachment.path %}
-                            <br><small>{{ attachment.path }}</small>
-                            {% endif %}
-                          </li>
-                          {% endfor %}
-                        </ul>
-                        {% else %}
-                        <p>No attachments uploaded.</p>
-                        {% endif %}
+                        <p><em>File uploads are not supported for bug reports. Include any context directly in the description or notes.</em></p>
                       </details>
                     </div>
                   </td>

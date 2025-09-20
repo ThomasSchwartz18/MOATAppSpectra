@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta, timezone
-from typing import Any, Iterable, Tuple
+from typing import Any, Tuple
 
 from flask import current_app
 
@@ -230,9 +230,6 @@ def insert_bug_report(record: dict) -> tuple[list[dict] | None, str | None]:
 
     payload = dict(record)
     payload["updated_at"] = datetime.now(timezone.utc).isoformat()
-    attachments = payload.get("attachments")
-    if attachments is not None and not isinstance(attachments, list):
-        payload["attachments"] = list(attachments)
 
     try:
         response = supabase.table("bug_reports").insert(payload).execute()
@@ -291,9 +288,6 @@ def update_bug_report_status(
         return None, error
 
     payload = dict(updates)
-    attachments: Iterable[str] | None = payload.get("attachments")
-    if attachments is not None and not isinstance(attachments, list):
-        payload["attachments"] = list(attachments)
     payload["updated_at"] = datetime.now(timezone.utc).isoformat()
 
     try:

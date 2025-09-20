@@ -243,3 +243,55 @@ def test_admin_bug_report_view_shows_reporter_name(app_client, monkeypatch):
     assert response.status_code == 200
     html = response.get_data(as_text=True)
     assert "Carla Candidate" in html
+
+
+def test_admin_bug_report_update_rejects_only_attachments(app_client, monkeypatch):
+    app, client = app_client
+
+    called = False
+
+    def fake_update(report_id, updates):
+        nonlocal called
+        called = True
+        return [{"id": report_id, "status": updates.get("status", "open")}], None
+
+    monkeypatch.setattr(routes_module, "update_bug_report_status", fake_update)
+    monkeypatch.setattr(routes_module, "_sync_feature_state_from_bug", lambda record: None)
+
+    with client.session_transaction() as session:
+        session["username"] = "ADMIN"
+        session["role"] = "ADMIN"
+
+    response = client.patch(
+        "/admin/bug-reports/99",
+        json={"attachments": ["foo"]},
+    )
+
+    assert response.status_code == 400
+    assert called is False
+
+
+def test_admin_bug_report_update_ignores_attachment_field(app_client, monkeypatch):
+    app, client = app_client
+
+    recorded = {}
+
+    def fake_update(report_id, updates):
+        recorded["updates"] = dict(updates)
+        stored = {"id": report_id, "status": updates.get("status", "open")}
+        return [stored], None
+
+    monkeypatch.setattr(routes_module, "update_bug_report_status", fake_update)
+    monkeypatch.setattr(routes_module, "_sync_feature_state_from_bug", lambda record: None)
+
+    with client.session_transaction() as session:
+        session["username"] = "ADMIN"
+        session["role"] = "ADMIN"
+
+    response = client.patch(
+        "/admin/bug-reports/101",
+        json={"status": "resolved", "attachments": ["ignored"]},
+    )
+
+    assert response.status_code == 200
+    assert recorded["updates"] == {"status": "resolved"}

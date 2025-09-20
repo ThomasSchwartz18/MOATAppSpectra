@@ -3,7 +3,14 @@ import json
 from pathlib import Path
 
 from flask import Flask, current_app, session
-from supabase import create_client
+
+try:  # pragma: no cover - dependency optional in tests
+    from supabase import create_client
+except ImportError:  # pragma: no cover - fallback for missing realtime extras
+    def create_client(*args, **kwargs):
+        raise RuntimeError(
+            "Supabase client is not available. Install supabase dependencies."
+        )
 
 from .auth.routes import auth_bp
 from .main.routes import main_bp
