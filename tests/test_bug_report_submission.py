@@ -295,3 +295,30 @@ def test_admin_bug_report_update_ignores_attachment_field(app_client, monkeypatc
 
     assert response.status_code == 200
     assert recorded["updates"] == {"status": "resolved"}
+
+
+def test_admin_bug_report_update_returns_json_on_error(app_client, monkeypatch):
+    app, client = app_client
+
+    def fake_update(report_id, updates):
+        return None, "Database unreachable: timeout"
+
+    monkeypatch.setattr(routes_module, "update_bug_report_status", fake_update)
+    monkeypatch.setattr(routes_module, "_sync_feature_state_from_bug", lambda record: None)
+
+    with client.session_transaction() as session:
+        session["username"] = "ADMIN"
+        session["role"] = "ADMIN"
+
+    response = client.patch(
+        "/admin/bug-reports/102",
+        json={"status": "resolved"},
+    )
+
+    assert response.status_code == 503
+    assert response.is_json
+    payload = response.get_json()
+    assert payload == {
+        "error": "update_failed",
+        "description": "Database unreachable: timeout",
+    }
