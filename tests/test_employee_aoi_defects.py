@@ -130,3 +130,100 @@ def test_employee_submission_validates_defect_selection(employee_app, monkeypatc
     error_payload = invalid_response.get_json()
     assert 'defect_id' in (error_payload.get('errors') or {})
     assert len(inserted_records) == 1
+
+
+def test_employee_submission_formats_rejection_details(employee_app, monkeypatch):
+    app, _ = employee_app
+    client = app.test_client()
+
+    with app.app_context():
+        from app.main import routes
+
+        monkeypatch.setattr(
+            routes,
+            'fetch_distinct_defect_ids',
+            lambda: (['DEF-1', 'DEF-2', 'DEF-3'], None),
+        )
+
+        inserted_records: list[dict] = []
+
+        def fake_insert(record):
+            inserted_records.append(record)
+            return ([record], None)
+
+        monkeypatch.setattr(routes, 'insert_aoi_report', fake_insert)
+
+    _login_employee(client)
+
+    payload = {
+        'date': '2024-02-03',
+        'shift': '2nd',
+        'operator': 'Operator Two',
+        'customer': 'Customer B',
+        'program': 'Program B',
+        'assembly': 'Assembly 2',
+        'job_number': 'J456',
+        'quantity_inspected': '25',
+        'quantity_rejected': '3',
+        'inspection_type': 'SMT',
+        'defect_id': 'DEF-1',
+        'notes': 'Needs review',
+        'rejection_details': [
+            {'ref': 'R15', 'defect_id': 'DEF-1', 'quantity': 2},
+            {'ref': 'R22', 'defect_id': 'DEF-2', 'quantity': 1},
+        ],
+    }
+
+    response = client.post('/employee/aoi_reports', json=payload)
+
+    assert response.status_code == 201
+    assert inserted_records
+    assert inserted_records[0]['Additional Information'] == (
+        'SMT AOI Inspection Data Sheet submission | '
+        'R15 DEF-1 2, R22 DEF-2 1 | Needs review'
+    )
+
+
+def test_employee_submission_rejects_invalid_rejection_rows(employee_app, monkeypatch):
+    app, _ = employee_app
+    client = app.test_client()
+
+    with app.app_context():
+        from app.main import routes
+
+        monkeypatch.setattr(
+            routes,
+            'fetch_distinct_defect_ids',
+            lambda: (['DEF-1', 'DEF-2'], None),
+        )
+
+        def fake_insert(record):
+            raise AssertionError('Should not insert invalid record')
+
+        monkeypatch.setattr(routes, 'insert_aoi_report', fake_insert)
+
+    _login_employee(client)
+
+    payload = {
+        'date': '2024-02-04',
+        'shift': '3rd',
+        'operator': 'Operator Three',
+        'customer': 'Customer C',
+        'program': 'Program C',
+        'assembly': 'Assembly 3',
+        'job_number': 'J789',
+        'quantity_inspected': '30',
+        'quantity_rejected': '2',
+        'inspection_type': 'SMT',
+        'defect_id': 'DEF-1',
+        'rejection_details': [
+            {'ref': '', 'defect_id': 'DEF-1', 'quantity': 2},
+            {'ref': 'R30', 'defect_id': 'UNKNOWN', 'quantity': 0},
+        ],
+    }
+
+    response = client.post('/employee/aoi_reports', json=payload)
+
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert 'rejection_details' in (payload.get('errors') or {})

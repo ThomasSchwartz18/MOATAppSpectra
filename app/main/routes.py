@@ -1308,6 +1308,14 @@ def _prepare_employee_aoi_record(
     errors: dict[str, str] = {}
     record: dict[str, str] = {}
 
+    defect_cache: tuple[list[str] | None, str | None] | None = None
+
+    def _get_defect_ids() -> tuple[list[str] | None, str | None]:
+        nonlocal defect_cache
+        if defect_cache is None:
+            defect_cache = fetch_distinct_defect_ids()
+        return defect_cache
+
     date_raw = (payload.get('date') or '').strip()
     if not date_raw:
         errors['date'] = 'Date is required.'
@@ -1353,7 +1361,7 @@ def _prepare_employee_aoi_record(
 
     defect_value = (payload.get('defect_id') or '').strip()
     if defect_value:
-        valid_defects, defect_error = fetch_distinct_defect_ids()
+        valid_defects, defect_error = _get_defect_ids()
         if defect_error:
             errors['defect_id'] = 'Unable to validate defect selection. Please try again later.'
         elif defect_value not in (valid_defects or []):
@@ -1377,9 +1385,61 @@ def _prepare_employee_aoi_record(
         errors['inspection_type'] = 'Select a valid inspection data sheet.'
 
     notes_value = (payload.get('notes') or '').strip()
+
+    rejection_details_raw = payload.get('rejection_details')
+    rejection_entries: list[dict[str, object]] = []
+    if isinstance(rejection_details_raw, str) and rejection_details_raw.strip():
+        try:
+            parsed = json.loads(rejection_details_raw)
+        except json.JSONDecodeError:
+            errors['rejection_details'] = 'Enter valid rejection detail rows.'
+        else:
+            if isinstance(parsed, list):
+                rejection_entries = [entry for entry in parsed if isinstance(entry, dict)]
+                if len(rejection_entries) != len(parsed):
+                    errors['rejection_details'] = 'Enter valid rejection detail rows.'
+            elif parsed:
+                errors['rejection_details'] = 'Enter valid rejection detail rows.'
+    elif isinstance(rejection_details_raw, list):
+        rejection_entries = [entry for entry in rejection_details_raw if isinstance(entry, dict)]
+        if len(rejection_entries) != len(rejection_details_raw):
+            errors['rejection_details'] = 'Enter valid rejection detail rows.'
+    elif rejection_details_raw not in (None, ''):
+        errors['rejection_details'] = 'Enter valid rejection detail rows.'
+
+    formatted_rejections: list[str] = []
+    if rejection_entries:
+        valid_defects, defect_error = _get_defect_ids()
+        if defect_error:
+            errors['rejection_details'] = (
+                'Unable to validate rejection details. Please try again later.'
+            )
+        else:
+            valid_defect_set = set(valid_defects or [])
+            detail_errors = False
+            for entry in rejection_entries:
+                ref = str(entry.get('ref', '') or '').strip()
+                defect_id = str(entry.get('defect_id', '') or '').strip()
+                quantity_raw = entry.get('quantity')
+                try:
+                    quantity = int(quantity_raw)
+                except (TypeError, ValueError):
+                    quantity = None
+                if not ref or defect_id not in valid_defect_set or not quantity or quantity <= 0:
+                    detail_errors = True
+                    break
+                formatted_rejections.append(f'{ref} {defect_id} {quantity}')
+            if detail_errors:
+                errors['rejection_details'] = (
+                    'Rejection detail entries must include a reference, valid defect, '
+                    'and quantity of 1 or more.'
+                )
+
     additional_parts = []
     if sheet_label:
         additional_parts.append(f'{sheet_label} submission')
+    if formatted_rejections:
+        additional_parts.append(', '.join(formatted_rejections))
     if notes_value:
         additional_parts.append(notes_value)
     if additional_parts:
