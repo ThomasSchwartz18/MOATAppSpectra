@@ -838,8 +838,30 @@ def list_bug_reports():
 def update_bug_report(report_id: int):
     payload = request.get_json(silent=True) or {}
 
-    allowed_fields = {'status', 'assignee_id', 'priority'}
-    updates = {key: value for key, value in payload.items() if key in allowed_fields and value is not None}
+    allowed_statuses = {'open', 'in_progress', 'resolved', 'on_hold'}
+    updates: dict[str, object] = {}
+
+    if 'status' in payload:
+        status_value = (payload.get('status') or '').strip().lower()
+        if not status_value:
+            abort(400, description='Status is required when provided.')
+        if status_value not in allowed_statuses:
+            abort(400, description='Invalid status selection.')
+        updates['status'] = status_value
+
+    if 'assignee_id' in payload:
+        assignee_value = payload.get('assignee_id')
+        updates['assignee_id'] = assignee_value if assignee_value not in (None, '') else None
+
+    if 'priority' in payload:
+        priority_value = (payload.get('priority') or '').strip()
+        updates['priority'] = priority_value or None
+
+    if 'notes' in payload:
+        notes_value = payload.get('notes')
+        if isinstance(notes_value, str):
+            notes_value = notes_value.strip()
+        updates['notes'] = notes_value or None
 
     if 'attachments' in payload:
         attachments = payload['attachments']
@@ -3963,6 +3985,121 @@ def analysis_tracker_logs():
 
     backtracking_sessions = [s for s in session_details if s['has_backtracking']]
 
+    bug_reports_raw: list[dict] = []
+    bug_reports_error: str | None = None
+    try:
+        bug_reports_raw, bug_reports_error = fetch_bug_reports()
+    except Exception as exc:  # pragma: no cover - defensive safeguard
+        bug_reports_raw = []
+        bug_reports_error = str(exc)
+
+    assignable_users: list[dict] = []
+    assignee_error: str | None = None
+    try:
+        fetched_users, assignee_error = _fetch_configured_users()
+    except Exception as exc:  # pragma: no cover - defensive safeguard
+        fetched_users = []
+        assignee_error = str(exc)
+
+    for user in fetched_users or []:
+        user_id = user.get('id')
+        if user_id is None:
+            continue
+        assignable_users.append(
+            {
+                'id': str(user_id),
+                'label': user.get('display_name') or user.get('username') or str(user_id),
+                'role': user.get('role'),
+            }
+        )
+
+    assignable_lookup = {user['id']: user for user in assignable_users}
+
+    status_counter: Counter[str] = Counter()
+    bucket = _bug_report_bucket()
+    supabase_client = current_app.config.get('SUPABASE')
+
+    def _attachment_link(path: str | None) -> dict[str, str | None]:
+        if not path:
+            return {'path': None, 'url': None, 'name': None}
+        public_url = None
+        if supabase_client is not None:
+            try:
+                public_url = supabase_client.storage.from_(bucket).get_public_url(path)
+            except Exception:  # pragma: no cover - public URL failures are non-fatal
+                public_url = None
+        filename = os.path.basename(path) if path else None
+        return {'path': path, 'url': public_url, 'name': filename or path}
+
+    formatted_bug_reports: list[dict] = []
+    for record in bug_reports_raw or []:
+        status_value = (record.get('status') or 'open').strip().lower()
+        status_counter[status_value] += 1
+
+        created_at = _parse_timestamp(record.get('created_at'))
+        updated_at = _parse_timestamp(record.get('updated_at'))
+
+        attachments_raw = record.get('attachments') or []
+        attachments: list[dict[str, str | None]] = []
+        if isinstance(attachments_raw, list):
+            attachments = [_attachment_link(item) for item in attachments_raw]
+
+        assignee_id = record.get('assignee_id')
+        assignee_id_str = str(assignee_id) if assignee_id not in (None, '') else ''
+        assignee_label = record.get('assignee_name') or assignable_lookup.get(assignee_id_str, {}).get('label')
+
+        formatted_bug_reports.append(
+            {
+                'id': record.get('id'),
+                'title': record.get('title'),
+                'description': record.get('description'),
+                'priority': record.get('priority') or 'Unspecified',
+                'status': status_value,
+                'status_label': status_value.replace('_', ' ').title(),
+                'reporter': record.get('reporter_name') or record.get('reporter_id'),
+                'reporter_id': record.get('reporter_id'),
+                'assignee_id': assignee_id_str,
+                'assignee_label': assignee_label or 'Unassigned',
+                'assignee_token': assignee_id_str or 'unassigned',
+                'notes': record.get('notes') or '',
+                'created_at': created_at,
+                'created_display': _format_timestamp(created_at) or '—',
+                'updated_at': updated_at,
+                'updated_display': _format_timestamp(updated_at) or '—',
+                'attachments': attachments,
+                'raw': record,
+            }
+        )
+
+    formatted_bug_reports.sort(key=lambda item: item['created_at'] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+
+    recent_bug_reports = formatted_bug_reports[:5]
+
+    known_statuses = ['open', 'in_progress', 'resolved', 'on_hold']
+    status_counts = [
+        {
+            'value': value,
+            'label': value.replace('_', ' ').title(),
+            'count': status_counter.get(value, 0),
+        }
+        for value in known_statuses
+    ]
+
+    for value, count in status_counter.items():
+        if value in known_statuses:
+            continue
+        status_counts.append(
+            {
+                'value': value,
+                'label': value.replace('_', ' ').title(),
+                'count': count,
+            }
+        )
+
+    total_bug_reports = sum(entry['count'] for entry in status_counts)
+
+    bug_update_base = url_for('main.update_bug_report', report_id=0).rsplit('/', 1)[0]
+
     return render_template(
         'analysis_tracker_logs.html',
         sessions=session_details,
@@ -3975,6 +4112,18 @@ def analysis_tracker_logs():
         event_summary_data=event_summary_data,
         role_breakdown_data=role_breakdown_data,
         backtracking_sessions=backtracking_sessions,
+        bug_reports=formatted_bug_reports,
+        bug_status_counts=status_counts,
+        bug_total=total_bug_reports,
+        recent_bug_reports=recent_bug_reports,
+        bug_reports_error=bug_reports_error,
+        bug_assignee_error=assignee_error,
+        bug_assignees=assignable_users,
+        bug_update_base=bug_update_base,
+        bug_status_options=[
+            {'value': value, 'label': value.replace('_', ' ').title()}
+            for value in known_statuses
+        ],
     )
 
 

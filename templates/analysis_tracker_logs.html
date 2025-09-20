@@ -19,6 +19,62 @@
       color: #333;
     }
 
+    .dashboard-tabs {
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .dashboard-tabs .tab-nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      border-bottom: 1px solid #dbe2ef;
+      padding-bottom: 0.5rem;
+    }
+
+    .dashboard-tabs .tab-link {
+      border: 1px solid transparent;
+      background: #f1f5f9;
+      padding: 0.6rem 1rem;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #475569;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .dashboard-tabs .tab-link:hover,
+    .dashboard-tabs .tab-link:focus {
+      background: #e2e8f0;
+      color: #1d4ed8;
+      outline: none;
+    }
+
+    .dashboard-tabs .tab-link.is-active {
+      background: #1d4ed8;
+      color: #fff;
+      border-color: #1d4ed8;
+    }
+
+    .dashboard-tabs .tab-panels {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    .dashboard-tabs .tab-panel {
+      display: none;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+
+    .dashboard-tabs .tab-panel.is-active {
+      display: flex;
+    }
+
     .tracker-dashboard .filters {
       display: grid;
       gap: 0.75rem 1rem;
@@ -66,7 +122,6 @@
       display: grid;
       gap: 1rem;
       grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      margin-bottom: 2rem;
     }
 
     .tracker-dashboard .stat-card {
@@ -96,7 +151,6 @@
       display: grid;
       grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
       gap: 1.5rem;
-      margin-bottom: 2rem;
     }
 
     .tracker-dashboard .chart-card {
@@ -202,6 +256,226 @@
       color: #1f2937;
     }
 
+    .bug-status-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 1rem;
+    }
+
+    .bug-status-card {
+      background: #fff;
+      border: 1px solid #dbe2ef;
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    }
+
+    .bug-status-card .status-label {
+      font-size: 0.9rem;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .bug-status-card strong {
+      font-size: 1.6rem;
+      color: #0f172a;
+    }
+
+    .bug-summary p {
+      margin-top: 0.25rem;
+    }
+
+    .bug-summary details {
+      margin-top: 0.5rem;
+    }
+
+    .bug-attachments {
+      list-style: none;
+      padding: 0;
+      margin: 0.5rem 0 0;
+      display: grid;
+      gap: 0.35rem;
+    }
+
+    .bug-attachments li {
+      font-size: 0.85rem;
+      color: #475569;
+    }
+
+    .bug-attachments a {
+      color: #1d4ed8;
+      text-decoration: none;
+    }
+
+    .bug-attachments a:hover,
+    .bug-attachments a:focus {
+      text-decoration: underline;
+    }
+
+    .bug-filter-form {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      align-items: flex-end;
+      margin-bottom: 1rem;
+    }
+
+    .bug-filter-form label {
+      display: flex;
+      flex-direction: column;
+      font-size: 0.85rem;
+      color: #4a4a4a;
+    }
+
+    .bug-filter-form select,
+    .bug-filter-form input {
+      margin-top: 0.25rem;
+      padding: 0.4rem 0.5rem;
+      border-radius: 4px;
+      border: 1px solid #cbd5e1;
+      font-size: 0.9rem;
+    }
+
+    .bug-filter-form button {
+      padding: 0.55rem 0.9rem;
+      border-radius: 4px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .bug-filter-form button[type="submit"] {
+      background: #1d4ed8;
+      color: #fff;
+    }
+
+    .bug-filter-form button[type="reset"] {
+      background: #e2e8f0;
+      color: #1f2937;
+    }
+
+    .bug-action-form {
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    .bug-action-form label {
+      display: flex;
+      flex-direction: column;
+      font-size: 0.8rem;
+      color: #475569;
+    }
+
+    .bug-action-form select,
+    .bug-action-form textarea {
+      margin-top: 0.2rem;
+      border-radius: 4px;
+      border: 1px solid #cbd5e1;
+      padding: 0.4rem;
+      font-size: 0.85rem;
+    }
+
+    .bug-action-form textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+
+    .bug-action-buttons {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .bug-action-buttons button {
+      padding: 0.45rem 0.75rem;
+      border-radius: 4px;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+    }
+
+    .bug-action-buttons button[type="submit"] {
+      background: #0f766e;
+      color: #fff;
+    }
+
+    .bug-action-buttons button[data-action="reset"] {
+      background: #e2e8f0;
+      color: #0f172a;
+    }
+
+    .bug-action-feedback {
+      font-size: 0.75rem;
+      color: #475569;
+      min-height: 1rem;
+    }
+
+    .bug-alert {
+      border: 1px solid #fbbf24;
+      background: #fef3c7;
+      color: #92400e;
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.2rem 0.5rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .status-open {
+      background: #eef2ff;
+      color: #3730a3;
+    }
+
+    .status-in_progress {
+      background: #fef3c7;
+      color: #b45309;
+    }
+
+    .status-resolved {
+      background: #dcfce7;
+      color: #047857;
+    }
+
+    .status-on_hold {
+      background: #fef9c3;
+      color: #92400e;
+    }
+
+    .bug-recent-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+      display: grid;
+      gap: 0.5rem;
+    }
+
+    .bug-recent-list li {
+      background: #fff;
+      border: 1px solid #dbe2ef;
+      border-radius: 6px;
+      padding: 0.65rem 0.75rem;
+      font-size: 0.85rem;
+    }
+
+    .bug-recent-list strong {
+      color: #0f172a;
+    }
+
+    .bug-token {
+      display: none;
+    }
+
     @media (max-width: 768px) {
       .tracker-dashboard {
         padding: 1rem;
@@ -212,6 +486,10 @@
       .tracker-dashboard table td {
         font-size: 0.8rem;
       }
+
+      .bug-action-form {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      }
     }
   </style>
 {% endblock %}
@@ -221,217 +499,387 @@
     <h1>Application Tracker Logs</h1>
     <p class="page-intro">Review recent application interaction sessions recorded by the in-app tracker. Use the filters to explore behaviour by role, event type, or backtracking activity.</p>
 
-    <form class="filters" method="get">
-      <label>
-        Role
-        <select name="role">
-          <option value="">All roles</option>
-          {% for option in role_options %}
-          <option value="{{ option }}" {% if filters.role == option %}selected{% endif %}>{{ option }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>
-        Event Type
-        <select name="event">
-          <option value="">All events</option>
-          {% for option in event_options %}
-          <option value="{{ option }}" {% if filters.event == option %}selected{% endif %}>{{ option }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>
-        Session / User Search
-        <input type="text" name="session" value="{{ filters.session }}" placeholder="Token, username or ID">
-      </label>
-      <label>
-        Backtracking
-        <select name="backtracking">
-          <option value="any" {% if filters.backtracking == 'any' %}selected{% endif %}>Any activity</option>
-          <option value="only" {% if filters.backtracking == 'only' %}selected{% endif %}>Backtracking only</option>
-          <option value="exclude" {% if filters.backtracking in ['exclude', 'none'] %}selected{% endif %}>Exclude backtracking</option>
-        </select>
-      </label>
-      <label>
-        Start (ISO date)
-        <input type="text" name="start" value="{{ filters.start }}" placeholder="YYYY-MM-DD or ISO timestamp">
-      </label>
-      <label>
-        End (ISO date)
-        <input type="text" name="end" value="{{ filters.end }}" placeholder="YYYY-MM-DD or ISO timestamp">
-      </label>
-      <label>
-        Session limit
-        <input type="number" min="10" max="250" step="10" name="limit" value="{{ filters.limit }}">
-      </label>
-      <div>
-        <button type="submit">Apply filters</button>
-        <button type="submit" name="reset" value="1" class="secondary" formnovalidate>Reset</button>
+    <div class="dashboard-tabs" data-tabs>
+      <div class="tab-nav" role="tablist" aria-label="Tracker views">
+        <button class="tab-link is-active" type="button" role="tab" aria-selected="true" tabindex="0" data-tab-target="analytics">Tracker Analytics</button>
+        <button class="tab-link" type="button" role="tab" aria-selected="false" tabindex="-1" data-tab-target="bug-reports">Bug Reports</button>
       </div>
-    </form>
 
-    <div class="stats-grid">
-      <div class="stat-card">
-        <h3>Sessions</h3>
-        <strong>{{ stats.total_sessions }}</strong>
-      </div>
-      <div class="stat-card">
-        <h3>Total Events</h3>
-        <strong>{{ stats.total_events }}</strong>
-      </div>
-      <div class="stat-card">
-        <h3>Navigation Events</h3>
-        <strong>{{ stats.total_navigation }}</strong>
-      </div>
-      <div class="stat-card">
-        <h3>Backtracking Events</h3>
-        <strong>{{ stats.total_backtracking }}</strong>
-      </div>
-      <div class="stat-card">
-        <h3>Average Session Duration</h3>
-        <strong>{{ stats.avg_duration }}</strong>
+      <div class="tab-panels">
+        <section class="tab-panel is-active" role="tabpanel" data-tab-panel="analytics" aria-hidden="false">
+          <form class="filters" method="get">
+            <label>
+              Role
+              <select name="role">
+                <option value="">All roles</option>
+                {% for option in role_options %}
+                <option value="{{ option }}" {% if filters.role == option %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>
+              Event Type
+              <select name="event">
+                <option value="">All events</option>
+                {% for option in event_options %}
+                <option value="{{ option }}" {% if filters.event == option %}selected{% endif %}>{{ option }}</option>
+                {% endfor %}
+              </select>
+            </label>
+            <label>
+              Session / User Search
+              <input type="text" name="session" value="{{ filters.session }}" placeholder="Token, username or ID">
+            </label>
+            <label>
+              Backtracking
+              <select name="backtracking">
+                <option value="any" {% if filters.backtracking == 'any' %}selected{% endif %}>Any activity</option>
+                <option value="only" {% if filters.backtracking == 'only' %}selected{% endif %}>Backtracking only</option>
+                <option value="exclude" {% if filters.backtracking in ['exclude', 'none'] %}selected{% endif %}>Exclude backtracking</option>
+              </select>
+            </label>
+            <label>
+              Start (ISO date)
+              <input type="text" name="start" value="{{ filters.start }}" placeholder="YYYY-MM-DD or ISO timestamp">
+            </label>
+            <label>
+              End (ISO date)
+              <input type="text" name="end" value="{{ filters.end }}" placeholder="YYYY-MM-DD or ISO timestamp">
+            </label>
+            <label>
+              Session limit
+              <input type="number" min="10" max="250" step="10" name="limit" value="{{ filters.limit }}">
+            </label>
+            <div>
+              <button type="submit">Apply filters</button>
+              <button type="submit" name="reset" value="1" class="secondary" formnovalidate>Reset</button>
+            </div>
+          </form>
+
+          <div class="stats-grid">
+            <div class="stat-card">
+              <h3>Sessions</h3>
+              <strong>{{ stats.total_sessions }}</strong>
+            </div>
+            <div class="stat-card">
+              <h3>Total Events</h3>
+              <strong>{{ stats.total_events }}</strong>
+            </div>
+            <div class="stat-card">
+              <h3>Navigation Events</h3>
+              <strong>{{ stats.total_navigation }}</strong>
+            </div>
+            <div class="stat-card">
+              <h3>Backtracking Events</h3>
+              <strong>{{ stats.total_backtracking }}</strong>
+            </div>
+            <div class="stat-card">
+              <h3>Average Session Duration</h3>
+              <strong>{{ stats.avg_duration }}</strong>
+            </div>
+          </div>
+
+          <section class="charts">
+            <div class="chart-card">
+              <h2>Session Duration vs Backtracking</h2>
+              <canvas id="sessionDurationChart" aria-label="Session duration vs backtracking chart"></canvas>
+            </div>
+            <div class="chart-card">
+              <h2>Event Distribution</h2>
+              <canvas id="eventDistributionChart" aria-label="Event distribution chart"></canvas>
+            </div>
+            <div class="chart-card">
+              <h2>Sessions by Role</h2>
+              <canvas id="roleBreakdownChart" aria-label="Session count by role"></canvas>
+            </div>
+          </section>
+
+          <section class="table-section">
+            <h2>Recent Sessions</h2>
+            {% if sessions %}
+            <table id="sessionTable">
+              <thead>
+                <tr>
+                  <th>Session</th>
+                  <th>User</th>
+                  <th>Role</th>
+                  <th>Started</th>
+                  <th>Ended</th>
+                  <th>Duration</th>
+                  <th>Events</th>
+                  <th>Navigation</th>
+                  <th>Backtracking</th>
+                  <th>Navigation Path</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for session in sessions %}
+                <tr class="{% if session.has_backtracking %}has-backtracking{% endif %}">
+                  <td data-label="Session">{{ session.token }}</td>
+                  <td data-label="User">{{ session.username or session.user_id or '—' }}</td>
+                  <td data-label="Role">{{ session.role or '—' }}</td>
+                  <td data-label="Started">{{ session.start_display or '—' }}</td>
+                  <td data-label="Ended">{{ session.end_display or '—' }}</td>
+                  <td data-label="Duration">{{ session.duration_label }}</td>
+                  <td data-label="Events">{{ session.event_count }}</td>
+                  <td data-label="Navigation">{{ session.navigation_count }}</td>
+                  <td data-label="Backtracking">{{ session.backtracking_count }}</td>
+                  <td data-label="Navigation Path">
+                    <div class="path">
+                      {% for entry in session.path %}
+                      <span class="{% if entry.is_backtrack %}is-backtrack{% endif %}">
+                        {{ entry.label or entry.href or 'Navigate' }}
+                      </span>
+                      {% endfor %}
+                    </div>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% else %}
+            <p>No sessions matched the selected filters.</p>
+            {% endif %}
+          </section>
+
+          <section class="table-section">
+            <h2>Interaction Events{% if filters.event %} &ndash; {{ filters.event }}{% endif %}</h2>
+            {% if events %}
+            <table id="eventTable">
+              <thead>
+                <tr>
+                  <th>Occurred</th>
+                  <th>Session</th>
+                  <th>User</th>
+                  <th>Event</th>
+                  <th>Label</th>
+                  <th>Context</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for event in events %}
+                <tr>
+                  <td data-label="Occurred">{{ event.occurred or '—' }}</td>
+                  <td data-label="Session">{{ event.session_token or '—' }}</td>
+                  <td data-label="User">{{ event.username or event.user_id or '—' }}</td>
+                  <td data-label="Event">{{ event.event }}</td>
+                  <td data-label="Label">{{ event.label or '—' }}</td>
+                  <td data-label="Context">
+                    {% if event.metadata %}
+                    <details>
+                      <summary>View</summary>
+                      <pre>{{ event.metadata | tojson(indent=2) }}</pre>
+                    </details>
+                    {% else %}
+                    —
+                    {% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% else %}
+            <p>No interaction events matched the selected filters.</p>
+            {% endif %}
+          </section>
+
+          {% if backtracking_sessions %}
+          <section class="backtracking-highlights">
+            <h2>Highlighted Backtracking Activity</h2>
+            <ul>
+              {% for session in backtracking_sessions %}
+              <li>
+                <h3>{{ session.username or session.user_id or session.token }}</h3>
+                <p><strong>Session:</strong> {{ session.token }}</p>
+                <p><strong>Backtracking events:</strong> {{ session.backtracking_count }}</p>
+                <p><strong>Duration:</strong> {{ session.duration_label }}</p>
+                <ul>
+                  {% for entry in session.backtracking_events %}
+                  <li>{{ entry.occurred }} &mdash; {{ entry.label or entry.href or 'Navigate' }}</li>
+                  {% endfor %}
+                </ul>
+              </li>
+              {% endfor %}
+            </ul>
+          </section>
+          {% endif %}
+        </section>
+
+        <section class="tab-panel" role="tabpanel" data-tab-panel="bug-reports" aria-hidden="true">
+          <header>
+            <h2>Bug Reports</h2>
+            <p>Monitor issues submitted by users, review attachments, and coordinate follow-up directly from this dashboard.</p>
+          </header>
+
+          {% if bug_reports_error %}
+          <div class="bug-alert" role="alert">Unable to load bug reports: {{ bug_reports_error }}</div>
+          {% endif %}
+
+          {% if bug_assignee_error %}
+          <div class="bug-alert" role="alert">Assignee information could not be fully loaded: {{ bug_assignee_error }}</div>
+          {% endif %}
+
+          <div class="bug-status-grid">
+            <div class="bug-status-card">
+              <span class="status-label">Total Reports</span>
+              <strong>{{ bug_total }}</strong>
+            </div>
+            {% for entry in bug_status_counts %}
+            <div class="bug-status-card">
+              <span class="status-label">{{ entry.label }}</span>
+              <strong>{{ entry.count }}</strong>
+            </div>
+            {% endfor %}
+          </div>
+
+          {% if recent_bug_reports %}
+          <section>
+            <h3>Recent submissions</h3>
+            <ul class="bug-recent-list">
+              {% for report in recent_bug_reports %}
+              <li>
+                <strong>#{{ report.id }}</strong> &mdash; {{ report.title or 'Untitled' }}
+                <br>
+                <span>Status: {{ report.status_label }} &middot; Submitted {{ report.created_display }}</span>
+              </li>
+              {% endfor %}
+            </ul>
+          </section>
+          {% endif %}
+
+          <section>
+            <h3>All bug reports</h3>
+            <form class="bug-filter-form" data-bug-filters>
+              <label>
+                Status
+                <select name="bug_status">
+                  <option value="">All statuses</option>
+                  {% for option in bug_status_options %}
+                  <option value="{{ option.value }}">{{ option.label }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label>
+                Assignee
+                <select name="bug_assignee">
+                  <option value="">All owners</option>
+                  <option value="unassigned">Unassigned</option>
+                  {% for user in bug_assignees %}
+                  <option value="{{ user.id }}">{{ user.label }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+              <label>
+                Search
+                <input type="text" name="bug_search" placeholder="Search title, notes, reporter">
+              </label>
+              <button type="submit">Apply</button>
+              <button type="reset">Reset</button>
+            </form>
+
+            {% if bug_reports %}
+            <table id="bugReportsTable">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Summary</th>
+                  <th>Status</th>
+                  <th>Priority</th>
+                  <th>Assignee</th>
+                  <th>Reporter</th>
+                  <th>Created</th>
+                  <th>Updated</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for report in bug_reports %}
+                <tr data-status="{{ report.status }}" data-assignee="{{ report.assignee_token }}" data-priority="{{ report.priority | lower }}">
+                  <td data-label="ID">#{{ report.id }}</td>
+                  <td data-label="Summary">
+                    <div class="bug-summary">
+                      <strong>{{ report.title or 'Untitled' }}</strong>
+                      <span class="bug-token">status:{{ report.status }}</span>
+                      <span class="bug-token">assignee:{{ report.assignee_token }}</span>
+                      <span class="bug-token">priority:{{ report.priority | lower }}</span>
+                      {% if report.description %}
+                      <p>{{ report.description }}</p>
+                      {% endif %}
+                      <details>
+                        <summary>Additional details</summary>
+                        <p><strong>Reporter:</strong> {{ report.reporter or 'Unknown' }}</p>
+                        <p><strong>Notes:</strong> {{ report.notes or '—' }}</p>
+                        {% if report.attachments %}
+                        <h4>Attachments</h4>
+                        <ul class="bug-attachments">
+                          {% for attachment in report.attachments %}
+                          <li>
+                            {% if attachment.url %}
+                            <a href="{{ attachment.url }}" target="_blank" rel="noopener">{{ attachment.name }}</a>
+                            {% else %}
+                            <span>{{ attachment.name }}</span>
+                            {% endif %}
+                            {% if attachment.path %}
+                            <br><small>{{ attachment.path }}</small>
+                            {% endif %}
+                          </li>
+                          {% endfor %}
+                        </ul>
+                        {% else %}
+                        <p>No attachments uploaded.</p>
+                        {% endif %}
+                      </details>
+                    </div>
+                  </td>
+                  <td data-label="Status">
+                    <span class="status-pill status-{{ report.status }}">{{ report.status_label }}</span>
+                  </td>
+                  <td data-label="Priority">{{ report.priority }}</td>
+                  <td data-label="Assignee">{{ report.assignee_label }}</td>
+                  <td data-label="Reporter">{{ report.reporter or '—' }}</td>
+                  <td data-label="Created">{{ report.created_display }}</td>
+                  <td data-label="Updated">{{ report.updated_display }}</td>
+                  <td data-label="Actions">
+                    <form class="bug-action-form" data-report-id="{{ report.id }}" data-update-base="{{ bug_update_base }}">
+                      <label>
+                        <span>Status</span>
+                        <select name="status">
+                          {% for option in bug_status_options %}
+                          <option value="{{ option.value }}" {% if option.value == report.status %}selected{% endif %}>{{ option.label }}</option>
+                          {% endfor %}
+                        </select>
+                      </label>
+                      <label>
+                        <span>Assignee</span>
+                        <select name="assignee_id">
+                          <option value="">Unassigned</option>
+                          {% for user in bug_assignees %}
+                          <option value="{{ user.id }}" {% if user.id == report.assignee_id %}selected{% endif %}>{{ user.label }}</option>
+                          {% endfor %}
+                        </select>
+                      </label>
+                      <label class="bug-notes-field">
+                        <span>Notes</span>
+                        <textarea name="notes" rows="2">{{ report.notes }}</textarea>
+                      </label>
+                      <div class="bug-action-buttons">
+                        <button type="submit">Save</button>
+                        <button type="button" data-action="reset">Reset</button>
+                      </div>
+                      <p class="bug-action-feedback" role="status" aria-live="polite"></p>
+                    </form>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% else %}
+            <p>No bug reports have been submitted yet.</p>
+            {% endif %}
+          </section>
+        </section>
       </div>
     </div>
-
-    <section class="charts">
-      <div class="chart-card">
-        <h2>Session Duration vs Backtracking</h2>
-        <canvas id="sessionDurationChart" aria-label="Session duration vs backtracking chart"></canvas>
-      </div>
-      <div class="chart-card">
-        <h2>Event Distribution</h2>
-        <canvas id="eventDistributionChart" aria-label="Event distribution chart"></canvas>
-      </div>
-      <div class="chart-card">
-        <h2>Sessions by Role</h2>
-        <canvas id="roleBreakdownChart" aria-label="Session count by role"></canvas>
-      </div>
-    </section>
-
-    <section class="table-section">
-      <h2>Recent Sessions</h2>
-      {% if sessions %}
-      <table id="sessionTable">
-        <thead>
-          <tr>
-            <th>Session</th>
-            <th>User</th>
-            <th>Role</th>
-            <th>Started</th>
-            <th>Ended</th>
-            <th>Duration</th>
-            <th>Events</th>
-            <th>Navigation</th>
-            <th>Backtracking</th>
-            <th>Navigation Path</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for session in sessions %}
-          <tr class="{% if session.has_backtracking %}has-backtracking{% endif %}">
-            <td data-label="Session">{{ session.token }}</td>
-            <td data-label="User">{{ session.username or session.user_id or '—' }}</td>
-            <td data-label="Role">{{ session.role or '—' }}</td>
-            <td data-label="Started">{{ session.start_display or '—' }}</td>
-            <td data-label="Ended">{{ session.end_display or '—' }}</td>
-            <td data-label="Duration">{{ session.duration_label }}</td>
-            <td data-label="Events">{{ session.event_count }}</td>
-            <td data-label="Navigation">{{ session.navigation_count }}</td>
-            <td data-label="Backtracking">{{ session.backtracking_count }}</td>
-            <td data-label="Navigation Path">
-              <div class="path">
-                {% for entry in session.path %}
-                <span class="{% if entry.is_backtrack %}is-backtrack{% endif %}">
-                  {{ entry.label or entry.href or 'Navigate' }}
-                </span>
-                {% endfor %}
-              </div>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      {% else %}
-      <p>No sessions matched the selected filters.</p>
-      {% endif %}
-    </section>
-
-    <section class="table-section">
-      <h2>Interaction Events{% if filters.event %} &ndash; {{ filters.event }}{% endif %}</h2>
-      {% if events %}
-      <table id="eventTable">
-        <thead>
-          <tr>
-            <th>Session</th>
-            <th>User</th>
-            <th>Role</th>
-            <th>Event</th>
-            <th>Timestamp</th>
-            <th>Target</th>
-            <th>Backtrack?</th>
-            <th>Context</th>
-            <th>Metadata</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for event in events %}
-          <tr class="{% if event.is_backtrack %}has-backtracking{% endif %}">
-            <td data-label="Session">{{ event.session_token }}</td>
-            <td data-label="User">{{ event.user }}</td>
-            <td data-label="Role">{{ event.role or '—' }}</td>
-            <td data-label="Event">{{ event.event }}</td>
-            <td data-label="Timestamp">{{ event.occurred }}</td>
-            <td data-label="Target">{{ event.label or event.href or '—' }}</td>
-            <td data-label="Backtrack?">{{ 'Yes' if event.is_backtrack else 'No' }}</td>
-            <td data-label="Context">
-              {% if event.context %}
-              <details>
-                <summary>View</summary>
-                <pre>{{ event.context | tojson(indent=2) }}</pre>
-              </details>
-              {% else %}
-              —
-              {% endif %}
-            </td>
-            <td data-label="Metadata">
-              {% if event.metadata %}
-              <details>
-                <summary>View</summary>
-                <pre>{{ event.metadata | tojson(indent=2) }}</pre>
-              </details>
-              {% else %}
-              —
-              {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      {% else %}
-      <p>No interaction events matched the selected filters.</p>
-      {% endif %}
-    </section>
-
-    {% if backtracking_sessions %}
-    <section class="backtracking-highlights">
-      <h2>Highlighted Backtracking Activity</h2>
-      <ul>
-        {% for session in backtracking_sessions %}
-        <li>
-          <h3>{{ session.username or session.user_id or session.token }}</h3>
-          <p><strong>Session:</strong> {{ session.token }}</p>
-          <p><strong>Backtracking events:</strong> {{ session.backtracking_count }}</p>
-          <p><strong>Duration:</strong> {{ session.duration_label }}</p>
-          <ul>
-            {% for entry in session.backtracking_events %}
-            <li>{{ entry.occurred }} &mdash; {{ entry.label or entry.href or 'Navigate' }}</li>
-            {% endfor %}
-          </ul>
-        </li>
-        {% endfor %}
-      </ul>
-    </section>
-    {% endif %}
   </div>
 {% endblock %}
 
@@ -551,6 +999,9 @@
         });
       }
 
+      let bugTableInstance = null;
+      const bugTableElement = document.querySelector('#bugReportsTable');
+
       if (window.simpleDatatables) {
         const { DataTable } = window.simpleDatatables;
         const sessionTable = document.querySelector('#sessionTable');
@@ -570,7 +1021,156 @@
             perPage: 15,
           });
         }
+
+        if (bugTableElement) {
+          bugTableInstance = new DataTable(bugTableElement, {
+            searchable: true,
+            fixedHeight: false,
+            perPage: 10,
+          });
+        }
       }
+
+      const bugFilterForm = document.querySelector('[data-bug-filters]');
+      if (bugFilterForm) {
+        const statusFilter = bugFilterForm.querySelector('[name="bug_status"]');
+        const assigneeFilter = bugFilterForm.querySelector('[name="bug_assignee"]');
+        const searchFilter = bugFilterForm.querySelector('[name="bug_search"]');
+
+        const applyBugFilters = (event) => {
+          if (event) {
+            event.preventDefault();
+          }
+
+          const tokens = [];
+          const statusValue = statusFilter ? statusFilter.value.trim() : '';
+          const assigneeValue = assigneeFilter ? assigneeFilter.value.trim() : '';
+          const searchValue = searchFilter ? searchFilter.value.trim() : '';
+
+          if (statusValue) tokens.push(`status:${statusValue}`);
+          if (assigneeValue) tokens.push(`assignee:${assigneeValue}`);
+          if (searchValue) tokens.push(searchValue);
+
+          if (bugTableInstance && bugTableInstance.input) {
+            bugTableInstance.input.value = tokens.join(' ');
+            bugTableInstance.input.dispatchEvent(new Event('input', { bubbles: true }));
+          } else if (bugTableElement) {
+            const rows = bugTableElement.querySelectorAll('tbody tr');
+            rows.forEach((row) => {
+              const matchesStatus = !statusValue || row.dataset.status === statusValue;
+              const matchesAssignee = !assigneeValue || row.dataset.assignee === assigneeValue;
+              const matchesSearch = !searchValue || row.textContent.toLowerCase().includes(searchValue.toLowerCase());
+              row.style.display = matchesStatus && matchesAssignee && matchesSearch ? '' : 'none';
+            });
+          }
+        };
+
+        bugFilterForm.addEventListener('submit', applyBugFilters);
+        if (statusFilter) statusFilter.addEventListener('change', applyBugFilters);
+        if (assigneeFilter) assigneeFilter.addEventListener('change', applyBugFilters);
+        if (searchFilter) searchFilter.addEventListener('input', () => applyBugFilters());
+
+        bugFilterForm.addEventListener('reset', () => {
+          window.setTimeout(() => {
+            if (bugTableInstance && bugTableInstance.input) {
+              bugTableInstance.input.value = '';
+              bugTableInstance.input.dispatchEvent(new Event('input', { bubbles: true }));
+            } else if (bugTableElement) {
+              bugTableElement.querySelectorAll('tbody tr').forEach((row) => {
+                row.style.display = '';
+              });
+            }
+          }, 0);
+        });
+      }
+
+      const bugActionForms = document.querySelectorAll('.bug-action-form');
+      bugActionForms.forEach((form) => {
+        const reportId = form.dataset.reportId;
+        const updateBase = form.dataset.updateBase;
+        const statusSelect = form.querySelector('[name="status"]');
+        const assigneeSelect = form.querySelector('[name="assignee_id"]');
+        const notesField = form.querySelector('[name="notes"]');
+        const saveButton = form.querySelector('button[type="submit"]');
+        const resetButton = form.querySelector('button[data-action="reset"]');
+        const feedback = form.querySelector('.bug-action-feedback');
+
+        const initialState = {
+          status: statusSelect ? statusSelect.value : '',
+          assignee: assigneeSelect ? assigneeSelect.value : '',
+          notes: notesField ? (notesField.value || '').trim() : '',
+        };
+
+        if (resetButton) {
+          resetButton.addEventListener('click', (event) => {
+            event.preventDefault();
+            if (statusSelect) statusSelect.value = initialState.status;
+            if (assigneeSelect) assigneeSelect.value = initialState.assignee;
+            if (notesField) notesField.value = initialState.notes;
+            if (feedback) feedback.textContent = '';
+          });
+        }
+
+        form.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          if (!reportId || !updateBase) return;
+
+          const payload = {};
+          if (statusSelect && statusSelect.value !== initialState.status) {
+            payload.status = statusSelect.value;
+          }
+
+          if (assigneeSelect && assigneeSelect.value !== initialState.assignee) {
+            payload.assignee_id = assigneeSelect.value || null;
+          }
+
+          if (notesField) {
+            const noteValue = (notesField.value || '').trim();
+            if (noteValue !== initialState.notes) {
+              payload.notes = noteValue;
+            }
+          }
+
+          if (!Object.keys(payload).length) {
+            if (feedback) feedback.textContent = 'No changes to save.';
+            return;
+          }
+
+          if (feedback) feedback.textContent = 'Saving...';
+          if (saveButton) saveButton.disabled = true;
+
+          try {
+            const response = await fetch(`${updateBase}/${reportId}`, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+              },
+              body: JSON.stringify(payload),
+            });
+
+            if (!response.ok) {
+              let message = 'Failed to update bug report.';
+              try {
+                const data = await response.json();
+                if (data && data.description) {
+                  message = data.description;
+                }
+              } catch (error) {
+                // Response was not JSON; ignore.
+              }
+              throw new Error(message);
+            }
+
+            if (feedback) feedback.textContent = 'Saved.';
+            window.setTimeout(() => window.location.reload(), 700);
+          } catch (error) {
+            if (feedback) feedback.textContent = error.message || 'Unable to save changes.';
+          } finally {
+            if (saveButton) saveButton.disabled = false;
+          }
+        });
+      });
     });
   </script>
 {% endblock %}
