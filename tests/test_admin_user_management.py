@@ -1,5 +1,6 @@
 import os
 import sys
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -10,6 +11,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 os.environ.setdefault("USER_PASSWORD", "pw")
 os.environ.setdefault("ADMIN_PASSWORD", "pw")
+
+from flask import template_rendered
 
 import app as app_module
 from app import create_app
@@ -108,6 +111,20 @@ class FakeSupabase:
         return FakeQuery(self, name)
 
 
+@contextmanager
+def captured_templates(app):
+    recorded = []
+
+    def record(sender, template, context, **extra):
+        recorded.append((template, context))
+
+    template_rendered.connect(record, app)
+    try:
+        yield recorded
+    finally:
+        template_rendered.disconnect(record, app)
+
+
 @pytest.fixture
 def admin_app(monkeypatch):
     fake_supabase = FakeSupabase()
@@ -124,6 +141,33 @@ def _login_admin(client):
     with client.session_transaction() as sess:
         sess["username"] = "ADMIN"
         sess["role"] = "ADMIN"
+
+
+def test_admin_overview_lists_tracked_tables(admin_app):
+    app, supabase = admin_app
+    client = app.test_client()
+    _login_admin(client)
+
+    # Populate representative tables to exercise supabase summary logic.
+    supabase.tables.update(
+        {
+            "aoi_reports": [],
+            "fi_reports": [],
+            "bug_reports": [],
+            "defect": [],
+        }
+    )
+
+    with captured_templates(app) as templates:
+        response = client.get("/admin")
+
+    assert response.status_code == 200
+    assert templates, "Expected admin template to be rendered"
+    context = templates[0][1]
+    overview = context["overview"]
+    table_names = [table_info["name"] for table_info in overview["tracked_tables"]]
+    assert "bug_reports" in table_names
+    assert "defect" in table_names
 
 
 def test_admin_can_create_supabase_user(admin_app):
