@@ -294,6 +294,13 @@ function setupAoiArea(container) {
   const sheetButtons = picker ? picker.querySelectorAll('[data-sheet]') : [];
   const defectSelect = container.querySelector('[data-defect-select]');
   const wizard = setupInspectionWizard(sheetForm);
+  const quantityRejectedInput = sheetForm ? sheetForm.querySelector('input[name="quantity_rejected"]') : null;
+  const rejectionSection = sheetForm ? sheetForm.querySelector('[data-rejection-details]') : null;
+  const rejectionRowsContainer = sheetForm ? sheetForm.querySelector('[data-rejection-rows]') : null;
+  const rejectionEmptyRow = sheetForm ? sheetForm.querySelector('[data-rejection-empty]') : null;
+  const rejectionRowTemplate = sheetForm ? sheetForm.querySelector('[data-rejection-row-template]') : null;
+  const addRejectionRowButton = sheetForm ? sheetForm.querySelector('[data-action="add-rejection-row"]') : null;
+  const rejectionHiddenInput = sheetForm ? sheetForm.querySelector('[data-rejection-json]') : null;
 
   if (!picker || !sheetPanel || !sheetTitle || !sheetForm || !feedback || !backButton) {
     return;
@@ -301,35 +308,116 @@ function setupAoiArea(container) {
 
   let activeSheet = null;
   let defectOptionsLoaded = false;
+  let defectOptionsLoading = false;
+  let defectOptions = [];
   const sheetSubtitleMap = {
     SMT: 'Surface Mount Technology',
     TH: 'Through-Hole Assembly',
   };
 
-  function setDefectPlaceholder(message, disable) {
-    if (!defectSelect) return;
-    defectSelect.innerHTML = '';
+  const registeredDefectSelects = new Set();
+  const defectSelectPlaceholders = new WeakMap();
+
+  function setDefectSelectPlaceholder(select, message, disable = true) {
+    if (!select) return;
+    const currentValue = select.value;
+    select.innerHTML = '';
     const option = document.createElement('option');
     option.value = '';
     option.textContent = message;
     option.disabled = true;
     option.selected = true;
     option.defaultSelected = true;
-    defectSelect.appendChild(option);
-    defectSelect.disabled = Boolean(disable);
+    select.appendChild(option);
+    select.disabled = Boolean(disable);
+    if (!disable && currentValue && select.value !== currentValue) {
+      select.value = currentValue;
+    }
+  }
+
+  function populateDefectSelectElement(select, preferredValue = null) {
+    if (!select) return;
+    const placeholderText = defectSelectPlaceholders.get(select) || 'Select defect';
+    const previousValue = preferredValue !== null ? preferredValue : select.value;
+    select.innerHTML = '';
+    const placeholderOption = document.createElement('option');
+    placeholderOption.value = '';
+    placeholderOption.textContent = defectOptions.length ? placeholderText : 'No defects available';
+    placeholderOption.disabled = true;
+    placeholderOption.selected = true;
+    placeholderOption.defaultSelected = true;
+    select.appendChild(placeholderOption);
+    if (!defectOptions.length) {
+      select.disabled = true;
+      return;
+    }
+    const fragment = document.createDocumentFragment();
+    defectOptions.forEach(({ id, name }) => {
+      const option = document.createElement('option');
+      option.value = id;
+      option.textContent = name ? `${id} — ${name}` : id;
+      if (name) {
+        option.dataset.defectName = name;
+      }
+      fragment.appendChild(option);
+    });
+    select.appendChild(fragment);
+    select.disabled = false;
+    if (previousValue && defectOptions.some((item) => item.id === previousValue)) {
+      select.value = previousValue;
+      if (select.value === previousValue) {
+        placeholderOption.selected = false;
+      }
+    } else {
+      select.value = '';
+    }
+  }
+
+  function registerDefectSelect(select, placeholderText = 'Select defect') {
+    if (!select || registeredDefectSelects.has(select)) return;
+    registeredDefectSelects.add(select);
+    defectSelectPlaceholders.set(select, placeholderText);
+    if (defectOptionsLoaded) {
+      populateDefectSelectElement(select);
+    } else {
+      setDefectSelectPlaceholder(select, 'Loading defects...', true);
+    }
+  }
+
+  function unregisterDefectSelect(select) {
+    if (!select) return;
+    registeredDefectSelects.delete(select);
+    defectSelectPlaceholders.delete(select);
+  }
+
+  function resetRegisteredDefectSelects() {
+    registeredDefectSelects.forEach((select) => {
+      if (defectOptionsLoaded) {
+        populateDefectSelectElement(select);
+      } else {
+        setDefectSelectPlaceholder(select, 'Loading defects...', true);
+      }
+      select.value = '';
+      if (select.options.length > 0) {
+        select.selectedIndex = 0;
+      }
+    });
   }
 
   async function loadDefectOptions({ forceRefresh = false } = {}) {
-    if (!defectSelect || defectSelect.dataset.loading === 'true') {
+    if (defectOptionsLoading) {
       return;
     }
     if (defectOptionsLoaded && !forceRefresh) {
       return;
     }
-    defectSelect.dataset.loading = 'true';
+    defectOptionsLoading = true;
     defectOptionsLoaded = false;
-    const previousValue = forceRefresh ? defectSelect.value : '';
-    setDefectPlaceholder('Loading defects...', true);
+    const previousSelections = new Map();
+    registeredDefectSelects.forEach((select) => {
+      previousSelections.set(select, select.value);
+      setDefectSelectPlaceholder(select, 'Loading defects...', true);
+    });
     try {
       const response = await fetch('/employee/defects');
       if (!response.ok) {
@@ -352,62 +440,267 @@ function setupAoiArea(container) {
         unique.push({ id, name });
       });
       unique.sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true, sensitivity: 'base' }));
+      defectOptions = unique;
+      defectOptionsLoaded = true;
       if (!unique.length) {
-        setDefectPlaceholder('No defects available', true);
+        registeredDefectSelects.forEach((select) => {
+          setDefectSelectPlaceholder(select, 'No defects available', true);
+        });
         return;
       }
-      setDefectPlaceholder('Select defect', false);
-      const fragment = document.createDocumentFragment();
-      unique.forEach(({ id, name }) => {
-        const option = document.createElement('option');
-        option.value = id;
-        option.textContent = name ? `${id} — ${name}` : id;
-        if (name) {
-          option.dataset.defectName = name;
-        }
-        fragment.appendChild(option);
+      registeredDefectSelects.forEach((select) => {
+        populateDefectSelectElement(select, previousSelections.get(select) || null);
       });
-      defectSelect.appendChild(fragment);
-      defectSelect.disabled = false;
-      if (previousValue && unique.some((item) => item.id === previousValue)) {
-        defectSelect.value = previousValue;
-      } else {
-        defectSelect.value = '';
-      }
-      defectOptionsLoaded = true;
     } catch (error) {
-      setDefectPlaceholder('Unable to load defects', true);
+      defectOptions = [];
+      defectOptionsLoaded = false;
+      registeredDefectSelects.forEach((select) => {
+        setDefectSelectPlaceholder(select, 'Unable to load defects', true);
+      });
       setFeedback(feedback, 'Unable to load defect list. Please try again later.', 'error');
     } finally {
-      delete defectSelect.dataset.loading;
+      defectOptionsLoading = false;
     }
   }
 
+  function collectRejectionRowData() {
+    if (!rejectionRowsContainer) return [];
+    return Array.from(rejectionRowsContainer.querySelectorAll('[data-rejection-row]')).map((row) => {
+      const refInput = row.querySelector('[data-rejection-ref]');
+      const defectCodeSelect = row.querySelector('[data-rejection-defect]');
+      const quantityInput = row.querySelector('[data-rejection-quantity]');
+      const ref = refInput ? refInput.value.trim() : '';
+      const defectId = defectCodeSelect ? defectCodeSelect.value : '';
+      const quantityRaw = quantityInput ? quantityInput.value : '';
+      const quantityNumber = quantityRaw === '' ? Number.NaN : Number(quantityRaw);
+      const isQuantityValid = Number.isFinite(quantityNumber) && Number.isInteger(quantityNumber) && quantityNumber > 0;
+      return {
+        row,
+        ref,
+        defectId,
+        quantity: quantityNumber,
+        isQuantityValid,
+      };
+    });
+  }
+
+  function markRowValidity(row, isValid) {
+    if (!row) return;
+    if (isValid) {
+      row.classList.remove('is-invalid');
+      row.removeAttribute('data-invalid');
+    } else {
+      row.classList.add('is-invalid');
+      row.dataset.invalid = 'true';
+    }
+    const controls = row.querySelectorAll('[data-rejection-ref], [data-rejection-defect], [data-rejection-quantity]');
+    controls.forEach((control) => {
+      if (isValid) {
+        control.removeAttribute('aria-invalid');
+      } else {
+        control.setAttribute('aria-invalid', 'true');
+      }
+    });
+  }
+
+  function updateRejectionEmptyState() {
+    if (!rejectionRowsContainer) return;
+    const hasRows = Boolean(rejectionRowsContainer.querySelector('[data-rejection-row]'));
+    if (rejectionEmptyRow) {
+      rejectionEmptyRow.hidden = hasRows;
+    }
+  }
+
+  function syncRejectionDetails() {
+    if (!rejectionHiddenInput) return;
+    const rows = collectRejectionRowData();
+    const requireDetails = Boolean(rejectionSection && !rejectionSection.hidden);
+    const validEntries = rows.filter((entry) => entry.ref && entry.defectId && entry.isQuantityValid);
+    if (requireDetails && validEntries.length === rows.length && validEntries.length > 0) {
+      const serialized = validEntries.map(({ ref, defectId, quantity }) => ({
+        ref,
+        defect_id: defectId,
+        quantity,
+      }));
+      rejectionHiddenInput.value = JSON.stringify(serialized);
+    } else {
+      rejectionHiddenInput.value = '';
+    }
+    if (wizard) {
+      wizard.evaluate();
+    }
+  }
+
+  function clearRejectionRows() {
+    if (!rejectionRowsContainer) return;
+    const rows = Array.from(rejectionRowsContainer.querySelectorAll('[data-rejection-row]'));
+    rows.forEach((row) => {
+      const selectElement = row.querySelector('[data-rejection-defect]');
+      if (selectElement) {
+        unregisterDefectSelect(selectElement);
+      }
+      row.remove();
+    });
+    updateRejectionEmptyState();
+    syncRejectionDetails();
+  }
+
+  function ensureRejectionRows() {
+    if (!rejectionRowsContainer) return;
+    if (!rejectionRowsContainer.querySelector('[data-rejection-row]')) {
+      addRejectionRow();
+    }
+  }
+
+  function addRejectionRow() {
+    if (!rejectionRowTemplate || !rejectionRowsContainer) return null;
+    const fragment = rejectionRowTemplate.content.cloneNode(true);
+    const row = fragment.querySelector('[data-rejection-row]');
+    if (!row) return null;
+    const refInput = row.querySelector('[data-rejection-ref]');
+    const defectCodeSelect = row.querySelector('[data-rejection-defect]');
+    const quantityInput = row.querySelector('[data-rejection-quantity]');
+    const removeButton = row.querySelector('[data-action="remove-rejection-row"]');
+
+    if (defectCodeSelect) {
+      registerDefectSelect(defectCodeSelect, 'Select defect code');
+      if (defectOptionsLoaded) {
+        populateDefectSelectElement(defectCodeSelect);
+      }
+    }
+
+    const handleRowChange = (event) => {
+      const targetRow = event.target.closest('[data-rejection-row]');
+      if (targetRow) {
+        markRowValidity(targetRow, true);
+      }
+      syncRejectionDetails();
+    };
+
+    if (refInput) {
+      refInput.addEventListener('input', handleRowChange);
+      refInput.addEventListener('change', handleRowChange);
+    }
+    if (defectCodeSelect) {
+      defectCodeSelect.addEventListener('change', handleRowChange);
+      defectCodeSelect.addEventListener('input', handleRowChange);
+    }
+    if (quantityInput) {
+      quantityInput.addEventListener('input', handleRowChange);
+      quantityInput.addEventListener('change', handleRowChange);
+    }
+    if (removeButton) {
+      removeButton.addEventListener('click', () => {
+        if (defectCodeSelect) {
+          unregisterDefectSelect(defectCodeSelect);
+        }
+        row.remove();
+        updateRejectionEmptyState();
+        syncRejectionDetails();
+      });
+    }
+
+    rejectionRowsContainer.appendChild(row);
+    updateRejectionEmptyState();
+    syncRejectionDetails();
+    if (refInput && typeof refInput.focus === 'function') {
+      refInput.focus();
+    }
+    return row;
+  }
+
+  function validateRejectionRows() {
+    if (!rejectionSection || rejectionSection.hidden) {
+      return { valid: true, entries: [] };
+    }
+    const rows = collectRejectionRowData();
+    if (!rows.length) {
+      return { valid: false, entries: [] };
+    }
+    let valid = true;
+    const entries = [];
+    rows.forEach((entry) => {
+      const rowValid = Boolean(entry.ref) && Boolean(entry.defectId) && entry.isQuantityValid;
+      markRowValidity(entry.row, rowValid);
+      if (!rowValid) {
+        valid = false;
+        return;
+      }
+      entries.push({ ref: entry.ref, defect_id: entry.defectId, quantity: entry.quantity });
+    });
+    if (!valid || !entries.length) {
+      return { valid: false, entries: [] };
+    }
+    return { valid: true, entries };
+  }
+
+  function handleQuantityRejectedChange() {
+    if (!quantityRejectedInput) return;
+    const rawValue = quantityRejectedInput.value;
+    const parsed = rawValue === '' ? 0 : Number(rawValue);
+    const shouldShow = Number.isFinite(parsed) && parsed > 0;
+    if (rejectionSection) {
+      rejectionSection.hidden = !shouldShow;
+    }
+    if (shouldShow) {
+      ensureRejectionRows();
+    } else {
+      clearRejectionRows();
+    }
+    updateRejectionEmptyState();
+    syncRejectionDetails();
+  }
+
   function resetDefectSelection() {
-    if (!defectSelect) return;
-    if (defectOptionsLoaded) {
-      defectSelect.disabled = false;
-      defectSelect.selectedIndex = 0;
-      defectSelect.value = '';
-    } else if (defectSelect.dataset.loading !== 'true') {
+    resetRegisteredDefectSelects();
+    if (!defectOptionsLoaded && !defectOptionsLoading) {
       loadDefectOptions();
+    }
+    clearRejectionRows();
+    if (rejectionSection) {
+      rejectionSection.hidden = true;
+    }
+    if (rejectionHiddenInput) {
+      rejectionHiddenInput.value = '';
+    }
+    updateRejectionEmptyState();
+    if (quantityRejectedInput) {
+      quantityRejectedInput.value = '';
+      handleQuantityRejectedChange();
     }
   }
 
   if (defectSelect) {
-    loadDefectOptions();
-    if (!defectSelect.dataset.refreshBound) {
-      const refreshDefectOptions = () => loadDefectOptions({ forceRefresh: true });
-      const handleVisibilityChange = () => {
-        if (!document.hidden) {
-          refreshDefectOptions();
-        }
-      };
-      defectSelect.dataset.refreshBound = 'true';
-      window.setInterval(refreshDefectOptions, 900000);
-      document.addEventListener('visibilitychange', handleVisibilityChange);
-      window.addEventListener('focus', refreshDefectOptions);
-    }
+    registerDefectSelect(defectSelect, 'Select defect');
+  }
+
+  loadDefectOptions();
+
+  if (defectSelect && !defectSelect.dataset.refreshBound) {
+    const refreshDefectOptions = () => loadDefectOptions({ forceRefresh: true });
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        refreshDefectOptions();
+      }
+    };
+    defectSelect.dataset.refreshBound = 'true';
+    window.setInterval(refreshDefectOptions, 900000);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', refreshDefectOptions);
+  }
+
+  if (quantityRejectedInput) {
+    quantityRejectedInput.addEventListener('input', handleQuantityRejectedChange);
+    quantityRejectedInput.addEventListener('change', handleQuantityRejectedChange);
+    handleQuantityRejectedChange();
+  } else {
+    updateRejectionEmptyState();
+  }
+
+  if (addRejectionRowButton) {
+    addRejectionRowButton.addEventListener('click', () => {
+      addRejectionRow();
+    });
   }
 
   sheetButtons.forEach((button) => {
@@ -466,11 +759,31 @@ function setupAoiArea(container) {
       submitButton.disabled = true;
     }
 
+    const requiresRejectionDetails = Boolean(rejectionSection && !rejectionSection.hidden);
+    let rejectionEntries = [];
+    if (requiresRejectionDetails) {
+      const validation = validateRejectionRows();
+      if (!validation.valid) {
+        if (submitButton) {
+          submitButton.disabled = false;
+        }
+        setFeedback(feedback, 'Complete all rejection detail rows before submitting.', 'error');
+        return;
+      }
+      rejectionEntries = validation.entries;
+      if (rejectionHiddenInput) {
+        rejectionHiddenInput.value = JSON.stringify(rejectionEntries);
+      }
+    } else if (rejectionHiddenInput) {
+      rejectionHiddenInput.value = '';
+    }
+
     setFeedback(feedback, 'Submitting...');
 
     const formData = new FormData(sheetForm);
     const payload = Object.fromEntries(formData.entries());
     payload.inspection_type = activeSheet;
+    payload.rejection_details = rejectionEntries;
 
     try {
       const response = await fetch('/employee/aoi_reports', {
