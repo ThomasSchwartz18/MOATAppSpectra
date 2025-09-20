@@ -1204,8 +1204,7 @@ def submit_bug_report():
     attachment_paths: list[str] = []
 
     reporter_display_name = user.get('username')
-    reporter_auth_uuid: str | None = None
-    reporter_supabase_id: str | None = None
+    reporter_identifier: str | None = None
 
     username = user.get('username')
     if username:
@@ -1218,20 +1217,35 @@ def submit_bug_report():
             reporter_display_name = (
                 supabase_account.get('display_name') or reporter_display_name
             )
-            account_id = supabase_account.get('id')
-            if account_id is not None:
-                reporter_supabase_id = str(account_id)
-            if not reporter_supabase_id:
+            auth_user_id = supabase_account.get('auth_user_id')
+            if auth_user_id:
+                reporter_identifier = str(auth_user_id)
+            else:
+                # Some records hydrate the linked auth.users row under ``auth_user``.
+                auth_user = supabase_account.get('auth_user')
+                if isinstance(auth_user, dict):
+                    linked_id = auth_user.get('id') or auth_user.get('uuid')
+                    if linked_id:
+                        reporter_identifier = str(linked_id)
+
+            if not reporter_identifier:
                 for key in (
-                    'auth_user_id',
                     'auth_user_uuid',
-                    'auth_user',
                     'auth_uuid',
                 ):
                     candidate = supabase_account.get(key)
                     if candidate:
-                        reporter_auth_uuid = str(candidate)
+                        reporter_identifier = str(candidate)
                         break
+
+            if not reporter_identifier:
+                # Environment-only accounts or orphaned Supabase rows are not linked
+                # to auth.users and therefore cannot be referenced safely. Skip
+                # storing a reporter_id to avoid persisting a dangling foreign key.
+                current_app.logger.info(
+                    'Skipping reporter_id for %s because no linked auth user was found.',
+                    username,
+                )
 
     for file_storage in request.files.getlist('attachments'):
         if not file_storage or not file_storage.filename:
@@ -1252,7 +1266,6 @@ def submit_bug_report():
         'status': payload.get('status') or 'open',
     }
 
-    reporter_identifier = reporter_supabase_id or reporter_auth_uuid
     if reporter_identifier is not None:
         record['reporter_id'] = str(reporter_identifier)
 

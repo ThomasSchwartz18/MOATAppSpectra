@@ -23,7 +23,7 @@ def app_client(monkeypatch):
     return app, client
 
 
-def test_bug_report_prefers_supabase_id_for_supabase_user(app_client, monkeypatch):
+def test_bug_report_prefers_auth_user_id_for_supabase_user(app_client, monkeypatch):
     app, client = app_client
 
     recorded = {}
@@ -41,6 +41,7 @@ def test_bug_report_prefers_supabase_id_for_supabase_user(app_client, monkeypatc
             "username": username,
             "display_name": "Ana Analyst",
             "auth_user_id": "00000000-0000-0000-0000-000000000123",
+            "auth_user": {"id": "00000000-0000-0000-0000-000000000123"},
         }, None
 
     monkeypatch.setattr(routes_module, "insert_bug_report", fake_insert)
@@ -58,10 +59,10 @@ def test_bug_report_prefers_supabase_id_for_supabase_user(app_client, monkeypatc
     assert response.status_code == 201
     assert recorded["fetched_username"] == "analyst"
     inserted_record = recorded["record"]
-    assert inserted_record["reporter_id"] == "9876"
+    assert inserted_record["reporter_id"] == "00000000-0000-0000-0000-000000000123"
 
     payload = response.get_json()
-    assert payload["reporter_id"] == "9876"
+    assert payload["reporter_id"] == "00000000-0000-0000-0000-000000000123"
     assert payload["reporter_display_name"] == "Ana Analyst"
 
 
@@ -100,3 +101,52 @@ def test_bug_report_omits_reporter_id_for_environment_user(app_client, monkeypat
     payload = response.get_json()
     assert "reporter_id" not in payload
     assert payload["reporter_display_name"] == "ADMIN"
+
+
+def test_bug_report_omits_reporter_id_for_orphaned_account(
+    app_client, monkeypatch, caplog
+):
+    app, client = app_client
+
+    recorded = {}
+
+    def fake_insert(record):
+        recorded["record"] = record
+        stored = dict(record)
+        stored.setdefault("id", 3)
+        return [stored], None
+
+    def fake_fetch(username):
+        recorded["fetched_username"] = username
+        return {
+            "id": 777,
+            "username": username,
+            "display_name": "Ophelia Ops",
+            # Simulate a Supabase row that is no longer linked to auth.users.
+            "auth_user_id": None,
+        }, None
+
+    monkeypatch.setattr(routes_module, "insert_bug_report", fake_insert)
+    monkeypatch.setattr(routes_module, "fetch_app_user_credentials", fake_fetch)
+
+    with client.session_transaction() as session:
+        session["username"] = "orphaned"
+
+    with caplog.at_level("INFO"):
+        response = client.post(
+            "/bug-reports",
+            json={
+                "title": "Missing auth",
+                "description": "Account removed from auth.users",
+            },
+        )
+
+    assert response.status_code == 201
+    assert recorded["fetched_username"] == "orphaned"
+    inserted_record = recorded["record"]
+    assert "reporter_id" not in inserted_record
+
+    payload = response.get_json()
+    assert "reporter_id" not in payload
+    assert payload["reporter_display_name"] == "Ophelia Ops"
+    assert "Skipping reporter_id" in caplog.text
