@@ -432,7 +432,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const authGuard = chatContainer.querySelector('.bug-chat-auth-guard');
     const submitButton = chatContainer.querySelector('.bug-chat-submit');
     const resetButton = chatContainer.querySelector('.bug-chat-reset');
-    const attachmentsInput = form ? form.querySelector('input[name="attachments"]') : null;
 
     if (panel) {
       panel.setAttribute('aria-hidden', 'true');
@@ -526,7 +525,6 @@ document.addEventListener('DOMContentLoaded', () => {
         values.description,
         values.priority,
         values.severity,
-        values.environment,
       ]);
     };
 
@@ -633,7 +631,6 @@ document.addEventListener('DOMContentLoaded', () => {
           description: (formData.get('description') || '').toString().trim(),
           priority: (formData.get('priority') || '').toString().trim(),
           severity: (formData.get('severity') || '').toString().trim(),
-          environment: (formData.get('environment') || '').toString().trim(),
         };
 
         if (!values.title || !values.description) {
@@ -668,12 +665,6 @@ document.addEventListener('DOMContentLoaded', () => {
         payload.append('description', values.description);
         if (values.priority) payload.append('priority', values.priority);
         if (values.severity) payload.append('severity', values.severity);
-        if (values.environment) payload.append('environment', values.environment);
-        if (attachmentsInput && attachmentsInput.files) {
-          Array.from(attachmentsInput.files).forEach((file) => {
-            payload.append('attachments', file);
-          });
-        }
 
         fetch(endpoint, {
           method: 'POST',
