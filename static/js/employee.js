@@ -61,11 +61,16 @@ function setupAoiArea(container) {
     defectSelect.disabled = Boolean(disable);
   }
 
-  async function loadDefectOptions() {
-    if (!defectSelect || defectSelect.dataset.loading === 'true' || defectOptionsLoaded) {
+  async function loadDefectOptions({ forceRefresh = false } = {}) {
+    if (!defectSelect || defectSelect.dataset.loading === 'true') {
+      return;
+    }
+    if (defectOptionsLoaded && !forceRefresh) {
       return;
     }
     defectSelect.dataset.loading = 'true';
+    defectOptionsLoaded = false;
+    const previousValue = forceRefresh ? defectSelect.value : '';
     setDefectPlaceholder('Loading defects...', true);
     try {
       const response = await fetch('/employee/defects');
@@ -106,7 +111,11 @@ function setupAoiArea(container) {
       });
       defectSelect.appendChild(fragment);
       defectSelect.disabled = false;
-      defectSelect.value = '';
+      if (previousValue && unique.some((item) => item.id === previousValue)) {
+        defectSelect.value = previousValue;
+      } else {
+        defectSelect.value = '';
+      }
       defectOptionsLoaded = true;
     } catch (error) {
       setDefectPlaceholder('Unable to load defects', true);
@@ -129,6 +138,18 @@ function setupAoiArea(container) {
 
   if (defectSelect) {
     loadDefectOptions();
+    if (!defectSelect.dataset.refreshBound) {
+      const refreshDefectOptions = () => loadDefectOptions({ forceRefresh: true });
+      const handleVisibilityChange = () => {
+        if (!document.hidden) {
+          refreshDefectOptions();
+        }
+      };
+      defectSelect.dataset.refreshBound = 'true';
+      window.setInterval(refreshDefectOptions, 900000);
+      document.addEventListener('visibilitychange', handleVisibilityChange);
+      window.addEventListener('focus', refreshDefectOptions);
+    }
   }
 
   sheetButtons.forEach((button) => {
