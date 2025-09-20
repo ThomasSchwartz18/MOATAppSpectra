@@ -76,6 +76,99 @@
   <main class="content" role="main">
     {% block content %}{% endblock %}
   </main>
+
+  <div
+    id="bug-chat-container"
+    class="bug-chat-container"
+    data-endpoint="{{ url_for('main.submit_bug_report') }}"
+    data-signed-in="{{ 'true' if user_id else 'false' }}"
+    data-username="{{ username or '' }}"
+  >
+    <button
+      type="button"
+      class="bug-chat-trigger"
+      aria-haspopup="dialog"
+      aria-controls="bug-chat-panel"
+      aria-expanded="false"
+    >
+      <span class="trigger-label">Report an issue</span>
+      <span class="trigger-icon" aria-hidden="true">&#9993;</span>
+    </button>
+
+    <section
+      id="bug-chat-panel"
+      class="bug-chat-panel"
+      role="dialog"
+      aria-modal="false"
+      aria-labelledby="bug-chat-title"
+      tabindex="-1"
+      hidden
+    >
+      <header class="bug-chat-header">
+        <div class="header-text">
+          <h2 id="bug-chat-title">Need help or found a bug?</h2>
+          <p class="header-subtitle">Send a quick note to the support team.</p>
+        </div>
+        <button type="button" class="bug-chat-close" aria-label="Close support chat">&times;</button>
+      </header>
+
+      <div class="bug-chat-body">
+        <div class="bug-chat-messages" aria-live="polite" aria-atomic="false"></div>
+
+        <form class="bug-chat-form" novalidate>
+          <fieldset class="bug-chat-auth-guard" hidden>
+            <legend>Sign in required</legend>
+            <p class="auth-message">Please <a href="{{ url_for('auth.login') }}">sign in</a> to report an issue.</p>
+          </fieldset>
+
+          <fieldset class="bug-chat-fields">
+            <legend class="sr-only">Bug details</legend>
+            <label class="bug-chat-field">
+              <span>Title</span>
+              <input type="text" name="title" required maxlength="200" autocomplete="off" />
+            </label>
+            <label class="bug-chat-field">
+              <span>Description</span>
+              <textarea name="description" rows="4" required></textarea>
+            </label>
+            <div class="bug-chat-row">
+              <label class="bug-chat-field">
+                <span>Priority</span>
+                <select name="priority">
+                  <option value="">Select</option>
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </label>
+              <label class="bug-chat-field">
+                <span>Severity</span>
+                <select name="severity">
+                  <option value="">Select</option>
+                  <option value="minor">Minor</option>
+                  <option value="major">Major</option>
+                  <option value="critical">Critical</option>
+                </select>
+              </label>
+            </div>
+            <label class="bug-chat-field">
+              <span>Environment</span>
+              <input type="text" name="environment" placeholder="e.g. Production, Chrome 124" />
+            </label>
+            <label class="bug-chat-field">
+              <span>Attachments (optional)</span>
+              <input type="file" name="attachments" multiple />
+            </label>
+          </fieldset>
+
+          <div class="bug-chat-actions">
+            <button type="submit" class="bug-chat-submit">Send report</button>
+            <button type="button" class="bug-chat-reset" hidden>Report another issue</button>
+          </div>
+        </form>
+      </div>
+    </section>
+  </div>
   {% set tracking_context = {
     'user': {
       'id': user_id,
