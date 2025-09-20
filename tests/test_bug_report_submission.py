@@ -1,5 +1,6 @@
 import os
 import sys
+from contextlib import nullcontext
 from pathlib import Path
 
 import pytest
@@ -60,6 +61,7 @@ def test_bug_report_prefers_auth_user_id_for_supabase_user(app_client, monkeypat
     assert recorded["fetched_username"] == "analyst"
     inserted_record = recorded["record"]
     assert inserted_record["reporter_id"] == "00000000-0000-0000-0000-000000000123"
+    assert inserted_record["reporter_name"] == "Ana Analyst"
 
     payload = response.get_json()
     assert payload["reporter_id"] == "00000000-0000-0000-0000-000000000123"
@@ -97,6 +99,7 @@ def test_bug_report_omits_reporter_id_for_environment_user(app_client, monkeypat
     assert recorded["fetched_username"] == "ADMIN"
     inserted_record = recorded["record"]
     assert "reporter_id" not in inserted_record
+    assert inserted_record["reporter_name"] == "ADMIN"
 
     payload = response.get_json()
     assert "reporter_id" not in payload
@@ -145,6 +148,7 @@ def test_bug_report_omits_reporter_id_for_orphaned_account(
     assert recorded["fetched_username"] == "orphaned"
     inserted_record = recorded["record"]
     assert "reporter_id" not in inserted_record
+    assert inserted_record["reporter_name"] == "Ophelia Ops"
 
     payload = response.get_json()
     assert "reporter_id" not in payload
@@ -191,7 +195,53 @@ def test_bug_report_falls_back_to_session_user_id(app_client, monkeypatch):
     assert recorded["fetched_username"] == "sessioned"
     inserted_record = recorded["record"]
     assert inserted_record["reporter_id"] == "4321"
+    assert inserted_record["reporter_name"] == "Sasha Session"
 
     payload = response.get_json()
     assert payload["reporter_id"] == "4321"
     assert payload["reporter_display_name"] == "Sasha Session"
+
+
+def test_admin_bug_report_view_shows_reporter_name(app_client, monkeypatch):
+    app, client = app_client
+
+    class DummyCursor:
+        def fetchall(self):
+            return []
+
+        def fetchone(self):
+            return None
+
+    class DummyConnection:
+        def execute(self, *args, **kwargs):
+            return DummyCursor()
+
+    class DummyTracker:
+        def _connect(self):
+            return nullcontext(DummyConnection())
+
+    def fake_fetch_bug_reports(filters=None):
+        record = {
+            "id": 55,
+            "title": "Broken widget",
+            "status": "open",
+            "priority": "High",
+            "reporter_name": "Carla Candidate",
+            "created_at": "2024-01-01T12:00:00+00:00",
+            "updated_at": "2024-01-02T12:00:00+00:00",
+        }
+        return [record], None
+
+    monkeypatch.setattr(routes_module, "_get_tracker", lambda: DummyTracker())
+    monkeypatch.setattr(routes_module, "fetch_bug_reports", fake_fetch_bug_reports)
+    monkeypatch.setattr(routes_module, "_fetch_configured_users", lambda: ([], None))
+
+    with client.session_transaction() as session:
+        session["username"] = "ADMIN"
+        session["role"] = "ADMIN"
+
+    response = client.get("/analysis/tracker-logs")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Carla Candidate" in html
