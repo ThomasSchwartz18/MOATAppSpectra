@@ -1205,6 +1205,7 @@ def submit_bug_report():
 
     reporter_display_name = user.get('username')
     reporter_auth_uuid: str | None = None
+    reporter_supabase_id: str | None = None
 
     username = user.get('username')
     if username:
@@ -1217,16 +1218,20 @@ def submit_bug_report():
             reporter_display_name = (
                 supabase_account.get('display_name') or reporter_display_name
             )
-            for key in (
-                'auth_user_id',
-                'auth_user_uuid',
-                'auth_user',
-                'auth_uuid',
-            ):
-                candidate = supabase_account.get(key)
-                if candidate:
-                    reporter_auth_uuid = str(candidate)
-                    break
+            account_id = supabase_account.get('id')
+            if account_id is not None:
+                reporter_supabase_id = str(account_id)
+            if not reporter_supabase_id:
+                for key in (
+                    'auth_user_id',
+                    'auth_user_uuid',
+                    'auth_user',
+                    'auth_uuid',
+                ):
+                    candidate = supabase_account.get(key)
+                    if candidate:
+                        reporter_auth_uuid = str(candidate)
+                        break
 
     for file_storage in request.files.getlist('attachments'):
         if not file_storage or not file_storage.filename:
@@ -1247,8 +1252,9 @@ def submit_bug_report():
         'status': payload.get('status') or 'open',
     }
 
-    if reporter_auth_uuid:
-        record['reporter_id'] = reporter_auth_uuid
+    reporter_identifier = reporter_supabase_id or reporter_auth_uuid
+    if reporter_identifier is not None:
+        record['reporter_id'] = str(reporter_identifier)
 
     created, error = insert_bug_report(record)
     if error:

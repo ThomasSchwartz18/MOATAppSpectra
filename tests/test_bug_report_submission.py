@@ -23,7 +23,7 @@ def app_client(monkeypatch):
     return app, client
 
 
-def test_bug_report_uses_auth_uuid_for_supabase_user(app_client, monkeypatch):
+def test_bug_report_prefers_supabase_id_for_supabase_user(app_client, monkeypatch):
     app, client = app_client
 
     recorded = {}
@@ -37,6 +37,7 @@ def test_bug_report_uses_auth_uuid_for_supabase_user(app_client, monkeypatch):
     def fake_fetch(username):
         recorded["fetched_username"] = username
         return {
+            "id": 9876,
             "username": username,
             "display_name": "Ana Analyst",
             "auth_user_id": "00000000-0000-0000-0000-000000000123",
@@ -57,10 +58,10 @@ def test_bug_report_uses_auth_uuid_for_supabase_user(app_client, monkeypatch):
     assert response.status_code == 201
     assert recorded["fetched_username"] == "analyst"
     inserted_record = recorded["record"]
-    assert inserted_record["reporter_id"] == "00000000-0000-0000-0000-000000000123"
+    assert inserted_record["reporter_id"] == "9876"
 
     payload = response.get_json()
-    assert payload["reporter_id"] == "00000000-0000-0000-0000-000000000123"
+    assert payload["reporter_id"] == "9876"
     assert payload["reporter_display_name"] == "Ana Analyst"
 
 
