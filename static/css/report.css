@@ -128,10 +128,14 @@ header h1 {
     font-size: 13px;
     line-height: 1.6;
     color: rgba(255, 255, 255, 0.85);
+    display: flex;
+    align-items: center;
 }
 
 .report-details p {
     margin: 0;
+    display: flex;
+    align-items: center;
 }
 .section-card {
     position: relative;
