@@ -1129,6 +1129,7 @@ def add_aoi_report():
 
 
 @main_bp.route('/bug-reports', methods=['POST'])
+@main_bp.route('/bug_reports', methods=['POST'])
 def submit_bug_report():
     user = _require_authenticated_user()
 
