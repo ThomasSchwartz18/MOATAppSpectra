@@ -10,6 +10,8 @@
         {% include 'report/aoi_daily/cover.html' %}
     {% endif %}
 
+    {% include 'report/aoi_daily/summary_toc.html' %}
+
     {% include 'report/aoi_daily/shift_summary.html' %}
     {% for asm in assemblies %}
         {% include 'report/aoi_daily/assembly_detail.html' %}
