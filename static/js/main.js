@@ -322,6 +322,62 @@ document.addEventListener('DOMContentLoaded', () => {
     }, { passive: true });
   }
 
+  const featureModal = document.querySelector('[data-feature-lock-modal]');
+  const featureMessageEl = featureModal ? featureModal.querySelector('[data-feature-lock-message]') : null;
+  const featureCloseBtn = featureModal ? featureModal.querySelector('[data-feature-lock-close]') : null;
+  const featureTitleEl = featureModal ? featureModal.querySelector('#feature-lock-title') : null;
+
+  const hideFeatureModal = () => {
+    if (!featureModal) return;
+    featureModal.setAttribute('hidden', '');
+    featureModal.style.display = 'none';
+  };
+
+  const showFeatureModal = (label, message) => {
+    if (!featureModal) return;
+    if (featureTitleEl) {
+      featureTitleEl.textContent = `${label} temporarily unavailable`;
+    }
+    if (featureMessageEl) {
+      featureMessageEl.textContent = message;
+    }
+    featureModal.style.display = 'flex';
+    featureModal.removeAttribute('hidden');
+    if (typeof featureModal.focus === 'function') {
+      featureModal.focus();
+    }
+  };
+
+  const lockedFeatureLinks = document.querySelectorAll('[data-feature-lock="true"]');
+  lockedFeatureLinks.forEach((link) => {
+    link.addEventListener('click', (event) => {
+      const status = (link.dataset.featureStatus || '').toLowerCase();
+      if (status && status !== 'available') {
+        event.preventDefault();
+        const label = (link.dataset.featureLabel || 'This feature').trim();
+        const message = (link.dataset.featureMessage || `${label} is temporarily unavailable.`).trim();
+        showFeatureModal(label, message);
+      }
+    });
+  });
+
+  if (featureCloseBtn) {
+    featureCloseBtn.addEventListener('click', hideFeatureModal);
+  }
+
+  if (featureModal) {
+    featureModal.addEventListener('click', (event) => {
+      if (event.target === featureModal) {
+        hideFeatureModal();
+      }
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !featureModal.hasAttribute('hidden')) {
+        hideFeatureModal();
+      }
+    });
+  }
+
   // Tab navigation for admin console and other tabbed layouts
   const tabContainers = document.querySelectorAll('[data-tabs]');
   tabContainers.forEach((container) => {

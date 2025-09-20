@@ -10,6 +10,7 @@ from flask import (
     current_app,
     send_file,
     flash,
+    g,
 )
 from functools import wraps
 import csv
@@ -64,6 +65,9 @@ from app.db import (
     insert_moat_bulk,
     fetch_bug_reports,
     update_bug_report_status,
+    fetch_feature_states,
+    fetch_feature_states_for_bug,
+    upsert_feature_state,
 )
 
 from app.grades import calculate_aoi_grades
@@ -386,6 +390,196 @@ EMPLOYEE_SHEET_LABELS = {
 }
 
 
+FEATURE_REGISTRY = [
+    {
+        "slug": "analysis_ppm",
+        "label": "PPM Analysis",
+        "category": "analysis",
+        "description": "Monitor AOI false-call performance and long-term yield trends.",
+        "default_message": "PPM Analysis is temporarily unavailable while we perform maintenance.",
+    },
+    {
+        "slug": "analysis_aoi_grades",
+        "label": "AOI & FI Analysis",
+        "category": "analysis",
+        "description": "Advanced AOI and FI analytics including escape pareto and learning curves.",
+        "default_message": "AOI & FI Analysis is undergoing maintenance. Please check back soon.",
+    },
+    {
+        "slug": "analysis_aoi_daily",
+        "label": "AOI Daily Reports",
+        "category": "analysis",
+        "description": "Review daily AOI production metrics and exportable summaries.",
+        "default_message": "AOI Daily Reports are temporarily locked while we investigate an issue.",
+    },
+    {
+        "slug": "analysis_fi_daily",
+        "label": "FI Daily Reports",
+        "category": "analysis",
+        "description": "Inspect final inspection throughput and rejection trends.",
+        "default_message": "FI Daily Reports are paused for maintenance.",
+    },
+    {
+        "slug": "reports_integrated",
+        "label": "AOI Integrated Report",
+        "category": "reports",
+        "description": "Combined AOI insights with export capabilities for leadership reviews.",
+        "default_message": "The AOI Integrated Report is temporarily unavailable.",
+    },
+    {
+        "slug": "reports_operator",
+        "label": "Operator Report",
+        "category": "reports",
+        "description": "Operator-level KPIs and drill-down performance dashboards.",
+        "default_message": "The Operator Report is temporarily unavailable while we resolve a bug.",
+    },
+    {
+        "slug": "reports_aoi_daily",
+        "label": "AOI Daily Report",
+        "category": "reports",
+        "description": "Classic AOI daily production summary for distribution.",
+        "default_message": "The AOI Daily Report export is momentarily locked.",
+    },
+    {
+        "slug": "tools_assembly_forecast",
+        "label": "Assembly Forecast",
+        "category": "tools",
+        "description": "Forecast SMT assemblies and predict workload based on recent history.",
+        "default_message": "Assembly Forecast is temporarily offline while we improve accuracy.",
+    },
+]
+
+FEATURE_DEFINITIONS = {entry["slug"]: entry for entry in FEATURE_REGISTRY}
+
+FEATURE_STATUS_AVAILABLE = "available"
+FEATURE_STATUS_LOCKED = "locked"
+
+
+def _feature_definition(slug: str) -> dict[str, str]:
+    return FEATURE_DEFINITIONS.get(slug, {})
+
+
+def _normalize_feature_status(status: str | None) -> str:
+    normalized = (status or FEATURE_STATUS_AVAILABLE).strip().lower()
+    return normalized or FEATURE_STATUS_AVAILABLE
+
+
+def _get_feature_state_map() -> dict[str, dict[str, object]]:
+    cached = getattr(g, "_feature_state_map", None)
+    if cached is not None:
+        return cached
+
+    records, error = fetch_feature_states()
+    mapping: dict[str, dict[str, object]] = {}
+    for record in records or []:
+        slug = record.get("slug")
+        if not slug:
+            continue
+        key = str(slug)
+        mapping[key] = {
+            "status": _normalize_feature_status(record.get("status")),
+            "message": record.get("message") or None,
+            "bug_report_id": record.get("bug_report_id"),
+            "updated_at": record.get("updated_at"),
+        }
+
+    g._feature_state_map = mapping
+    g._feature_state_error = error
+    return mapping
+
+
+def _compose_feature_state(slug: str) -> dict[str, object]:
+    definition = _feature_definition(slug)
+    merged = {
+        "slug": slug,
+        "label": definition.get("label", slug.replace("_", " ").title()),
+        "category": definition.get("category"),
+        "description": definition.get("description"),
+    }
+
+    state_map = _get_feature_state_map()
+    record = state_map.get(slug, {})
+    status = _normalize_feature_status(record.get("status"))
+    default_message = definition.get("default_message") or definition.get("description")
+    message = record.get("message")
+    if not message and status != FEATURE_STATUS_AVAILABLE:
+        message = default_message
+    merged.update(
+        {
+            "status": status,
+            "message": message or "",
+            "bug_report_id": record.get("bug_report_id"),
+            "updated_at": record.get("updated_at"),
+        }
+    )
+    return merged
+
+
+def _feature_locked_response(slug: str):
+    state = _compose_feature_state(slug)
+    status = state.get("status") or FEATURE_STATUS_LOCKED
+    message = state.get("message") or (
+        f"{state.get('label', 'This feature')} is currently unavailable."
+    )
+
+    wants_json = False
+    if request.path.startswith("/api/"):
+        wants_json = True
+    if request.is_json:
+        wants_json = True
+    accept = request.accept_mimetypes
+    if accept and accept.best == "application/json" and accept["application/json"] > accept["text/html"]:
+        wants_json = True
+
+    if wants_json:
+        payload = {
+            "error": "feature_locked",
+            "feature": slug,
+            "status": status,
+            "message": message,
+        }
+        return jsonify(payload), 423
+
+    flash(message, "warning")
+    return redirect(url_for("main.home"))
+
+
+def feature_required(slug: str):
+    """Decorator enforcing feature availability for non-admin users."""
+
+    def decorator(view):
+        @wraps(view)
+        def wrapped_view(*args, **kwargs):
+            role = (session.get("role") or session.get("username") or "").upper()
+            if role == "ADMIN":
+                return view(*args, **kwargs)
+
+            state = _compose_feature_state(slug)
+            status = _normalize_feature_status(state.get("status"))
+            if status == FEATURE_STATUS_AVAILABLE:
+                return view(*args, **kwargs)
+
+            return _feature_locked_response(slug)
+
+        return wrapped_view
+
+    return decorator
+
+
+@main_bp.app_context_processor
+def inject_feature_state_context() -> dict[str, object]:
+    try:
+        context = {entry["slug"]: _compose_feature_state(entry["slug"]) for entry in FEATURE_REGISTRY}
+    except Exception:  # pragma: no cover - defensive guard for template rendering
+        context = {}
+    error = getattr(g, "_feature_state_error", None)
+    return {
+        "feature_states": context,
+        "feature_registry": FEATURE_REGISTRY,
+        "feature_state_error": error,
+    }
+
+
 @main_bp.route('/home')
 def home():
     if 'username' not in session:
@@ -632,11 +826,144 @@ def _fetch_configured_users() -> tuple[list[dict], str | None]:
     return users, supabase_error
 
 
+def _normalize_bug_id(value: object) -> int | None:
+    try:
+        if value in (None, ""):
+            return None
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _build_feature_cards(
+    bug_records: list[dict] | None,
+) -> tuple[list[dict[str, object]], dict[int, dict]]:
+    cards: list[dict[str, object]] = []
+    bug_lookup: dict[int, dict] = {}
+
+    for bug in bug_records or []:
+        bug_id = _normalize_bug_id(bug.get("id"))
+        if bug_id is None:
+            continue
+        bug_lookup[bug_id] = bug
+
+    for entry in FEATURE_REGISTRY:
+        state = _compose_feature_state(entry["slug"])
+        bug_id = _normalize_bug_id(state.get("bug_report_id"))
+        bug_info = bug_lookup.get(bug_id) if bug_id is not None else None
+        status = _normalize_feature_status(state.get("status"))
+
+        cards.append(
+            {
+                "slug": entry["slug"],
+                "label": state.get("label"),
+                "description": state.get("description"),
+                "status": status,
+                "message": state.get("message"),
+                "bug_report_id": bug_id,
+                "bug_summary": (
+                    f"#{bug_id} · {(bug_info.get('title') or 'Untitled')}" if bug_info else None
+                ),
+                "bug_status": (bug_info.get("status") if bug_info else None) or "",
+                "updated_at": state.get("updated_at"),
+            }
+        )
+
+    return cards, bug_lookup
+
+
+def _build_bug_options(bug_records: list[dict] | None) -> list[dict[str, object]]:
+    options: list[dict[str, object]] = []
+    for record in bug_records or []:
+        bug_id = _normalize_bug_id(record.get("id"))
+        if bug_id is None:
+            continue
+        status = (record.get("status") or "open").replace("_", " ").title()
+        title = record.get("title") or "Untitled"
+        options.append(
+            {
+                "id": bug_id,
+                "label": f"#{bug_id} — {title} ({status})",
+                "status": record.get("status") or "open",
+            }
+        )
+
+    options.sort(
+        key=lambda item: (
+            0 if item["status"] == "on_hold" else 1,
+            0 if item["status"] == "open" else 1,
+            item["id"],
+        )
+    )
+    return options
+
+
+def _sync_feature_state_from_bug(record: dict | None) -> None:
+    if not record:
+        return
+
+    bug_id = _normalize_bug_id(record.get("id"))
+    if bug_id is None:
+        return
+
+    status = _normalize_feature_status(record.get("status"))
+    linked_states, error = fetch_feature_states_for_bug(bug_id)
+    if error:
+        current_app.logger.warning("Failed to load feature state for bug %s: %s", bug_id, error)
+        return
+
+    if not linked_states:
+        return
+
+    status_label = status.replace("_", " ").title()
+    for state in linked_states:
+        slug = state.get("slug")
+        if not slug:
+            continue
+        definition = _feature_definition(slug)
+        label = definition.get("label", str(slug).replace("_", " ").title())
+        if status == "on_hold":
+            message = (
+                f"{label} is temporarily locked while we investigate bug #{bug_id}."
+            )
+            _, update_error = upsert_feature_state(
+                slug,
+                status=FEATURE_STATUS_LOCKED,
+                message=message,
+                bug_report_id=bug_id,
+            )
+        else:
+            message = (
+                f"{label} has been reopened after bug #{bug_id} was marked {status_label}."
+            )
+            _, update_error = upsert_feature_state(
+                slug,
+                status=FEATURE_STATUS_AVAILABLE,
+                message=message,
+                bug_report_id=bug_id,
+            )
+        if update_error:
+            current_app.logger.warning(
+                "Failed to update feature '%s' from bug %s: %s", slug, bug_id, update_error
+            )
+
 @main_bp.route('/admin')
 @admin_required
 def admin_panel():
+    active_tab = request.args.get('tab') or 'overview'
     supabase_status = _summarize_supabase_status()
     users, supabase_user_error = _fetch_configured_users()
+    bug_records: list[dict] | None = None
+    feature_bug_error: str | None = None
+    try:
+        bug_records, feature_bug_error = fetch_bug_reports()
+    except Exception as exc:  # pragma: no cover - defensive safeguard
+        bug_records = []
+        feature_bug_error = str(exc)
+
+    feature_cards, _ = _build_feature_cards(bug_records)
+    feature_state_error = getattr(g, '_feature_state_error', None)
+    bug_options = _build_bug_options(bug_records)
     overview = {
         "supabase_status": supabase_status["status"],
         "user_count": len(users),
@@ -665,6 +992,11 @@ def admin_panel():
         overview=overview,
         missing_feeds=missing_feeds,
         user_role_choices=USER_ROLE_CHOICES,
+        feature_cards=feature_cards,
+        feature_bug_options=bug_options,
+        feature_state_error=feature_state_error,
+        feature_bug_error=feature_bug_error,
+        active_tab=active_tab,
     )
 
 
@@ -742,6 +1074,54 @@ def admin_user_action():
         flash(f"Unrecognised action '{action}'.", 'error')
 
     return redirect(url_for('main.admin_panel'))
+
+
+@main_bp.route('/admin/features', methods=['POST'])
+@admin_required
+def admin_feature_action():
+    slug = (request.form.get('slug') or '').strip()
+    if not slug or slug not in FEATURE_DEFINITIONS:
+        flash('Select a valid application feature to update.', 'error')
+        return redirect(url_for('main.admin_panel', tab='features'))
+
+    status = _normalize_feature_status(request.form.get('status'))
+    message = (request.form.get('message') or '').strip()
+    raw_bug_id = (request.form.get('bug_report_id') or '').strip()
+    bug_id = _normalize_bug_id(raw_bug_id)
+
+    if raw_bug_id and bug_id is None:
+        flash('Enter a valid bug report number to link.', 'error')
+        return redirect(url_for('main.admin_panel', tab='features'))
+
+    definition = _feature_definition(slug)
+    label = definition.get('label', slug.replace('_', ' ').title())
+
+    if status == FEATURE_STATUS_AVAILABLE and not message:
+        if bug_id is not None:
+            message = f"{label} has been reopened after bug #{bug_id} was resolved."
+        else:
+            message = f"{label} is available."
+    elif status != FEATURE_STATUS_AVAILABLE and not message:
+        if bug_id is not None:
+            message = f"{label} is temporarily locked while we investigate bug #{bug_id}."
+        else:
+            message = definition.get('default_message') or f"{label} is temporarily unavailable."
+
+    _, error = upsert_feature_state(
+        slug,
+        status=status,
+        message=message,
+        bug_report_id=bug_id,
+    )
+    if error:
+        flash(error, 'error')
+    else:
+        if status == FEATURE_STATUS_AVAILABLE:
+            flash(f"{label} marked available.", 'success')
+        else:
+            flash(f"{label} locked for maintenance.", 'info')
+
+    return redirect(url_for('main.admin_panel', tab='features'))
 
 
 @main_bp.route('/aoi_reports', methods=['GET'])
@@ -883,6 +1263,8 @@ def update_bug_report(report_id: int):
 
     if not updated:
         abort(404, description='Bug report not found.')
+
+    _sync_feature_state_from_bug(updated[0])
 
     return jsonify({'bug_report': updated[0]})
 
@@ -1218,6 +1600,7 @@ def upload_fi_reports():
 
 @main_bp.route('/ppm_reports/upload', methods=['POST'])
 @admin_required
+@feature_required('analysis_ppm')
 def upload_ppm_reports():
     """Upload an XLS or XLSX PPM report and store rows in the MOAT table."""
     uploaded = request.files.get('file')
@@ -1581,6 +1964,7 @@ def forecast_preview():
 
 
 @main_bp.route('/analysis/ppm', methods=['GET'])
+@feature_required('analysis_ppm')
 def ppm_analysis():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
@@ -1588,6 +1972,7 @@ def ppm_analysis():
 
 
 @main_bp.route('/analysis/ppm/data', methods=['GET'])
+@feature_required('analysis_ppm')
 def ppm_data():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
@@ -1644,6 +2029,7 @@ def ppm_data():
 
 
 @main_bp.route('/analysis/ppm/saved', methods=['GET', 'POST', 'PUT'])
+@feature_required('analysis_ppm')
 def ppm_saved_queries():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
@@ -1682,6 +2068,7 @@ def ppm_saved_queries():
 
 
 @main_bp.route('/tools/assembly-forecast')
+@feature_required('tools_assembly_forecast')
 def assembly_forecast():
     """Render the Assembly Forecast tool page."""
     if 'username' not in session:
@@ -1690,6 +2077,7 @@ def assembly_forecast():
 
 
 @main_bp.route('/api/assemblies/search')
+@feature_required('tools_assembly_forecast')
 def api_assemblies_search():
     """Search distinct assembly names across MOAT and AOI data."""
     if 'username' not in session:
@@ -1722,6 +2110,7 @@ def api_assemblies_search():
 
 
 @main_bp.route('/api/assemblies/forecast', methods=['POST'])
+@feature_required('tools_assembly_forecast')
 def api_assemblies_forecast():
     """Return forecast metrics for selected assemblies."""
     if 'username' not in session:
@@ -2456,6 +2845,7 @@ def build_report_payload(start=None, end=None):
 
 
 @main_bp.route('/api/reports/integrated', methods=['GET'])
+@feature_required('reports_integrated')
 def api_integrated_report():
     """Aggregate yield, operator and false-call stats for the AOI integrated report."""
     if 'username' not in session:
@@ -2469,6 +2859,7 @@ def api_integrated_report():
 
 
 @main_bp.route('/reports/integrated', methods=['GET'])
+@feature_required('reports_integrated')
 def integrated_report():
     """Render the AOI Integrated Report page."""
     if 'username' not in session:
@@ -2477,6 +2868,7 @@ def integrated_report():
 
 
 @main_bp.route('/reports/integrated/export')
+@feature_required('reports_integrated')
 def export_integrated_report():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
@@ -2571,6 +2963,7 @@ def export_integrated_report():
 
 
 @main_bp.route('/reports/aoi_daily', methods=['GET'])
+@feature_required('reports_aoi_daily')
 def aoi_daily_report_page():
     """Render the AOI Daily Report page."""
     if 'username' not in session:
@@ -2579,6 +2972,7 @@ def aoi_daily_report_page():
 
 
 @main_bp.route('/reports/aoi_daily/export')
+@feature_required('reports_aoi_daily')
 def export_aoi_daily_report():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
@@ -2766,6 +3160,7 @@ def _aggregate_operator_report(start=None, end=None, operator: str | None = None
 
 
 @main_bp.route('/api/reports/operator', methods=['GET'])
+@feature_required('reports_operator')
 def api_operator_report():
     """Return operator report data filtered by date range and operator."""
     if 'username' not in session:
@@ -2785,6 +3180,7 @@ def build_operator_report_payload(start=None, end=None, operator: str | None = N
 
 
 @main_bp.route('/api/reports/aoi_daily', methods=['GET'])
+@feature_required('reports_aoi_daily')
 def api_aoi_daily_report():
     """Return AOI daily report data for preview."""
     if 'username' not in session:
@@ -2988,6 +3384,7 @@ def build_aoi_daily_report_payload(
 
 
 @main_bp.route('/reports/operator', methods=['GET'])
+@feature_required('reports_operator')
 def operator_report():
     """Render the Operator Report page."""
     if 'username' not in session:
@@ -2996,6 +3393,7 @@ def operator_report():
 
 
 @main_bp.route('/reports/operator/export')
+@feature_required('reports_operator')
 def export_operator_report():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
@@ -3102,6 +3500,7 @@ def export_operator_report():
 
 
 @main_bp.route('/analysis/aoi/grades', methods=['GET'])
+@feature_required('analysis_aoi_grades')
 def aoi_grades():
     """Return AOI grades computed from combined reports.
 
@@ -3155,6 +3554,7 @@ def aoi_grades():
 
 
 @main_bp.route('/analysis/aoi/grades/escape_pareto', methods=['GET'])
+@feature_required('analysis_aoi_grades')
 def aoi_grades_escape_pareto():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
@@ -3205,6 +3605,7 @@ def aoi_grades_escape_pareto():
 
 
 @main_bp.route('/analysis/aoi/grades/gap_risk', methods=['GET'])
+@feature_required('analysis_aoi_grades')
 def aoi_grades_gap_risk():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
@@ -3252,6 +3653,7 @@ def aoi_grades_gap_risk():
 
 
 @main_bp.route('/analysis/aoi/grades/learning_curves', methods=['GET'])
+@feature_required('analysis_aoi_grades')
 def aoi_grades_learning_curves():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
@@ -3326,6 +3728,7 @@ def aoi_grades_learning_curves():
 
 
 @main_bp.route('/analysis/aoi/grades/smt_th_heatmap', methods=['GET'])
+@feature_required('analysis_aoi_grades')
 def aoi_grades_smt_th_heatmap():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
@@ -3367,6 +3770,7 @@ def aoi_grades_smt_th_heatmap():
 
 
 @main_bp.route('/analysis/aoi/grades/shift_effect', methods=['GET'])
+@feature_required('analysis_aoi_grades')
 def aoi_grades_shift_effect():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
@@ -3437,6 +3841,7 @@ def aoi_grades_shift_effect():
 
 
 @main_bp.route('/analysis/aoi/grades/customer_yield', methods=['GET'])
+@feature_required('analysis_aoi_grades')
 def aoi_grades_customer_yield():
     """Return per-customer true yield using AOI and FI rejects.
 
@@ -3486,6 +3891,7 @@ def aoi_grades_customer_yield():
 
 
 @main_bp.route('/analysis/aoi/grades/program_trend', methods=['GET'])
+@feature_required('analysis_aoi_grades')
 def aoi_grades_program_trend():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
@@ -3528,6 +3934,7 @@ def aoi_grades_program_trend():
 
 
 @main_bp.route('/analysis/aoi/grades/adjusted_operator_ranking', methods=['GET'])
+@feature_required('analysis_aoi_grades')
 def aoi_grades_adjusted_operator_ranking():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
@@ -3613,6 +4020,7 @@ def aoi_grades_adjusted_operator_ranking():
 
 
 @main_bp.route('/analysis/aoi/grades/view', methods=['GET'])
+@feature_required('analysis_aoi_grades')
 def aoi_grades_page():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
@@ -4128,6 +4536,7 @@ def analysis_tracker_logs():
 
 
 @main_bp.route('/analysis/aoi', methods=['GET'])
+@feature_required('analysis_aoi_daily')
 def aoi_daily_reports():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
@@ -4342,11 +4751,13 @@ def _daily_data(fetch_func):
 
 
 @main_bp.route('/analysis/aoi/data', methods=['GET'])
+@feature_required('analysis_aoi_daily')
 def aoi_daily_data():
     return _daily_data(fetch_aoi_reports)
 
 
 @main_bp.route('/analysis/fi', methods=['GET'])
+@feature_required('analysis_fi_daily')
 def fi_daily_reports():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
@@ -4354,11 +4765,13 @@ def fi_daily_reports():
 
 
 @main_bp.route('/analysis/fi/data', methods=['GET'])
+@feature_required('analysis_fi_daily')
 def fi_daily_data():
     return _daily_data(fetch_fi_reports)
 
 
 @main_bp.route('/analysis/fi/saved', methods=['GET', 'POST', 'PUT'])
+@feature_required('analysis_fi_daily')
 def fi_saved_queries():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
@@ -4385,6 +4798,7 @@ def fi_saved_queries():
 
 
 @main_bp.route('/analysis/aoi/saved', methods=['GET', 'POST', 'PUT'])
+@feature_required('analysis_aoi_daily')
 def aoi_saved_queries():
     if 'username' not in session:
         return redirect(url_for('auth.login'))

@@ -23,16 +23,18 @@
 {% endwith %}
 
 <section class="admin-console" data-tabs>
+  {% set current_tab = active_tab or 'overview' %}
   <aside class="tab-nav" role="tablist" aria-label="Administration Sections">
-    <button class="tab-link is-active" type="button" role="tab" aria-selected="true" tabindex="0" data-tab-target="overview">Overview</button>
-    <button class="tab-link" type="button" role="tab" aria-selected="false" tabindex="-1" data-tab-target="data">Data Connections</button>
-    <button class="tab-link" type="button" role="tab" aria-selected="false" tabindex="-1" data-tab-target="users">User Accounts</button>
-    <button class="tab-link" type="button" role="tab" aria-selected="false" tabindex="-1" data-tab-target="roles">Roles &amp; Permissions</button>
-    <button class="tab-link" type="button" role="tab" aria-selected="false" tabindex="-1" data-tab-target="system">System Policies</button>
+    <button class="tab-link {% if current_tab == 'overview' %}is-active{% endif %}" type="button" role="tab" aria-selected="{{ 'true' if current_tab == 'overview' else 'false' }}" tabindex="{{ '0' if current_tab == 'overview' else '-1' }}" data-tab-target="overview">Overview</button>
+    <button class="tab-link {% if current_tab == 'features' %}is-active{% endif %}" type="button" role="tab" aria-selected="{{ 'true' if current_tab == 'features' else 'false' }}" tabindex="{{ '0' if current_tab == 'features' else '-1' }}" data-tab-target="features">Feature Availability</button>
+    <button class="tab-link {% if current_tab == 'data' %}is-active{% endif %}" type="button" role="tab" aria-selected="{{ 'true' if current_tab == 'data' else 'false' }}" tabindex="{{ '0' if current_tab == 'data' else '-1' }}" data-tab-target="data">Data Connections</button>
+    <button class="tab-link {% if current_tab == 'users' %}is-active{% endif %}" type="button" role="tab" aria-selected="{{ 'true' if current_tab == 'users' else 'false' }}" tabindex="{{ '0' if current_tab == 'users' else '-1' }}" data-tab-target="users">User Accounts</button>
+    <button class="tab-link {% if current_tab == 'roles' %}is-active{% endif %}" type="button" role="tab" aria-selected="{{ 'true' if current_tab == 'roles' else 'false' }}" tabindex="{{ '0' if current_tab == 'roles' else '-1' }}" data-tab-target="roles">Roles &amp; Permissions</button>
+    <button class="tab-link {% if current_tab == 'system' %}is-active{% endif %}" type="button" role="tab" aria-selected="{{ 'true' if current_tab == 'system' else 'false' }}" tabindex="{{ '0' if current_tab == 'system' else '-1' }}" data-tab-target="system">System Policies</button>
   </aside>
 
   <div class="tab-panels">
-    <article class="tab-panel is-active" role="tabpanel" data-tab-panel="overview" aria-hidden="false">
+    <article class="tab-panel {% if current_tab == 'overview' %}is-active{% endif %}" role="tabpanel" data-tab-panel="overview" aria-hidden="{{ 'false' if current_tab == 'overview' else 'true' }}">
       <h2>Operational Snapshot</h2>
       {% set available_tables = overview.tracked_tables | selectattr('status', 'equalto', 'Available') | list %}
       {% set unavailable_tables = overview.tracked_tables | selectattr('status', 'equalto', 'Unavailable') | list %}
@@ -113,7 +115,80 @@
       {% endif %}
     </article>
 
-    <article class="tab-panel" role="tabpanel" data-tab-panel="data" aria-hidden="true">
+    <article class="tab-panel {% if current_tab == 'features' %}is-active{% endif %}" role="tabpanel" data-tab-panel="features" aria-hidden="{{ 'false' if current_tab == 'features' else 'true' }}">
+      <h2>Feature Availability</h2>
+      <p>Control which application areas are available to end users and communicate planned maintenance.</p>
+      {% if feature_state_error %}
+      <div class="feature-alert" role="alert">Feature state data is unavailable: {{ feature_state_error }}</div>
+      {% endif %}
+      {% if feature_bug_error %}
+      <div class="feature-alert" role="alert">Bug report metadata could not be fully loaded: {{ feature_bug_error }}</div>
+      {% endif %}
+      {% if feature_cards %}
+      <div class="feature-grid">
+        {% for feature in feature_cards %}
+        <section class="feature-card {% if feature.status != 'available' %}is-locked{% endif %}">
+          <header class="feature-card__header">
+            <div>
+              <h3>{{ feature.label }}</h3>
+              <p class="feature-card__description">{{ feature.description }}</p>
+            </div>
+            <span class="feature-status feature-status--{{ feature.status }}">{{ feature.status.replace('_', ' ') | title }}</span>
+          </header>
+          <dl class="feature-card__meta">
+            {% if feature.updated_at %}
+            <div>
+              <dt>Updated</dt>
+              <dd>{{ feature.updated_at }}</dd>
+            </div>
+            {% endif %}
+            {% if feature.bug_summary %}
+            <div>
+              <dt>Linked bug</dt>
+              <dd>{{ feature.bug_summary }}{% if feature.bug_status %} &middot; {{ feature.bug_status.replace('_', ' ') | title }}{% endif %}</dd>
+            </div>
+            {% endif %}
+          </dl>
+          <form class="feature-form" method="post" action="{{ url_for('main.admin_feature_action') }}">
+            <input type="hidden" name="slug" value="{{ feature.slug }}">
+            <div class="feature-form__row">
+              <label>
+                <span>Availability</span>
+                <select name="status">
+                  <option value="available" {% if feature.status == 'available' %}selected{% endif %}>Available</option>
+                  <option value="locked" {% if feature.status != 'available' %}selected{% endif %}>Locked for maintenance</option>
+                </select>
+              </label>
+              <label>
+                <span>Linked bug report</span>
+                <select name="bug_report_id">
+                  <option value="">None</option>
+                  {% if feature.bug_report_id and not feature_bug_options | selectattr('id', 'equalto', feature.bug_report_id) | list %}
+                  <option value="{{ feature.bug_report_id }}" selected>#{{ feature.bug_report_id }}</option>
+                  {% endif %}
+                  {% for option in feature_bug_options %}
+                  <option value="{{ option.id }}" {% if option.id == feature.bug_report_id %}selected{% endif %}>{{ option.label }}</option>
+                  {% endfor %}
+                </select>
+              </label>
+            </div>
+            <label class="feature-form__message">
+              <span>User-facing notice</span>
+              <textarea name="message" rows="2" placeholder="Share a maintenance message">{{ feature.message }}</textarea>
+            </label>
+            <div class="feature-form__actions">
+              <button type="submit" class="primary">Save changes</button>
+            </div>
+          </form>
+        </section>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p class="feature-empty">Feature toggles will appear once Supabase connectivity is configured.</p>
+      {% endif %}
+    </article>
+
+    <article class="tab-panel {% if current_tab == 'data' %}is-active{% endif %}" role="tabpanel" data-tab-panel="data" aria-hidden="{{ 'false' if current_tab == 'data' else 'true' }}">
       <h2>Data Connections</h2>
       <p>Link production databases and control how data synchronizes with Spectra Operations Suite.</p>
       <div class="summary-block">
@@ -224,7 +299,7 @@
       </form>
     </article>
 
-    <article class="tab-panel" role="tabpanel" data-tab-panel="users" aria-hidden="true">
+    <article class="tab-panel {% if current_tab == 'users' %}is-active{% endif %}" role="tabpanel" data-tab-panel="users" aria-hidden="{{ 'false' if current_tab == 'users' else 'true' }}">
       <h2>User Accounts</h2>
       <p>Create and deactivate user accounts to control who can access Spectra Operations Suite.</p>
 
@@ -300,7 +375,7 @@
       </form>
     </article>
 
-    <article class="tab-panel" role="tabpanel" data-tab-panel="roles" aria-hidden="true">
+    <article class="tab-panel {% if current_tab == 'roles' %}is-active{% endif %}" role="tabpanel" data-tab-panel="roles" aria-hidden="{{ 'false' if current_tab == 'roles' else 'true' }}">
       <h2>Roles &amp; Permissions</h2>
       <div class="summary-block">
         <p>{{ missing_feeds.roles }}</p>
@@ -308,7 +383,7 @@
       </div>
     </article>
 
-    <article class="tab-panel" role="tabpanel" data-tab-panel="system" aria-hidden="true">
+    <article class="tab-panel {% if current_tab == 'system' %}is-active{% endif %}" role="tabpanel" data-tab-panel="system" aria-hidden="{{ 'false' if current_tab == 'system' else 'true' }}">
       <h2>System Policies</h2>
       <div class="summary-block">
         <p>{{ missing_feeds.system_policies }}</p>

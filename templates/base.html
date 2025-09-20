@@ -8,6 +8,27 @@
   {% block extra_head %}{% endblock %}
 </head>
 <body class="{% if user_role == 'EMPLOYEE' %}employee-layout{% endif %}">
+  {% macro feature_nav_link(label, href, slug) -%}
+    {% set feature = (feature_states.get(slug) if feature_states else {}) %}
+    {% set status = feature.get('status', 'available') %}
+    {% set globally_locked = status != 'available' %}
+    {% set locked_for_user = globally_locked and user_role != 'ADMIN' %}
+    {% set message = feature.get('message') or feature.get('description') or '' %}
+    <a
+      href="{{ href }}"
+      class="{% if locked_for_user %}is-locked{% endif %}"
+      data-feature-slug="{{ slug }}"
+      data-feature-status="{{ status }}"
+      data-feature-label="{{ feature.get('label', label) }}"
+      data-feature-message="{{ message }}"
+      {% if locked_for_user %}data-feature-lock="true" aria-disabled="true"{% endif %}
+    >
+      {{ label }}
+      {% if globally_locked %}
+      <span class="nav-lock-indicator" aria-hidden="true">Locked</span>
+      {% endif %}
+    </a>
+  {%- endmacro %}
   {% if user_role != 'EMPLOYEE' %}
   <header class="app-header">
     <nav class="navbar" role="navigation" aria-label="Primary">
@@ -26,10 +47,10 @@
           <li class="nav-item">
             <a href="#">Analysis <span class="arrow">&#9662;</span></a>
             <div class="dropdown" role="menu">
-              <a href="{{ url_for('main.ppm_analysis') }}">PPM Analysis</a>
-              <a href="{{ url_for('main.aoi_grades_page') }}">AOI &amp; FI Analysis</a>
-              <a href="{{ url_for('main.aoi_daily_reports') }}">AOI Daily Reports</a>
-              <a href="{{ url_for('main.fi_daily_reports') }}">FI Daily Reports</a>
+              {{ feature_nav_link('PPM Analysis', url_for('main.ppm_analysis'), 'analysis_ppm') }}
+              {{ feature_nav_link('AOI & FI Analysis', url_for('main.aoi_grades_page'), 'analysis_aoi_grades') }}
+              {{ feature_nav_link('AOI Daily Reports', url_for('main.aoi_daily_reports'), 'analysis_aoi_daily') }}
+              {{ feature_nav_link('FI Daily Reports', url_for('main.fi_daily_reports'), 'analysis_fi_daily') }}
               {% if user_role == 'ADMIN' %}
               <a href="{{ url_for('main.analysis_tracker_logs') }}">Application Tracker Logs</a>
               {% endif %}
@@ -40,7 +61,7 @@
             <div class="dropdown" role="menu">
               <a href="#">Rework Stencil Lookup</a>
               <a href="#">Verified Part Markings</a>
-              <a href="{{ url_for('main.assembly_forecast') }}">Assembly Forecast</a>
+              {{ feature_nav_link('Assembly Forecast', url_for('main.assembly_forecast'), 'tools_assembly_forecast') }}
             </div>
           </li>
           <li class="nav-item">
@@ -53,9 +74,9 @@
           <li class="nav-item">
             <a href="#">Reports <span class="arrow">&#9662;</span></a>
             <div class="dropdown" role="menu">
-              <a href="{{ url_for('main.integrated_report') }}">AOI Integrated Report</a>
-              <a href="{{ url_for('main.operator_report') }}">Operator Report</a>
-              <a href="{{ url_for('main.aoi_daily_report_page') }}">AOI Daily Report</a>
+              {{ feature_nav_link('AOI Integrated Report', url_for('main.integrated_report'), 'reports_integrated') }}
+              {{ feature_nav_link('Operator Report', url_for('main.operator_report'), 'reports_operator') }}
+              {{ feature_nav_link('AOI Daily Report', url_for('main.aoi_daily_report_page'), 'reports_aoi_daily') }}
             </div>
           </li>
         </ul>
@@ -76,6 +97,18 @@
   <main class="content" role="main">
     {% block content %}{% endblock %}
   </main>
+
+  <div class="modal-overlay" data-feature-lock-modal hidden tabindex="-1">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="feature-lock-title">
+      <div class="modal-header">
+        <h2 id="feature-lock-title">Feature temporarily unavailable</h2>
+        <button type="button" class="modal-close" data-feature-lock-close aria-label="Close">Close</button>
+      </div>
+      <div class="modal-body">
+        <p data-feature-lock-message></p>
+      </div>
+    </div>
+  </div>
 
   <div
     id="bug-chat-container"

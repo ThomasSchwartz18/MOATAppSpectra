@@ -48,6 +48,119 @@ def _apply_report_date_offset(rows: list[dict]) -> list[dict]:
     return rows
 
 
+def fetch_feature_states() -> tuple[list[dict] | None, str | None]:
+    """Return all persisted feature availability records."""
+
+    supabase, error = _ensure_supabase_client()
+    if error:
+        return [], error
+
+    try:
+        response = supabase.table("app_feature_states").select("*").execute()
+        return response.data or [], None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to fetch feature states: {exc}"
+
+
+def fetch_feature_state(slug: str) -> tuple[dict | None, str | None]:
+    """Return the feature state identified by ``slug`` if it exists."""
+
+    if not slug:
+        return None, "Feature slug is required"
+
+    supabase, error = _ensure_supabase_client()
+    if error:
+        return None, error
+
+    try:
+        response = (
+            supabase.table("app_feature_states")
+            .select("*")
+            .eq("slug", slug)
+            .limit(1)
+            .execute()
+        )
+        records = response.data or []
+        return (records[0] if records else None), None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to fetch feature state: {exc}"
+
+
+def upsert_feature_state(
+    slug: str,
+    *,
+    status: str,
+    message: str | None = None,
+    bug_report_id: int | str | None = None,
+) -> tuple[list[dict] | None, str | None]:
+    """Create or update a feature state entry."""
+
+    if not slug:
+        return None, "Feature slug is required"
+    if not status:
+        return None, "Feature status is required"
+
+    supabase, error = _ensure_supabase_client()
+    if error:
+        return None, error
+
+    bug_value: int | None
+    if bug_report_id in (None, ""):
+        bug_value = None
+    else:
+        try:
+            bug_value = int(bug_report_id)
+        except (TypeError, ValueError):
+            return None, "Bug report identifier must be a number"
+
+    payload = {
+        "slug": slug,
+        "status": status,
+        "message": message or None,
+        "bug_report_id": bug_value,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    try:
+        response = (
+            supabase.table("app_feature_states")
+            .upsert(payload, on_conflict="slug")
+            .execute()
+        )
+        return response.data or [], None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to update feature state: {exc}"
+
+
+def fetch_feature_states_for_bug(
+    bug_report_id: int | str,
+) -> tuple[list[dict] | None, str | None]:
+    """Return feature state records associated with ``bug_report_id``."""
+
+    if bug_report_id in (None, ""):
+        return [], None
+
+    try:
+        bug_value = int(bug_report_id)
+    except (TypeError, ValueError):
+        return [], "Invalid bug report identifier"
+
+    supabase, error = _ensure_supabase_client()
+    if error:
+        return [], error
+
+    try:
+        response = (
+            supabase.table("app_feature_states")
+            .select("*")
+            .eq("bug_report_id", bug_value)
+            .execute()
+        )
+        return response.data or [], None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to fetch linked feature states: {exc}"
+
+
 def fetch_app_users(include_sensitive: bool = False) -> tuple[list[dict] | None, str | None]:
     """Return application users stored in Supabase.
 
