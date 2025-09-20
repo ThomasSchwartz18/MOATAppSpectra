@@ -75,29 +75,26 @@ Remove the helper once the source data is fixed.
 
 ### WeasyPrint native dependencies
 PDF exports rely on [WeasyPrint](https://weasyprint.org/), which in turn needs
-platform-specific libraries for font handling and rendering. Install the native
-dependencies before attempting to generate Integrated, Operator, or AOI Daily
-report PDFs:
+platform-specific libraries for font handling and rendering. **PDF generation is
+supported only on Linux or Windows hosts. macOS is not supported.** Install the
+native dependencies before attempting to generate Integrated, Operator, or AOI
+Daily report PDFs:
 
-- **macOS (Homebrew):** `brew install cairo gobject-introspection pango`. If your
-  Homebrew prefix is non-standard (for example, when using an Apple Silicon
-  machine), set the `WEASYPRINT_NATIVE_LIB_PATHS` environment variable to point
-  to the directories or specific libraries installed by Homebrew, e.g.:
-
-  ```bash
-  export WEASYPRINT_NATIVE_LIB_PATHS="/opt/homebrew/lib"
-  ```
-
-- **macOS (Homebrew):** `brew install cairo gobject-introspection pango`
 - **Debian/Ubuntu:** `sudo apt-get install libcairo2 libgdk-pixbuf2.0-0 libpango-1.0-0 gir1.2-pango-1.0`
+- **Windows:** Use the WeasyPrint Windows installer or follow the
+  [official installation guide](https://doc.courtbouillon.org/weasyprint/stable/first_steps.html#windows).
 
 Once the packages are present, `pip install -r requirements.txt` will install
 WeasyPrint and the Flask endpoints will be able to stream PDF responses.
 
-### wkhtmltopdf fallback setup (Windows & macOS)
+If your Linux distribution installs WeasyPrint libraries in non-standard
+locations, set the `WEASYPRINT_NATIVE_LIB_PATHS` environment variable to include
+paths that contain the required `.so` files.
+
+### wkhtmltopdf fallback setup (Windows & Linux)
 If WeasyPrint or its native libraries are unavailable, the application can fall
 back to [wkhtmltopdf](https://wkhtmltopdf.org/) via `pdfkit`. Install the tool
-and point the app to the binary so developers on Windows or macOS can still
+and point the app to the binary so developers on supported platforms can still
 export reports:
 
 - **Windows:** Download and install the official wkhtmltopdf build. Set the
@@ -108,33 +105,10 @@ export reports:
   setx WKHTMLTOPDF_CMD "C:\\Program Files\\wkhtmltopdf\\bin\\wkhtmltopdf.exe"
   ```
 
-- **macOS (Homebrew):** `brew install wkhtmltopdf`. Ensure the binary is either
-  on your `PATH` or export the command path before starting Flask:
-
-  ```bash
-  export WKHTMLTOPDF_CMD="/usr/local/bin/wkhtmltopdf"
-  ```
+- **Linux:** Install wkhtmltopdf from your distribution's repositories and
+  ensure it is on the `PATH`, or export the command path before starting Flask.
 
 The fallback runner also honours `app.config["WKHTMLTOPDF_CMD"]` if you prefer
 to configure the command within the Flask application. With the binary
 configured, PDF generation will transparently switch to wkhtmltopdf whenever
 WeasyPrint fails to load.
-
-### macOS Chromium fallback
-On macOS machines where both WeasyPrint and wkhtmltopdf are unavailable, the
-application falls back to a headless Chromium renderer powered by
-[`pyppeteer`](https://github.com/pyppeteer/pyppeteer). To enable this helper:
-
-1. Install the Python dependency:
-   ```bash
-   pip install pyppeteer
-   ```
-2. Download a compatible Chromium binary (pyppeteer can handle this step):
-   ```bash
-   python -m pyppeteer install
-   ```
-
-The macOS helper runs only when both of the other backends fail, so Linux and
-Windows environments are unaffected. If PDF generation continues to raise
-errors, verify that Chromium launches correctly in headless mode and consult the
-console output for additional details.

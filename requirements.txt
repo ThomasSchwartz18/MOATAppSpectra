@@ -10,5 +10,4 @@ pytest
 numpy
 weasyprint
 pdfkit
-pyppeteer
 matplotlib
