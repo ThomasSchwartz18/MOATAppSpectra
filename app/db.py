@@ -390,7 +390,7 @@ def fetch_defect_catalog() -> tuple[list[dict[str, str]] | None, str | None]:
         return None, error
 
     try:
-        response = supabase.table("defect").select("id,name").execute()
+        response = supabase.table("defects").select("id,name").execute()
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to fetch defects: {exc}"
 
@@ -414,7 +414,7 @@ def fetch_defect_catalog() -> tuple[list[dict[str, str]] | None, str | None]:
 
 
 def fetch_distinct_defect_ids() -> tuple[list[str] | None, str | None]:
-    """Return unique defect identifiers from the ``defect`` table."""
+    """Return unique defect identifiers from the ``defects`` table."""
 
     catalog, error = fetch_defect_catalog()
     if error:
