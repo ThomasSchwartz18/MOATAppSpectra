@@ -137,29 +137,23 @@
                   <input type="number" name="quantity_rejected" min="0" step="1" required>
                 </label>
               </div>
-              <div class="inspection-step" data-step data-step-name="defect">
-                <label class="inspection-field inspection-field--full">
-                  <span class="inspection-field__label">Defect</span>
-                  <select name="defect_id" data-defect-select required disabled>
-                    <option value="" disabled selected>Loading defects...</option>
-                  </select>
-                </label>
+              <div class="inspection-step" data-step data-step-name="rejection">
                 <input type="hidden" name="rejection_details" data-rejection-json>
                 <section class="inspection-rejection" data-rejection-details hidden aria-label="Reason for rejection details">
                   <header class="inspection-rejection__header">
                     <h4>Rejection Details</h4>
-                    <p>List each rejected assembly, the related defect code, and the rejected quantity.</p>
+                    <p>List each rejected assembly, describe the reason, and include the rejected quantity.</p>
                   </header>
                   <div class="inspection-rejection__controls">
                     <button type="button" class="inspection-rejection__add" data-action="add-rejection-row">Add rejection reason</button>
                   </div>
                   <div class="inspection-rejection__table">
                     <table>
-                      <caption class="sr-only">Rejected assemblies and associated defect codes</caption>
+                      <caption class="sr-only">Rejected assemblies and associated reasons</caption>
                       <thead>
                         <tr>
                           <th scope="col">Reference Designator</th>
-                          <th scope="col">Defect Code</th>
+                          <th scope="col">Rejection Reason</th>
                           <th scope="col">Quantity</th>
                           <th scope="col"><span class="sr-only">Actions</span></th>
                         </tr>
@@ -177,10 +171,8 @@
                     <td data-label="Reference Designator">
                       <input type="text" data-rejection-ref placeholder="e.g. R15" autocomplete="off">
                     </td>
-                    <td data-label="Defect Code">
-                      <select data-rejection-defect disabled>
-                        <option value="" disabled selected>Loading defects...</option>
-                      </select>
+                    <td data-label="Rejection Reason">
+                      <input type="text" data-rejection-reason placeholder="e.g. Bent lead" autocomplete="off">
                     </td>
                     <td data-label="Quantity">
                       <input type="number" data-rejection-quantity min="1" step="1" placeholder="0">
