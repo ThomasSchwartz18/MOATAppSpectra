@@ -55,40 +55,12 @@ def _login_employee(client):
     with client.session_transaction() as session:
         session['username'] = 'Employee'
         session['role'] = 'EMPLOYEE'
-
-
-def test_employee_defect_endpoint_returns_unique_ids(employee_app):
-    app, supabase = employee_app
-    supabase.tables['defects'] = [
-        {'id': 'DEF-2', 'name': 'Solder Bridge'},
-        {'id': 'DEF-1', 'name': 'Component Shift'},
-        {'id': 'DEF-2', 'name': 'Solder Bridge'},
-        {'id': None, 'name': 'Ignore'},
-        {'id': '   ', 'name': 'Whitespace'},
-    ]
-
-    client = app.test_client()
-    _login_employee(client)
-    response = client.get('/employee/defects')
-
-    assert response.status_code == 200
-    payload = response.get_json()
-    assert payload == {
-        'defects': [
-            {'id': 'DEF-1', 'name': 'Component Shift'},
-            {'id': 'DEF-2', 'name': 'Solder Bridge'},
-        ]
-    }
-
-
-def test_employee_submission_validates_defect_selection(employee_app, monkeypatch):
+def test_employee_submission_succeeds_without_defect_dropdown(employee_app, monkeypatch):
     app, _ = employee_app
     client = app.test_client()
 
     with app.app_context():
         from app.main import routes
-
-        monkeypatch.setattr(routes, 'fetch_distinct_defect_ids', lambda: (['DEF-1'], None))
 
         inserted_records: list[dict] = []
 
@@ -108,28 +80,16 @@ def test_employee_submission_validates_defect_selection(employee_app, monkeypatc
         'assembly': 'Assembly 1',
         'job_number': 'J123',
         'quantity_inspected': '10',
-        'quantity_rejected': '1',
+        'quantity_rejected': '0',
         'inspection_type': 'SMT',
     }
 
-    response = client.post(
-        '/employee/aoi_reports',
-        json={**base_payload, 'defect_id': 'DEF-1'},
-    )
-
+    response = client.post('/employee/aoi_reports', json=base_payload)
     assert response.status_code == 201
     assert len(inserted_records) == 1
-    assert inserted_records[0]['Defect ID'] == 'DEF-1'
-
-    invalid_response = client.post(
-        '/employee/aoi_reports',
-        json={**base_payload, 'defect_id': 'UNKNOWN'},
-    )
-
-    assert invalid_response.status_code == 400
-    error_payload = invalid_response.get_json()
-    assert 'defect_id' in (error_payload.get('errors') or {})
-    assert len(inserted_records) == 1
+    record = inserted_records[0]
+    assert 'Defect ID' not in record
+    assert record['Additional Information'] == 'SMT AOI Inspection Data Sheet submission'
 
 
 def test_employee_submission_formats_rejection_details(employee_app, monkeypatch):
@@ -138,12 +98,6 @@ def test_employee_submission_formats_rejection_details(employee_app, monkeypatch
 
     with app.app_context():
         from app.main import routes
-
-        monkeypatch.setattr(
-            routes,
-            'fetch_distinct_defect_ids',
-            lambda: (['DEF-1', 'DEF-2', 'DEF-3'], None),
-        )
 
         inserted_records: list[dict] = []
 
@@ -166,11 +120,10 @@ def test_employee_submission_formats_rejection_details(employee_app, monkeypatch
         'quantity_inspected': '25',
         'quantity_rejected': '3',
         'inspection_type': 'SMT',
-        'defect_id': 'DEF-1',
         'notes': 'Needs review',
         'rejection_details': [
-            {'ref': 'R15', 'defect_id': 'DEF-1', 'quantity': 2},
-            {'ref': 'R22', 'defect_id': 'DEF-2', 'quantity': 1},
+            {'ref': 'R15', 'reason': 'Bent lead', 'quantity': 2},
+            {'ref': 'R22', 'reason': ' Tombstone ', 'quantity': 1},
         ],
     }
 
@@ -180,7 +133,7 @@ def test_employee_submission_formats_rejection_details(employee_app, monkeypatch
     assert inserted_records
     assert inserted_records[0]['Additional Information'] == (
         'SMT AOI Inspection Data Sheet submission | '
-        'R15 DEF-1 2, R22 DEF-2 1 | Needs review'
+        'R15 - Bent lead (2), R22 - Tombstone (1) | Needs review'
     )
 
 
@@ -190,12 +143,6 @@ def test_employee_submission_rejects_invalid_rejection_rows(employee_app, monkey
 
     with app.app_context():
         from app.main import routes
-
-        monkeypatch.setattr(
-            routes,
-            'fetch_distinct_defect_ids',
-            lambda: (['DEF-1', 'DEF-2'], None),
-        )
 
         def fake_insert(record):
             raise AssertionError('Should not insert invalid record')
@@ -215,10 +162,9 @@ def test_employee_submission_rejects_invalid_rejection_rows(employee_app, monkey
         'quantity_inspected': '30',
         'quantity_rejected': '2',
         'inspection_type': 'SMT',
-        'defect_id': 'DEF-1',
         'rejection_details': [
-            {'ref': '', 'defect_id': 'DEF-1', 'quantity': 2},
-            {'ref': 'R30', 'defect_id': 'UNKNOWN', 'quantity': 0},
+            {'ref': '', 'reason': 'Bent lead', 'quantity': 2},
+            {'ref': 'R30', 'reason': 'Missing component', 'quantity': 0},
         ],
     }
 

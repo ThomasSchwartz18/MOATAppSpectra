@@ -40,7 +40,6 @@ from app.db import (
     fetch_aoi_reports,
     fetch_combined_reports,
     fetch_defect_catalog,
-    fetch_distinct_defect_ids,
     fetch_app_user_credentials,
     fetch_app_users,
     fetch_fi_reports,
@@ -1308,14 +1307,6 @@ def _prepare_employee_aoi_record(
     errors: dict[str, str] = {}
     record: dict[str, str] = {}
 
-    defect_cache: tuple[list[str] | None, str | None] | None = None
-
-    def _get_defect_ids() -> tuple[list[str] | None, str | None]:
-        nonlocal defect_cache
-        if defect_cache is None:
-            defect_cache = fetch_distinct_defect_ids()
-        return defect_cache
-
     date_raw = (payload.get('date') or '').strip()
     if not date_raw:
         errors['date'] = 'Date is required.'
@@ -1359,18 +1350,6 @@ def _prepare_employee_aoi_record(
             continue
         record[column] = str(number)
 
-    defect_value = (payload.get('defect_id') or '').strip()
-    if defect_value:
-        valid_defects, defect_error = _get_defect_ids()
-        if defect_error:
-            errors['defect_id'] = 'Unable to validate defect selection. Please try again later.'
-        elif defect_value not in (valid_defects or []):
-            errors['defect_id'] = 'Select a valid defect.'
-        else:
-            record['Defect ID'] = defect_value
-    else:
-        errors['defect_id'] = 'Select a defect.'
-
     rev_value = (payload.get('rev') or '').strip()
     if rev_value:
         record['Rev'] = rev_value
@@ -1409,31 +1388,25 @@ def _prepare_employee_aoi_record(
 
     formatted_rejections: list[str] = []
     if rejection_entries:
-        valid_defects, defect_error = _get_defect_ids()
-        if defect_error:
+        detail_errors = False
+        for entry in rejection_entries:
+            ref = str(entry.get('ref', '') or '').strip()
+            reason = str(entry.get('reason', '') or '').strip()
+            quantity_raw = entry.get('quantity')
+            try:
+                quantity = int(quantity_raw)
+            except (TypeError, ValueError):
+                quantity = None
+            if not ref or not reason or not quantity or quantity <= 0:
+                detail_errors = True
+                break
+            reason_normalized = ' '.join(reason.split())
+            formatted_rejections.append(f'{ref} - {reason_normalized} ({quantity})')
+        if detail_errors:
             errors['rejection_details'] = (
-                'Unable to validate rejection details. Please try again later.'
+                'Rejection detail entries must include a reference, reason, '
+                'and quantity of 1 or more.'
             )
-        else:
-            valid_defect_set = set(valid_defects or [])
-            detail_errors = False
-            for entry in rejection_entries:
-                ref = str(entry.get('ref', '') or '').strip()
-                defect_id = str(entry.get('defect_id', '') or '').strip()
-                quantity_raw = entry.get('quantity')
-                try:
-                    quantity = int(quantity_raw)
-                except (TypeError, ValueError):
-                    quantity = None
-                if not ref or defect_id not in valid_defect_set or not quantity or quantity <= 0:
-                    detail_errors = True
-                    break
-                formatted_rejections.append(f'{ref} {defect_id} {quantity}')
-            if detail_errors:
-                errors['rejection_details'] = (
-                    'Rejection detail entries must include a reference, valid defect, '
-                    'and quantity of 1 or more.'
-                )
 
     additional_parts = []
     if sheet_label:
