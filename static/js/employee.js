@@ -300,6 +300,12 @@ function setupAoiArea(container) {
   const rejectionRowTemplate = sheetForm ? sheetForm.querySelector('[data-rejection-row-template]') : null;
   const addRejectionRowButton = sheetForm ? sheetForm.querySelector('[data-action="add-rejection-row"]') : null;
   const rejectionHiddenInput = sheetForm ? sheetForm.querySelector('[data-rejection-json]') : null;
+  const operatorSignature = sheetForm ? sheetForm.querySelector('[data-operator-signature]') : null;
+  const signatureControl = operatorSignature ? operatorSignature.querySelector('[data-action="operator-signature"]') : null;
+  const signatureDisplay = operatorSignature ? operatorSignature.querySelector('[data-signature-display]') : null;
+  const signatureHiddenInput = operatorSignature ? operatorSignature.querySelector('[data-signature-field]') : null;
+  const signatureDefaultText = signatureDisplay ? signatureDisplay.textContent.trim() : 'Sign on file';
+  const operatorUsername = sheetForm ? (sheetForm.dataset.operatorUsername || '').trim() : '';
 
   if (!picker || !sheetPanel || !sheetTitle || !sheetForm || !feedback || !backButton) {
     return;
@@ -389,6 +395,39 @@ function setupAoiArea(container) {
     });
     updateRejectionEmptyState();
     syncRejectionDetails();
+  }
+
+  function isSignatureAcknowledged() {
+    return Boolean(signatureHiddenInput && signatureHiddenInput.value === 'true');
+  }
+
+  function setSignatureAcknowledged(value) {
+    const acknowledged = Boolean(value);
+    if (signatureHiddenInput) {
+      signatureHiddenInput.value = acknowledged ? 'true' : '';
+    }
+    if (signatureControl) {
+      signatureControl.setAttribute('aria-pressed', acknowledged ? 'true' : 'false');
+      if (acknowledged) {
+        signatureControl.classList.add('is-signed');
+      } else {
+        signatureControl.classList.remove('is-signed');
+      }
+    }
+    if (signatureDisplay) {
+      if (acknowledged) {
+        signatureDisplay.textContent = operatorUsername || 'Signature confirmed';
+      } else {
+        signatureDisplay.textContent = signatureDefaultText || 'Sign on file';
+      }
+    }
+    if (wizard) {
+      wizard.evaluate();
+    }
+  }
+
+  function resetSignatureState() {
+    setSignatureAcknowledged(false);
   }
 
   function ensureRejectionRows() {
@@ -520,6 +559,15 @@ function setupAoiArea(container) {
     updateRejectionEmptyState();
   }
 
+  resetSignatureState();
+
+  if (signatureControl) {
+    signatureControl.addEventListener('click', () => {
+      const nextState = !isSignatureAcknowledged();
+      setSignatureAcknowledged(nextState);
+    });
+  }
+
   if (addRejectionRowButton) {
     addRejectionRowButton.addEventListener('click', () => {
       addRejectionRow();
@@ -543,6 +591,7 @@ function setupAoiArea(container) {
       }
       sheetForm.reset();
       resetRejectionDetails();
+      resetSignatureState();
       setFeedback(feedback, '');
       if (wizard) {
         wizard.reset({ focus: true });
@@ -556,6 +605,7 @@ function setupAoiArea(container) {
     delete sheetPanel.dataset.sheet;
     sheetForm.reset();
     resetRejectionDetails();
+    resetSignatureState();
     activeSheet = null;
     setFeedback(feedback, '');
     if (sheetForm) {
@@ -580,6 +630,17 @@ function setupAoiArea(container) {
     const submitButton = sheetForm.querySelector('[type="submit"]');
     if (submitButton) {
       submitButton.disabled = true;
+    }
+
+    if (signatureHiddenInput && signatureControl && !isSignatureAcknowledged()) {
+      if (submitButton) {
+        submitButton.disabled = false;
+      }
+      setFeedback(feedback, 'Confirm your operator signature before submitting.', 'error');
+      if (typeof signatureControl.focus === 'function') {
+        signatureControl.focus();
+      }
+      return;
     }
 
     const requiresRejectionDetails = Boolean(rejectionSection && !rejectionSection.hidden);
@@ -634,6 +695,7 @@ function setupAoiArea(container) {
       setFeedback(feedback, successMessage, 'success');
       sheetForm.reset();
       resetRejectionDetails();
+      resetSignatureState();
       if (wizard) {
         wizard.reset({ focus: true });
       }

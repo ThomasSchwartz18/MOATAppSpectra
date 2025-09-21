@@ -82,6 +82,7 @@ def test_employee_submission_succeeds_without_defect_dropdown(employee_app, monk
         'quantity_inspected': '10',
         'quantity_rejected': '0',
         'inspection_type': 'SMT',
+        'operator_signature_acknowledged': 'true',
     }
 
     response = client.post('/employee/aoi_reports', json=base_payload)
@@ -125,6 +126,7 @@ def test_employee_submission_formats_rejection_details(employee_app, monkeypatch
             {'ref': 'R15', 'reason': 'Bent lead', 'quantity': 2},
             {'ref': 'R22', 'reason': ' Tombstone ', 'quantity': 1},
         ],
+        'operator_signature_acknowledged': 'true',
     }
 
     response = client.post('/employee/aoi_reports', json=payload)
@@ -166,6 +168,7 @@ def test_employee_submission_rejects_invalid_rejection_rows(employee_app, monkey
             {'ref': '', 'reason': 'Bent lead', 'quantity': 2},
             {'ref': 'R30', 'reason': 'Missing component', 'quantity': 0},
         ],
+        'operator_signature_acknowledged': 'true',
     }
 
     response = client.post('/employee/aoi_reports', json=payload)
@@ -173,3 +176,38 @@ def test_employee_submission_rejects_invalid_rejection_rows(employee_app, monkey
     assert response.status_code == 400
     payload = response.get_json()
     assert 'rejection_details' in (payload.get('errors') or {})
+
+
+def test_employee_submission_requires_operator_signature(employee_app, monkeypatch):
+    app, _ = employee_app
+    client = app.test_client()
+
+    with app.app_context():
+        from app.main import routes
+
+        def fake_insert(record):
+            raise AssertionError('Should not insert without signature')
+
+        monkeypatch.setattr(routes, 'insert_aoi_report', fake_insert)
+
+    _login_employee(client)
+
+    payload = {
+        'date': '2024-03-01',
+        'shift': '1st',
+        'operator': 'Operator Four',
+        'customer': 'Customer D',
+        'program': 'Program D',
+        'assembly': 'Assembly 4',
+        'job_number': 'J101',
+        'quantity_inspected': '15',
+        'quantity_rejected': '0',
+        'inspection_type': 'SMT',
+        'operator_signature_acknowledged': '',
+    }
+
+    response = client.post('/employee/aoi_reports', json=payload)
+
+    assert response.status_code == 400
+    response_payload = response.get_json() or {}
+    assert 'operator_signature_acknowledged' in (response_payload.get('errors') or {})
