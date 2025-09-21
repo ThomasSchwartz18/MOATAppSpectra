@@ -1571,6 +1571,32 @@ body.employee-layout .content {
   gap: 16px;
 }
 
+.inspection-rejection__table-grid {
+  width: 100%;
+  border-collapse: collapse;
+  border: var(--border-thick) solid var(--ink);
+}
+
+.inspection-rejection__table-grid thead th {
+  background: var(--muted);
+  color: var(--ink);
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: left;
+}
+
+.inspection-rejection__table-grid th,
+.inspection-rejection__table-grid td {
+  border: var(--border-thin) solid var(--border-strong);
+  padding: 10px 12px;
+  vertical-align: top;
+}
+
+.inspection-rejection__table-grid tbody tr:nth-child(even) {
+  background: var(--muted-light);
+}
+
 .employee-form {
   display: flex;
   flex-direction: column;
