@@ -1,3 +1,41 @@
+const employeePortalPopup = (() => {
+  let handler = null;
+
+  function getHandler() {
+    if (handler) return handler;
+    if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+      return (message) => window.alert(message);
+    }
+    return null;
+  }
+
+  function normalizeMessage(message) {
+    if (message == null) return '';
+    return String(message).trim();
+  }
+
+  return {
+    show(message, type) {
+      const normalized = normalizeMessage(message);
+      if (!normalized) return;
+      const activeHandler = getHandler();
+      if (typeof activeHandler === 'function') {
+        activeHandler(normalized, type);
+      }
+    },
+    setHandler(nextHandler) {
+      handler = typeof nextHandler === 'function' ? nextHandler : null;
+    },
+    resetHandler() {
+      handler = null;
+    },
+  };
+})();
+
+if (typeof window !== 'undefined') {
+  window.employeePortalPopup = employeePortalPopup;
+}
+
 function setFeedback(element, message, type) {
   if (!element) return;
   element.textContent = message || '';
@@ -623,7 +661,9 @@ function setupAoiArea(container) {
   sheetForm.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!activeSheet) {
-      setFeedback(feedback, 'Select a data sheet before submitting.', 'error');
+      const message = 'Select a data sheet before submitting.';
+      employeePortalPopup.show(message, 'error');
+      setFeedback(feedback, message, 'error');
       return;
     }
 
@@ -636,7 +676,9 @@ function setupAoiArea(container) {
       if (submitButton) {
         submitButton.disabled = false;
       }
-      setFeedback(feedback, 'Confirm your operator signature before submitting.', 'error');
+      const message = 'Confirm your operator signature before submitting.';
+      employeePortalPopup.show(message, 'error');
+      setFeedback(feedback, message, 'error');
       if (typeof signatureControl.focus === 'function') {
         signatureControl.focus();
       }
@@ -651,7 +693,9 @@ function setupAoiArea(container) {
         if (submitButton) {
           submitButton.disabled = false;
         }
-        setFeedback(feedback, 'Complete all rejection detail rows before submitting.', 'error');
+        const message = 'Complete all rejection detail rows before submitting.';
+        employeePortalPopup.show(message, 'error');
+        setFeedback(feedback, message, 'error');
         return;
       }
       rejectionEntries = validation.entries;
@@ -686,12 +730,14 @@ function setupAoiArea(container) {
       if (!response.ok) {
         const errorMessage = formatErrors(responseData && responseData.errors) ||
           'Unable to submit inspection at this time.';
+        employeePortalPopup.show(errorMessage, 'error');
         setFeedback(feedback, errorMessage, 'error');
         return;
       }
 
       const successMessage = (responseData && responseData.message) ||
         'AOI report submitted successfully.';
+      employeePortalPopup.show(successMessage, 'success');
       setFeedback(feedback, successMessage, 'success');
       sheetForm.reset();
       resetRejectionDetails();
@@ -700,7 +746,9 @@ function setupAoiArea(container) {
         wizard.reset({ focus: true });
       }
     } catch (error) {
-      setFeedback(feedback, 'Unable to submit inspection at this time.', 'error');
+      const message = 'Unable to submit inspection at this time.';
+      employeePortalPopup.show(message, 'error');
+      setFeedback(feedback, message, 'error');
     } finally {
       if (submitButton) {
         submitButton.disabled = false;
