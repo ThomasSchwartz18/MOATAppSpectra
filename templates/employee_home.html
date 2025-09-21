@@ -49,7 +49,7 @@
         <button type="button" class="employee-back" data-action="back-to-picker">&larr; Choose a different data sheet</button>
         <h3 class="inspection-sheet__heading" data-sheet-title></h3>
         <p class="inspection-sheet__subheading" data-sheet-subtitle hidden></p>
-        <form class="inspection-sheet" data-sheet-form novalidate>
+        <form class="inspection-sheet" data-sheet-form data-operator-username="{{ username or '' }}" novalidate>
           <div class="inspection-progress" data-progress>
             <div class="inspection-progress__track">
               <div class="inspection-progress__bar" data-progress-bar></div>
@@ -197,10 +197,13 @@
           </div>
 
           <section class="inspection-sheet__signoff" aria-label="Inspection sign-off" data-step-finish hidden>
-            <div class="inspection-signature">
+            <div class="inspection-signature" data-operator-signature>
               <span class="inspection-signature__label">Operator Signature</span>
-              <span class="inspection-signature__line" aria-hidden="true"></span>
-              <span class="inspection-signature__hint">Sign on file</span>
+              <button type="button" class="inspection-signature__line inspection-signature__control" data-action="operator-signature" aria-pressed="false">
+                <span data-signature-display>Sign on file</span>
+              </button>
+              <input type="hidden" name="operator_signature_acknowledged" data-signature-field>
+              <span class="inspection-signature__hint">Select to confirm</span>
             </div>
             <div class="inspection-signature">
               <span class="inspection-signature__label">Quality Approval</span>

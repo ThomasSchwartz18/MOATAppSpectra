@@ -1332,6 +1332,10 @@ def _prepare_employee_aoi_record(
         else:
             record[column] = value
 
+    signature_value = str(payload.get('operator_signature_acknowledged') or '').strip().lower()
+    if signature_value not in {'true', '1', 'yes', 'on'}:
+        errors['operator_signature_acknowledged'] = 'Confirm the operator signature before submitting.'
+
     numeric_fields = (
         ('quantity_inspected', 'Quantity Inspected'),
         ('quantity_rejected', 'Quantity Rejected'),
