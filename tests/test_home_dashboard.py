@@ -21,9 +21,11 @@ def app_instance(monkeypatch):
     return app
 
 
-def _login(client):
+def _login(client, role=None):
     with client.session_transaction() as session:
         session["username"] = "tester"
+        if role:
+            session["role"] = role
 
 
 def _make_fetch(rows, error=None):
@@ -159,3 +161,32 @@ def test_home_dashboard_previews_return_expected_fields(
     assert {"values", "yields"} & payload.keys()
     assert "start_date" in payload
     assert "end_date" in payload
+
+
+def test_home_admin_renders_diagnostics(app_instance, monkeypatch):
+    client = app_instance.test_client()
+    diagnostics = {
+        "status": "Connected",
+        "error": "Supabase service offline",
+        "tables": [
+            {
+                "name": "aoi_reports",
+                "status": "Unavailable",
+                "error": "Table missing",
+                "description": "AOI inspection uploads used across the AOI dashboards.",
+            }
+        ],
+    }
+
+    with app_instance.app_context():
+        from app.main import routes
+
+        monkeypatch.setattr(routes, "_summarize_supabase_status", lambda: diagnostics)
+
+    _login(client, role="ADMIN")
+    response = client.get("/home")
+
+    assert response.status_code == 200
+    html = response.data.decode("utf-8")
+    assert "Supabase service offline" in html
+    assert "Table missing" in html

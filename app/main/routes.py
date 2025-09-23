@@ -596,13 +596,67 @@ def home():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
     role = session.get('role')
+    username = session.get('username')
     if role == 'EMPLOYEE':
         return render_template(
             'employee_home.html',
-            username=session.get('username'),
+            username=username,
             areas=EMPLOYEE_AREA_OPTIONS,
+            user_role=role,
         )
-    return render_template('home.html', username=session.get('username'))
+    code_errors: list[dict[str, str]] = []
+    if role == 'ADMIN':
+        supabase_status: dict | None = None
+        try:
+            supabase_status = _summarize_supabase_status()
+        except Exception as exc:  # pragma: no cover - defensive gathering
+            supabase_status = {
+                'error': str(exc),
+                'tables': [],
+            }
+
+        if supabase_status:
+            for table in supabase_status.get('tables', []):
+                if (table or {}).get('status') == 'Unavailable':
+                    code_errors.append(
+                        {
+                            'source': 'Supabase',
+                            'name': table.get('name') or 'Tracked table',
+                            'status': table.get('status') or 'Unavailable',
+                            'message': table.get('error')
+                            or 'Supabase reported this table as unavailable.',
+                            'description': table.get('description'),
+                        }
+                    )
+            if supabase_status.get('error'):
+                code_errors.append(
+                    {
+                        'source': 'Supabase',
+                        'name': 'Connection',
+                        'status': 'Unavailable',
+                        'message': supabase_status['error'],
+                        'description': 'Spectra could not reach the configured Supabase project.',
+                    }
+                )
+
+        feature_state_error = getattr(g, '_feature_state_error', None)
+        if feature_state_error:
+            code_errors.append(
+                {
+                    'source': 'Feature service',
+                    'name': 'Feature state records',
+                    'status': 'Unavailable',
+                    'message': feature_state_error,
+                    'description': 'Feature availability data may be incomplete until connectivity is restored.',
+                }
+            )
+
+    return render_template(
+        'home.html',
+        username=username,
+        user_role=role,
+        code_errors=code_errors,
+    )
 
 
 def _role_required(allowed_roles: set[str]):
