@@ -269,14 +269,16 @@ def _render_html_to_pdf_with_wkhtmltopdf(
 def render_html_to_pdf(html: str, base_url: str | None = None) -> bytes:
     """Render HTML content to PDF bytes using WeasyPrint."""
 
-    if platform.system() == "Darwin":
-        raise PdfGenerationError(_MAC_UNSUPPORTED_MESSAGE)
+    system = platform.system()
 
     weasyprint_error: PdfGenerationError | None = None
-    try:
-        return _render_html_to_pdf_with_weasyprint(html, base_url=base_url)
-    except PdfGenerationError as exc:
-        weasyprint_error = exc
+    if system == "Darwin":
+        weasyprint_error = PdfGenerationError(_MAC_UNSUPPORTED_MESSAGE)
+    else:
+        try:
+            return _render_html_to_pdf_with_weasyprint(html, base_url=base_url)
+        except PdfGenerationError as exc:
+            weasyprint_error = exc
 
     chromium_error: PdfGenerationError | None = None
     try:

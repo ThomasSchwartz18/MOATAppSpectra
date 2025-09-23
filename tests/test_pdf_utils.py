@@ -171,14 +171,68 @@ def test_render_html_to_pdf_raises_when_fallback_fails(monkeypatch):
     assert "fallback failure" in message
 
 
-def test_render_html_to_pdf_raises_on_macos(monkeypatch):
+def test_render_html_to_pdf_uses_chromium_on_macos(monkeypatch):
     monkeypatch.setattr(pdf_utils.platform, "system", lambda: "Darwin")
+
+    def failing_weasyprint(html: str, base_url: str | None = None) -> bytes:
+        raise AssertionError("WeasyPrint should not be used on macOS")
+
+    def successful_chromium(html: str, base_url: str | None = None) -> bytes:
+        assert html == "<p>Hello</p>"
+        assert base_url is None
+        return b"chromium-pdf"
+
+    monkeypatch.setattr(
+        pdf_utils, "_render_html_to_pdf_with_weasyprint", failing_weasyprint
+    )
+    monkeypatch.setattr(
+        pdf_utils, "_render_html_to_pdf_with_chromium", successful_chromium
+    )
+    def unused_wkhtmltopdf(html: str, base_url: str | None = None) -> bytes:
+        raise pdf_utils.PdfGenerationError("wkhtmltopdf should not run")
+
+    monkeypatch.setattr(
+        pdf_utils,
+        "_render_html_to_pdf_with_wkhtmltopdf",
+        unused_wkhtmltopdf,
+    )
+
+    result = pdf_utils.render_html_to_pdf("<p>Hello</p>")
+
+    assert result == b"chromium-pdf"
+
+
+def test_render_html_to_pdf_on_macos_includes_message_when_fallbacks_fail(monkeypatch):
+    monkeypatch.setattr(pdf_utils.platform, "system", lambda: "Darwin")
+
+    def failing_weasyprint(html: str, base_url: str | None = None) -> bytes:
+        raise AssertionError("WeasyPrint should not be used on macOS")
+
+    def failing_chromium(html: str, base_url: str | None = None) -> bytes:
+        raise pdf_utils.PdfGenerationError("chromium failure")
+
+    def failing_wkhtmltopdf(html: str, base_url: str | None = None) -> bytes:
+        raise pdf_utils.PdfGenerationError(pdf_utils._FALLBACK_DEPENDENCY_MESSAGE)
+
+    monkeypatch.setattr(
+        pdf_utils, "_render_html_to_pdf_with_weasyprint", failing_weasyprint
+    )
+    monkeypatch.setattr(
+        pdf_utils, "_render_html_to_pdf_with_chromium", failing_chromium
+    )
+    monkeypatch.setattr(
+        pdf_utils,
+        "_render_html_to_pdf_with_wkhtmltopdf",
+        failing_wkhtmltopdf,
+    )
 
     with pytest.raises(pdf_utils.PdfGenerationError) as excinfo:
         pdf_utils.render_html_to_pdf("<p>Hello</p>")
 
     message = str(excinfo.value)
-    assert message == pdf_utils._MAC_UNSUPPORTED_MESSAGE
+    assert pdf_utils._MAC_UNSUPPORTED_MESSAGE in message
+    assert "chromium failure" in message
+    assert pdf_utils._FALLBACK_DEPENDENCY_MESSAGE in message
 
 
 class FakePage:
