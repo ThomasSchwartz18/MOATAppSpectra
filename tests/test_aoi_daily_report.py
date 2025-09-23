@@ -85,6 +85,7 @@ def test_export_aoi_daily_report_cover_fields(app_instance, monkeypatch):
         )
         assert resp.status_code == 200
         html = resp.data.decode()
+        assert "http://localhost/static/images/company-logo.png" in html
         assert "<style>" in html
         assert "--font-body" in html
         assert "report_range:</b> 2024-06-01 - 2024-06-01" in html
