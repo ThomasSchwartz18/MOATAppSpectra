@@ -32,8 +32,8 @@ _CHROMIUM_DEPENDENCY_MESSAGE = (
 )
 
 _MAC_UNSUPPORTED_MESSAGE = (
-    "Unable to generate PDF exports on macOS. PDF generation is supported only on "
-    "Linux or Windows hosts."
+    "WeasyPrint PDF rendering is skipped on macOS; attempting Chromium and "
+    "wkhtmltopdf fallbacks instead."
 )
 
 
