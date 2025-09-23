@@ -696,6 +696,19 @@ admin_required = _role_required({'ADMIN'})
 employee_portal_required = _role_required({'EMPLOYEE', 'ADMIN'})
 
 
+@main_bp.route('/admin/employee-portal')
+@admin_required
+def admin_employee_portal():
+    username = session.get('username')
+    role = session.get('role') or 'ADMIN'
+    return render_template(
+        'employee_home.html',
+        username=username,
+        user_role=role,
+        areas=EMPLOYEE_AREA_OPTIONS,
+    )
+
+
 def _require_authenticated_user() -> dict[str, str | None]:
     """Return the current session user or abort if unauthenticated."""
 

@@ -127,6 +127,14 @@
       <span class="trigger-label">Report an issue</span>
       <span class="trigger-icon" aria-hidden="true">&#9993;</span>
     </button>
+    {% if user_role == 'ADMIN' %}
+    <a
+      class="bug-chat-admin-link"
+      href="{{ url_for('main.admin_employee_portal') }}"
+    >
+      Employee portal preview
+    </a>
+    {% endif %}
 
     <section
       id="bug-chat-panel"
