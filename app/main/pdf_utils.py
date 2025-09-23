@@ -25,6 +25,12 @@ _FALLBACK_DEPENDENCY_MESSAGE = (
     "README for instructions)."
 )
 
+_CHROMIUM_DEPENDENCY_MESSAGE = (
+    "Unable to generate PDF exports using the Chromium fallback because the "
+    "Playwright dependencies are not installed. Install the Playwright package "
+    "and download the Chromium browser to enable this fallback."
+)
+
 _MAC_UNSUPPORTED_MESSAGE = (
     "Unable to generate PDF exports on macOS. PDF generation is supported only on "
     "Linux or Windows hosts."
@@ -170,6 +176,38 @@ def _render_html_to_pdf_with_weasyprint(html: str, base_url: str | None = None) 
         raise PdfGenerationError(_REQUIRED_NATIVE_DEPS_MESSAGE) from exc
 
 
+def _render_html_to_pdf_with_chromium(
+    html: str, base_url: str | None = None
+) -> bytes:
+    """Render HTML to PDF bytes using Playwright with Chromium."""
+
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError as exc:  # pragma: no cover - exercised via tests
+        raise PdfGenerationError(_CHROMIUM_DEPENDENCY_MESSAGE) from exc
+
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch()
+            try:
+                page = browser.new_page()
+                page.set_content(html, wait_until="networkidle", base_url=base_url)
+                return page.pdf(
+                    print_background=True,
+                    prefer_css_page_size=True,
+                    margin={
+                        "top": "0",
+                        "right": "0",
+                        "bottom": "0",
+                        "left": "0",
+                    },
+                )
+            finally:
+                browser.close()
+    except Exception as exc:  # pragma: no cover - exercised via tests
+        raise PdfGenerationError(_CHROMIUM_DEPENDENCY_MESSAGE) from exc
+
+
 def _get_configured_wkhtmltopdf_command() -> str | None:
     """Return the configured wkhtmltopdf command, if available."""
 
@@ -240,6 +278,12 @@ def render_html_to_pdf(html: str, base_url: str | None = None) -> bytes:
     except PdfGenerationError as exc:
         weasyprint_error = exc
 
+    chromium_error: PdfGenerationError | None = None
+    try:
+        return _render_html_to_pdf_with_chromium(html, base_url=base_url)
+    except PdfGenerationError as exc:
+        chromium_error = exc
+
     wkhtmltopdf_error: PdfGenerationError | None = None
     try:
         return _render_html_to_pdf_with_wkhtmltopdf(html, base_url=base_url)
@@ -249,6 +293,8 @@ def render_html_to_pdf(html: str, base_url: str | None = None) -> bytes:
     messages: list[str] = []
     if weasyprint_error is not None:
         messages.append(str(weasyprint_error))
+    if chromium_error is not None:
+        messages.append(str(chromium_error))
     if wkhtmltopdf_error is not None:
         messages.append(str(wkhtmltopdf_error))
 
