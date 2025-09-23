@@ -683,6 +683,38 @@ document.addEventListener('DOMContentLoaded', () => {
     const authGuard = chatContainer.querySelector('.bug-chat-auth-guard');
     const submitButton = chatContainer.querySelector('.bug-chat-submit');
     const resetButton = chatContainer.querySelector('.bug-chat-reset');
+    const previewToggle = chatContainer.querySelector('[data-admin-employee-toggle]');
+    const previewLabel = chatContainer.querySelector('[data-preview-toggle-label]');
+
+    if (previewToggle) {
+      const role = (chatContainer.dataset.userRole || '').toUpperCase();
+      if (role === 'ADMIN') {
+        const syncPreviewLabel = () => {
+          if (!previewLabel) return;
+          const stateText = previewToggle.checked
+            ? 'Employee portal preview on'
+            : 'Employee portal preview off';
+          previewLabel.textContent = stateText;
+        };
+
+        const initialState = (previewToggle.dataset.previewActive || '').toLowerCase();
+        if (initialState) {
+          previewToggle.checked = initialState === 'true';
+        }
+
+        syncPreviewLabel();
+
+        previewToggle.addEventListener('change', () => {
+          syncPreviewLabel();
+          const targetUrl = previewToggle.checked
+            ? previewToggle.dataset.employeeUrl
+            : previewToggle.dataset.adminUrl;
+          if (targetUrl) {
+            window.location.href = targetUrl;
+          }
+        });
+      }
+    }
 
     if (panel) {
       panel.setAttribute('aria-hidden', 'true');

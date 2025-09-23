@@ -321,7 +321,7 @@ def test_admin_employee_portal_requires_admin_role(app_instance):
     assert response.status_code == 403
 
 
-def test_admin_employee_portal_link_visible_for_admin(app_instance, monkeypatch):
+def test_admin_preview_toggle_visible_for_admin(app_instance, monkeypatch):
     client = app_instance.test_client()
 
     with app_instance.app_context():
@@ -342,7 +342,8 @@ def test_admin_employee_portal_link_visible_for_admin(app_instance, monkeypatch)
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    assert "/admin/employee-portal" in html
+    assert 'data-admin-employee-toggle' in html
+    assert 'data-employee-url="/admin/employee-portal' in html
 
 
 def test_employee_portal_link_hidden_for_non_admin(app_instance):
@@ -353,4 +354,19 @@ def test_employee_portal_link_hidden_for_non_admin(app_instance):
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    assert "/admin/employee-portal" not in html
+    assert 'data-admin-employee-toggle' not in html
+
+
+def test_admin_employee_portal_preview_uses_employee_layout(app_instance):
+    client = app_instance.test_client()
+
+    _login(client, role="ADMIN")
+    response = client.get("/admin/employee-portal?return=/home")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert '<body class="employee-layout"' in html
+    assert '<header class="app-header"' not in html
+    assert 'data-admin-employee-toggle' in html
+    assert 'data-admin-url="/home"' in html
+    assert 'data-preview-active="true"' in html
