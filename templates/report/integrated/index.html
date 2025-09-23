@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>AOI Integrated Report</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/report.css') }}">
+    <style>{{ report_css|safe }}</style>
 </head>
 <body>
     {% if show_cover %}

@@ -82,6 +82,8 @@ def test_export_operator_report(app_instance, monkeypatch):
         )
         assert resp.status_code == 200
         html = resp.data.decode()
+        assert "<style>" in html
+        assert "--font-body" in html
         assert "Total Boards" in html
         # Assemblies for Alice are A1 and A2
         assert "A1" in html and "A2" in html
@@ -186,4 +188,4 @@ def test_operator_cover_page(app_instance, monkeypatch):
         )
         assert resp.status_code == 200
         html = resp.data.decode()
-        assert "cover-page" not in html
+        assert 'class="cover-page"' not in html

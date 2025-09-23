@@ -88,6 +88,8 @@ def test_export_integrated_report_respects_date_range(app_instance, monkeypatch)
         )
         assert resp.status_code == 200
         html = resp.data.decode("utf-8")
+        assert "<style>" in html
+        assert "--font-body" in html
         # Only in-range data should be present
         assert "2024-07-01" in html
         assert "2024-08-01" not in html
