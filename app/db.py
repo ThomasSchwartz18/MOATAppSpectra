@@ -91,7 +91,7 @@ def upsert_feature_state(
     *,
     status: str,
     message: str | None = None,
-    bug_report_id: int | str | None = None,
+    bug_report_id: str | None = None,
 ) -> tuple[list[dict] | None, str | None]:
     """Create or update a feature state entry."""
 
@@ -104,14 +104,11 @@ def upsert_feature_state(
     if error:
         return None, error
 
-    bug_value: int | None
+    bug_value: str | None
     if bug_report_id in (None, ""):
         bug_value = None
     else:
-        try:
-            bug_value = int(bug_report_id)
-        except (TypeError, ValueError):
-            return None, "Bug report identifier must be a number"
+        bug_value = str(bug_report_id)
 
     payload = {
         "slug": slug,
@@ -133,17 +130,12 @@ def upsert_feature_state(
 
 
 def fetch_feature_states_for_bug(
-    bug_report_id: int | str,
+    bug_report_id: str,
 ) -> tuple[list[dict] | None, str | None]:
     """Return feature state records associated with ``bug_report_id``."""
 
     if bug_report_id in (None, ""):
         return [], None
-
-    try:
-        bug_value = int(bug_report_id)
-    except (TypeError, ValueError):
-        return [], "Invalid bug report identifier"
 
     supabase, error = _ensure_supabase_client()
     if error:
@@ -153,7 +145,7 @@ def fetch_feature_states_for_bug(
         response = (
             supabase.table("app_feature_states")
             .select("*")
-            .eq("bug_report_id", bug_value)
+            .eq("bug_report_id", str(bug_report_id))
             .execute()
         )
         return response.data or [], None
