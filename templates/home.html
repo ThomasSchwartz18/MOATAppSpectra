@@ -29,5 +29,38 @@
     </div>
   </a>
 </section>
+{% if user_role == 'ADMIN' and code_errors %}
+<section class="admin-diagnostics">
+  <h2>System Diagnostics</h2>
+  <p class="admin-diagnostics__lead">Spectra detected issues while preparing administrative data. Review the items below to restore service health.</p>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Source</th>
+        <th>Component</th>
+        <th>Status</th>
+        <th>Details</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in code_errors %}
+      <tr>
+        <td>{{ item.source or 'System' }}</td>
+        <td>{{ item.name }}</td>
+        <td>
+          <span class="status status-offline">{{ item.status or 'Unavailable' }}</span>
+        </td>
+        <td>
+          {{ item.message }}
+          {% if item.description %}
+          <br><small>{{ item.description }}</small>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
 {% endblock %}
 
