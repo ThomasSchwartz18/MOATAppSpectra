@@ -822,20 +822,18 @@ def _fetch_configured_users() -> tuple[list[dict], str | None]:
     return users, supabase_error
 
 
-def _normalize_bug_id(value: object) -> int | None:
-    try:
-        if value in (None, ""):
-            return None
-        return int(value)
-    except (TypeError, ValueError):
+def _normalize_bug_id(value: object) -> str | None:
+    if value in (None, ""):
         return None
+    text = str(value).strip()
+    return text or None
 
 
 def _build_feature_cards(
     bug_records: list[dict] | None,
-) -> tuple[list[dict[str, object]], dict[int, dict]]:
+) -> tuple[list[dict[str, object]], dict[str, dict]]:
     cards: list[dict[str, object]] = []
-    bug_lookup: dict[int, dict] = {}
+    bug_lookup: dict[str, dict] = {}
 
     for bug in bug_records or []:
         bug_id = _normalize_bug_id(bug.get("id"))
@@ -888,7 +886,7 @@ def _build_bug_options(bug_records: list[dict] | None) -> list[dict[str, object]
         key=lambda item: (
             0 if item["status"] == "on_hold" else 1,
             0 if item["status"] == "open" else 1,
-            item["id"],
+            str(item["id"]),
         )
     )
     return options
@@ -1086,7 +1084,7 @@ def admin_feature_action():
     bug_id = _normalize_bug_id(raw_bug_id)
 
     if raw_bug_id and bug_id is None:
-        flash('Enter a valid bug report number to link.', 'error')
+        flash('Enter a valid bug report identifier to link.', 'error')
         return redirect(url_for('main.admin_panel', tab='features'))
 
     definition = _feature_definition(slug)
