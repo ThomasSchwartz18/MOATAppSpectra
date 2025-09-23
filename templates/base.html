@@ -7,7 +7,9 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
   {% block extra_head %}{% endblock %}
 </head>
-<body class="{% if user_role == 'EMPLOYEE' %}employee-layout{% endif %}">
+{% set employee_preview_active = employee_preview_active|default(false) %}
+{% set employee_preview_return_url = employee_preview_return_url|default(request.args.get('return') or request.url) %}
+<body class="{% if user_role == 'EMPLOYEE' or employee_preview_active %}employee-layout{% endif %}">
   {% macro feature_nav_link(label, href, slug) -%}
     {% set feature = (feature_states.get(slug) if feature_states else {}) %}
     {% set status = feature.get('status', 'available') %}
@@ -29,7 +31,7 @@
       {% endif %}
     </a>
   {%- endmacro %}
-  {% if user_role != 'EMPLOYEE' %}
+  {% if user_role != 'EMPLOYEE' and not employee_preview_active %}
   <header class="app-header">
     <nav class="navbar" role="navigation" aria-label="Primary">
       <div class="nav-left">
@@ -112,10 +114,11 @@
 
   <div
     id="bug-chat-container"
-    class="bug-chat-container"
+    class="bug-chat-container{% if user_role == 'ADMIN' %} has-preview-toggle{% endif %}"
     data-endpoint="{{ url_for('main.submit_bug_report') }}"
     data-signed-in="{{ 'true' if user_id else 'false' }}"
     data-username="{{ username or '' }}"
+    data-user-role="{{ user_role or '' }}"
   >
     <button
       type="button"
@@ -128,12 +131,24 @@
       <span class="trigger-icon" aria-hidden="true">&#9993;</span>
     </button>
     {% if user_role == 'ADMIN' %}
-    <a
-      class="bug-chat-admin-link"
-      href="{{ url_for('main.admin_employee_portal') }}"
-    >
-      Employee portal preview
-    </a>
+    <div class="bug-chat-preview-control">
+      <label class="employee-preview-toggle">
+        <input
+          type="checkbox"
+          data-admin-employee-toggle
+          data-admin-url="{{ employee_preview_return_url }}"
+          data-employee-url="{{ url_for('main.admin_employee_portal', return=request.path) }}"
+          data-preview-active="{{ 'true' if employee_preview_active else 'false' }}"
+          {% if employee_preview_active %}checked{% endif %}
+        />
+        <span class="employee-preview-track" aria-hidden="true">
+          <span class="employee-preview-thumb"></span>
+        </span>
+        <span class="employee-preview-text" data-preview-toggle-label>
+          Employee portal preview
+        </span>
+      </label>
+    </div>
     {% endif %}
 
     <section

@@ -1763,6 +1763,77 @@ body.employee-layout .content {
   gap: 12px;
 }
 
+.bug-chat-container.has-preview-toggle {
+  flex-direction: row-reverse;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
+}
+
+.bug-chat-preview-control {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.employee-preview-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--surface);
+}
+
+.employee-preview-toggle input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.employee-preview-track {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--border-muted);
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+}
+
+.employee-preview-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow-ambient);
+  transition: transform 0.2s ease;
+}
+
+.employee-preview-toggle input:checked + .employee-preview-track {
+  background: var(--accent);
+}
+
+.employee-preview-toggle input:checked + .employee-preview-track .employee-preview-thumb {
+  transform: translateX(20px);
+}
+
+.employee-preview-toggle input:focus-visible + .employee-preview-track {
+  outline: 3px solid rgba(13, 155, 168, 0.45);
+  outline-offset: 2px;
+}
+
+.employee-preview-text {
+  color: var(--ink);
+}
+
 .bug-chat-trigger {
   display: inline-flex;
   align-items: center;
@@ -2018,5 +2089,11 @@ body.employee-layout .content {
 
   .bug-chat-row {
     flex-direction: column;
+  }
+
+  .bug-chat-container.has-preview-toggle {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
   }
 }

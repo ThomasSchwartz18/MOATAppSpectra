@@ -706,6 +706,8 @@ def admin_employee_portal():
         username=username,
         user_role=role,
         areas=EMPLOYEE_AREA_OPTIONS,
+        employee_preview_active=True,
+        employee_preview_return_url=request.args.get('return') or url_for('main.home'),
     )
 
 
