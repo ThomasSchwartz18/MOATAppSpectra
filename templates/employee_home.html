@@ -11,13 +11,18 @@
     </header>
     <div class="employee-card__body">
       <div class="employee-selection" data-area-selection>
-        <label for="employee-area">Select your area</label>
-        <select id="employee-area" data-area-select>
-          <option value="" disabled selected>Choose an area</option>
+        <p class="employee-selection__label" id="employee-area-label">Select your area</p>
+        <div class="employee-area-options" data-area-options role="group" aria-labelledby="employee-area-label">
           {% for area in areas %}
-          <option value="{{ area }}">{{ area }}</option>
+          <button
+            type="button"
+            class="employee-area-option"
+            data-area-option
+            data-area-value="{{ area }}"
+            aria-pressed="false"
+          >{{ area }}</button>
           {% endfor %}
-        </select>
+        </div>
       </div>
       <section class="employee-area-panel" data-area-content hidden>
         <div class="employee-area-panel__header">
@@ -44,6 +49,9 @@
           <button type="button" data-sheet="SMT">SMT AOI Inspection Data Sheet</button>
           <button type="button" data-sheet="TH">TH AOI Inspection Data Sheet</button>
         </div>
+      </div>
+      <div class="employee-aoi-placeholder" data-sheet-placeholder>
+        <p>Select SMT or TH to open the inspection data sheet.</p>
       </div>
       <section class="employee-aoi-panel" data-sheet-panel hidden>
         <button type="button" class="employee-back" data-action="back-to-picker">&larr; Choose a different data sheet</button>

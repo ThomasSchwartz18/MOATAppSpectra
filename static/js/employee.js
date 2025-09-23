@@ -327,6 +327,7 @@ function setupAoiArea(container) {
   const sheetTitle = container.querySelector('[data-sheet-title]');
   const sheetSubtitle = container.querySelector('[data-sheet-subtitle]');
   const sheetForm = container.querySelector('[data-sheet-form]');
+  const sheetPlaceholder = container.querySelector('[data-sheet-placeholder]');
   const feedback = container.querySelector('.employee-feedback');
   const backButton = container.querySelector('[data-action="back-to-picker"]');
   const sheetButtons = picker ? picker.querySelectorAll('[data-sheet]') : [];
@@ -344,9 +345,31 @@ function setupAoiArea(container) {
   const signatureHiddenInput = operatorSignature ? operatorSignature.querySelector('[data-signature-field]') : null;
   const signatureDefaultText = signatureDisplay ? signatureDisplay.textContent.trim() : 'Sign on file';
   const operatorUsername = sheetForm ? (sheetForm.dataset.operatorUsername || '').trim() : '';
+  const operatorInput = sheetForm ? sheetForm.querySelector('input[name="operator"]') : null;
 
   if (!picker || !sheetPanel || !sheetTitle || !sheetForm || !feedback || !backButton) {
     return;
+  }
+
+  picker.hidden = false;
+  sheetPanel.hidden = true;
+  if (sheetPlaceholder) {
+    sheetPlaceholder.hidden = false;
+  }
+  delete sheetPanel.dataset.sheet;
+  if (sheetForm) {
+    sheetForm.reset();
+    delete sheetForm.dataset.sheetVariant;
+  }
+  if (sheetSubtitle) {
+    sheetSubtitle.textContent = '';
+    sheetSubtitle.hidden = true;
+  }
+  setFeedback(feedback, '');
+  resetRejectionDetails();
+  resetSignatureState();
+  if (wizard && typeof wizard.reset === 'function') {
+    wizard.reset({ focus: false });
   }
 
   let activeSheet = null;
@@ -458,6 +481,16 @@ function setupAoiArea(container) {
       } else {
         signatureDisplay.textContent = signatureDefaultText || 'Sign on file';
       }
+    }
+    if (
+      acknowledged &&
+      operatorInput &&
+      !operatorInput.value.trim() &&
+      operatorUsername
+    ) {
+      operatorInput.value = operatorUsername;
+      operatorInput.dispatchEvent(new Event('input', { bubbles: true }));
+      operatorInput.dispatchEvent(new Event('change', { bubbles: true }));
     }
     if (wizard) {
       wizard.evaluate();
@@ -617,8 +650,11 @@ function setupAoiArea(container) {
       activeSheet = button.dataset.sheet || '';
       sheetTitle.textContent = button.textContent.trim();
       picker.hidden = true;
-      sheetPanel.hidden = false;
+      if (sheetPlaceholder) {
+        sheetPlaceholder.hidden = true;
+      }
       sheetPanel.dataset.sheet = activeSheet;
+      sheetPanel.hidden = false;
       if (sheetForm) {
         sheetForm.dataset.sheetVariant = activeSheet;
       }
@@ -640,6 +676,9 @@ function setupAoiArea(container) {
   backButton.addEventListener('click', () => {
     sheetPanel.hidden = true;
     picker.hidden = false;
+    if (sheetPlaceholder) {
+      sheetPlaceholder.hidden = false;
+    }
     delete sheetPanel.dataset.sheet;
     sheetForm.reset();
     resetRejectionDetails();
@@ -762,7 +801,7 @@ function setupEmployeePortal() {
   if (!portal) return;
 
   const areaSelection = portal.querySelector('[data-area-selection]');
-  const areaSelect = portal.querySelector('[data-area-select]');
+  const areaOptionsContainer = portal.querySelector('[data-area-options]');
   const areaPanel = portal.querySelector('[data-area-content]');
   const areaTitle = portal.querySelector('[data-area-title]');
   const areaSlot = portal.querySelector('[data-area-slot]');
@@ -770,30 +809,51 @@ function setupEmployeePortal() {
   const messageTemplate = portal.querySelector('#employee-area-message-template');
   const aoiTemplate = portal.querySelector('#employee-aoi-template');
 
-  if (!areaSelection || !areaSelect || !areaPanel || !areaTitle || !areaSlot || !changeAreaButton) {
+  if (!areaSelection || !areaOptionsContainer || !areaPanel || !areaTitle || !areaSlot || !changeAreaButton) {
     return;
+  }
+
+  function getAreaOptions() {
+    return Array.from(areaOptionsContainer.querySelectorAll('[data-area-option]'));
   }
 
   function clearAreaSlot() {
     areaSlot.innerHTML = '';
   }
 
-  function resetArea() {
+  function resetArea({ focus = false } = {}) {
     clearAreaSlot();
     areaPanel.hidden = true;
     areaTitle.textContent = '';
     areaSelection.hidden = false;
-    areaSelect.value = '';
+    getAreaOptions().forEach((option) => {
+      option.classList.remove('is-selected');
+      option.setAttribute('aria-pressed', 'false');
+    });
+
+    if (focus) {
+      const [firstOption] = getAreaOptions();
+      if (firstOption) {
+        firstOption.focus();
+      }
+    }
   }
 
   changeAreaButton.addEventListener('click', () => {
-    resetArea();
-    areaSelect.focus();
+    resetArea({ focus: true });
   });
 
-  areaSelect.addEventListener('change', (event) => {
-    const areaName = event.target.value;
+  function selectArea(option) {
+    if (!option) return;
+    const areaName = option.dataset.areaValue;
     if (!areaName) return;
+
+    getAreaOptions().forEach((candidate) => {
+      const isActive = candidate === option;
+      candidate.classList.toggle('is-selected', isActive);
+      candidate.setAttribute('aria-pressed', String(isActive));
+    });
+
     areaSelection.hidden = true;
     areaPanel.hidden = false;
     areaTitle.textContent = areaName;
@@ -813,6 +873,71 @@ function setupEmployeePortal() {
         paragraph.textContent = `The ${areaName} workflow is part of the prototype build and is not functional yet.`;
       }
       areaSlot.appendChild(areaContent);
+    }
+
+    changeAreaButton.focus();
+  }
+
+  areaOptionsContainer.addEventListener('click', (event) => {
+    const option = event.target.closest('[data-area-option]');
+    if (!option || !areaOptionsContainer.contains(option)) {
+      return;
+    }
+    event.preventDefault();
+    selectArea(option);
+  });
+
+  areaOptionsContainer.addEventListener('keydown', (event) => {
+    const option = event.target.closest('[data-area-option]');
+    if (!option || !areaOptionsContainer.contains(option)) {
+      return;
+    }
+
+    const options = getAreaOptions();
+    if (!options.length) {
+      return;
+    }
+
+    const currentIndex = options.indexOf(option);
+    if (currentIndex === -1) {
+      return;
+    }
+
+    const lastIndex = options.length - 1;
+
+    switch (event.key) {
+      case 'ArrowRight':
+      case 'ArrowDown': {
+        event.preventDefault();
+        const nextIndex = currentIndex === lastIndex ? 0 : currentIndex + 1;
+        options[nextIndex].focus();
+        break;
+      }
+      case 'ArrowLeft':
+      case 'ArrowUp': {
+        event.preventDefault();
+        const previousIndex = currentIndex === 0 ? lastIndex : currentIndex - 1;
+        options[previousIndex].focus();
+        break;
+      }
+      case 'Home': {
+        event.preventDefault();
+        options[0].focus();
+        break;
+      }
+      case 'End': {
+        event.preventDefault();
+        options[lastIndex].focus();
+        break;
+      }
+      case 'Enter':
+      case ' ': {
+        event.preventDefault();
+        selectArea(option);
+        break;
+      }
+      default:
+        break;
     }
   });
 }
