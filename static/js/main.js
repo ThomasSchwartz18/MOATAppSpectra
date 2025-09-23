@@ -92,6 +92,69 @@ const appTracker = (() => {
 
 window.APP_TRACKER = appTracker;
 
+function setPreviewSummary(infoId, data, summaryFormatter, options = {}) {
+  if (!infoId) return;
+  const infoEl = document.getElementById(infoId);
+  if (!infoEl) return;
+
+  const { isFalseCallPreview = false } = options;
+
+  let summaryText = '';
+  if (typeof summaryFormatter === 'function') {
+    try {
+      summaryText = summaryFormatter(data) || '';
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.warn('Failed to format preview summary', error);
+    }
+  }
+
+  if (!summaryText && data) {
+    if (typeof data.summary === 'string') {
+      summaryText = data.summary;
+    } else if (typeof data.summary_text === 'string') {
+      summaryText = data.summary_text;
+    } else if (typeof data.summaryText === 'string') {
+      summaryText = data.summaryText;
+    } else if (data.summary) {
+      const summary = data.summary;
+      const hasCounts = ['total_reports', 'active_reports', 'resolved_reports'].every(
+        (key) => typeof summary[key] === 'number'
+      );
+
+      if (hasCounts) {
+        const rangeStart = summary.start_date || data.start_date || 'N/A';
+        const rangeEnd = summary.end_date || data.end_date || 'N/A';
+        const total = Number(summary.total_reports || 0);
+        const resolved = Number(summary.resolved_reports || 0);
+        const active = Number(summary.active_reports || 0);
+        summaryText = `${rangeStart} to ${rangeEnd} | ${total} reports | ${resolved} resolved / ${active} active`;
+      }
+    }
+  }
+
+  if (!summaryText && isFalseCallPreview) {
+    const avg = Number.isFinite(Number(data.overall_avg))
+      ? Number(data.overall_avg).toFixed(2)
+      : '0';
+    const start = data.start_date || 'N/A';
+    const end = data.end_date || 'N/A';
+    infoEl.textContent = `${start} to ${end} | Avg False Calls: ${avg}`;
+    return;
+  }
+
+  if (summaryText) {
+    infoEl.textContent = summaryText;
+  } else if (data && Object.prototype.hasOwnProperty.call(data, 'avg_yield')) {
+    const avgYield = Number.isFinite(Number(data.avg_yield))
+      ? Number(data.avg_yield).toFixed(1)
+      : '0';
+    const start = data.start_date || 'N/A';
+    const end = data.end_date || 'N/A';
+    infoEl.textContent = `${start} to ${end} | Avg Yield: ${avgYield}%`;
+  }
+}
+
 function renderLinePreview({
   endpoint,
   canvasId,
@@ -261,64 +324,99 @@ function renderLinePreview({
       // eslint-disable-next-line no-undef
       new Chart(ctx, chartConfig);
 
-      if (infoId) {
-        const infoEl = document.getElementById(infoId);
-        if (infoEl) {
-          let summaryText = '';
-          if (typeof summaryFormatter === 'function') {
-            summaryText = summaryFormatter(data);
-          }
-
-          if (!summaryText && data) {
-            if (typeof data.summary === 'string') {
-              summaryText = data.summary;
-            } else if (typeof data.summary_text === 'string') {
-              summaryText = data.summary_text;
-            } else if (typeof data.summaryText === 'string') {
-              summaryText = data.summaryText;
-            } else if (data.summary) {
-              const summary = data.summary;
-              const hasCounts = ['total_reports', 'active_reports', 'resolved_reports'].every(
-                (key) => typeof summary[key] === 'number'
-              );
-
-              if (hasCounts) {
-                const rangeStart = summary.start_date || data.start_date || 'N/A';
-                const rangeEnd = summary.end_date || data.end_date || 'N/A';
-                const total = Number(summary.total_reports || 0);
-                const resolved = Number(summary.resolved_reports || 0);
-                const active = Number(summary.active_reports || 0);
-                summaryText = `${rangeStart} to ${rangeEnd} | ${total} reports | ${resolved} resolved / ${active} active`;
-              }
-            }
-          }
-
-          if (!summaryText && isFalseCallPreview) {
-            const avg = Number.isFinite(Number(data.overall_avg))
-              ? Number(data.overall_avg).toFixed(2)
-              : '0';
-            const start = data.start_date || 'N/A';
-            const end = data.end_date || 'N/A';
-            infoEl.textContent = `${start} to ${end} | Avg False Calls: ${avg}`;
-            return;
-          }
-
-          if (summaryText) {
-            infoEl.textContent = summaryText;
-          } else if (data && Object.prototype.hasOwnProperty.call(data, 'avg_yield')) {
-            const avgYield = Number.isFinite(Number(data.avg_yield))
-              ? Number(data.avg_yield).toFixed(1)
-              : '0';
-            const start = data.start_date || 'N/A';
-            const end = data.end_date || 'N/A';
-            infoEl.textContent = `${start} to ${end} | Avg Yield: ${avgYield}%`;
-          }
-        }
-      }
+      setPreviewSummary(infoId, data, summaryFormatter, { isFalseCallPreview });
     })
     .catch((err) => {
       // eslint-disable-next-line no-console
       console.error('Failed to load preview', err);
+    });
+}
+
+function formatTableValue(value) {
+  if (typeof value === 'number') {
+    if (Number.isInteger(value)) {
+      return value.toLocaleString();
+    }
+    return value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  }
+  if (value === null || typeof value === 'undefined') {
+    return '0';
+  }
+  return String(value);
+}
+
+function renderTablePreview({
+  endpoint,
+  tableId,
+  infoId,
+  summaryFormatter,
+  emptyMessage = 'No data available.',
+  valueFormatter,
+}) {
+  if (!endpoint) return;
+  const table = document.getElementById(tableId);
+  if (!table) return;
+  const tbody = table.querySelector('tbody');
+  if (!tbody) return;
+
+  const columnCount = table.querySelectorAll('thead th').length || 1;
+
+  const setTableMessage = (message) => {
+    tbody.innerHTML = '';
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.colSpan = columnCount;
+    cell.textContent = message;
+    row.appendChild(cell);
+    tbody.appendChild(row);
+  };
+
+  fetch(endpoint)
+    .then((res) => {
+      if (!res.ok) {
+        throw new Error(`Request failed with status ${res.status}`);
+      }
+      return res.json();
+    })
+    .then((data) => {
+      const labels = Array.isArray(data.labels) ? data.labels : [];
+      const values = Array.isArray(data.values) ? data.values : [];
+
+      tbody.innerHTML = '';
+
+      if (!labels.length || labels.length !== values.length) {
+        setTableMessage(emptyMessage);
+      } else {
+        labels.forEach((label, index) => {
+          const value = values[index];
+          const row = document.createElement('tr');
+          const labelCell = document.createElement('td');
+          labelCell.textContent = label || '—';
+
+          const valueCell = document.createElement('td');
+          const formattedValue = valueFormatter
+            ? valueFormatter(value, label, data)
+            : formatTableValue(value);
+          valueCell.textContent = formattedValue;
+
+          row.appendChild(labelCell);
+          row.appendChild(valueCell);
+          tbody.appendChild(row);
+        });
+      }
+
+      setPreviewSummary(infoId, data, summaryFormatter);
+    })
+    .catch((err) => {
+      // eslint-disable-next-line no-console
+      console.error('Failed to load preview table', err);
+      setTableMessage('Unable to load data.');
+      if (infoId) {
+        const infoEl = document.getElementById(infoId);
+        if (infoEl) {
+          infoEl.textContent = 'Unable to load summary.';
+        }
+      }
     });
 }
 
@@ -344,94 +442,67 @@ document.addEventListener('DOMContentLoaded', () => {
       canvasId: 'assemblyForecastPreview',
       onClickHref: '/tools/assembly-forecast',
     },
-    {
-      endpoint: '/bug_reports_preview',
-      canvasId: 'bugReportsPreview',
-      infoId: 'bugReportsInfo',
-      onClickHref: '/analysis/tracker-logs?tab=bug-reports',
-      chartOptions: {
-        type: 'bar',
-        dataset: {
-          borderColor: '#0d9ba8',
-          backgroundColor: 'rgba(13, 155, 168, 0.35)',
-          borderWidth: 1,
-        },
-        options: {
-          plugins: {
-            tooltip: { enabled: true },
-          },
-          scales: {
-            x: {
-              title: { display: true, text: 'Status' },
-              grid: { display: false },
-            },
-            y: {
-              beginAtZero: true,
-              title: { display: true, text: 'Reports' },
-              ticks: { precision: 0 },
-            },
-          },
-        },
-      },
-      summaryFormatter(data) {
-        if (!data || !data.summary) return '';
-        const { summary } = data;
-        const start = summary.start_date || data.start_date || 'N/A';
-        const end = summary.end_date || data.end_date || 'N/A';
-        const total = Number(summary.total_reports || 0);
-        const resolved = Number(summary.resolved_reports || 0);
-        const active = Number(summary.active_reports || 0);
-        const windowDays = Number(summary.window_days || 0);
-        const windowLabel = windowDays > 0 ? `${windowDays}-day` : 'Recent';
-        return `${start} to ${end} | ${windowLabel} summary: ${total} reports (${resolved} resolved / ${active} active)`;
-      },
-    },
-    {
-      endpoint: '/tracker_preview',
-      canvasId: 'trackerAnalyticsPreview',
-      infoId: 'trackerAnalyticsInfo',
-      onClickHref: '/analysis/tracker-logs?tab=analytics',
-      chartType: 'bar',
-      chartOptions: {
-        dataset: {
-          label: 'Recent activity',
-          borderColor: '#2563eb',
-          backgroundColor: 'rgba(37, 99, 235, 0.35)',
-          borderWidth: 1,
-        },
-        options: {
-          plugins: {
-            tooltip: { enabled: true },
-            legend: { display: false },
-          },
-          scales: {
-            x: {
-              grid: { display: false },
-            },
-            y: {
-              beginAtZero: true,
-              ticks: { precision: 0 },
-              title: { display: true, text: 'Count' },
-            },
-          },
-        },
-      },
-      summaryFormatter(data) {
-        if (!data) return '';
-        const start = data.start_display || data.start_time || data.start_date || 'N/A';
-        const end = data.end_display || data.end_time || data.end_date || 'N/A';
-        const sessions = Number(data.total_sessions || 0);
-        const events = Number(data.total_events || 0);
-        const navigation = Number(data.total_navigation_events || 0);
-        const backtracks = Number(data.total_backtracking_events || 0);
-        const avg = (data.average_duration_label || '').trim() || '--';
-        return `${start} to ${end} | ${sessions} sessions, ${events} events | Nav ${navigation} / Backtracks ${backtracks} | Avg ${avg}`;
-      },
-    },
   ];
 
   previewConfigs.forEach((config) => {
     renderLinePreview(config);
+  });
+
+  renderTablePreview({
+    endpoint: '/bug_reports_preview',
+    tableId: 'bugReportsPreviewTable',
+    infoId: 'bugReportsInfo',
+    summaryFormatter(data) {
+      if (!data || !data.summary) return '';
+      const { summary } = data;
+      const start = summary.start_date || data.start_date || 'N/A';
+      const end = summary.end_date || data.end_date || 'N/A';
+      const total = Number(summary.total_reports || 0);
+      const resolved = Number(summary.resolved_reports || 0);
+      const active = Number(summary.active_reports || 0);
+      const windowDays = Number(summary.window_days || 0);
+      const windowLabel = windowDays > 0 ? `${windowDays}-day` : 'Recent';
+      return `${start} to ${end} | ${windowLabel} summary: ${total} reports (${resolved} resolved / ${active} active)`;
+    },
+    emptyMessage: 'No recent bug reports.',
+    valueFormatter(value) {
+      const numeric = Number(value);
+      if (Number.isFinite(numeric)) {
+        return numeric.toLocaleString();
+      }
+      return formatTableValue(value);
+    },
+  });
+
+  renderTablePreview({
+    endpoint: '/tracker_preview',
+    tableId: 'trackerAnalyticsPreviewTable',
+    infoId: 'trackerAnalyticsInfo',
+    summaryFormatter(data) {
+      if (!data) return '';
+      const start = data.start_display || data.start_time || data.start_date || 'N/A';
+      const end = data.end_display || data.end_time || data.end_date || 'N/A';
+      const sessions = Number(data.total_sessions || 0);
+      const events = Number(data.total_events || 0);
+      const navigation = Number(data.total_navigation_events || 0);
+      const backtracks = Number(data.total_backtracking_events || 0);
+      const avg = (data.average_duration_label || '').trim() || '--';
+      return [
+        `${start} to ${end}`,
+        `${sessions} sessions`,
+        `${events} events`,
+        `Nav ${navigation} / Backtracks ${backtracks}`,
+        `Avg ${avg}`,
+      ].join(' | ');
+    },
+    emptyMessage: 'No recent tracker activity.',
+    valueFormatter(value) {
+      const numeric = Number(value);
+      if (Number.isFinite(numeric)) {
+        return numeric.toLocaleString();
+      }
+      return formatTableValue(value);
+    },
   });
 
   const tracker = window.APP_TRACKER;

@@ -352,6 +352,34 @@ p {
   height: 140px !important;
 }
 
+.dashboard-card__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  color: var(--ink-subtle);
+}
+
+.dashboard-card__table th,
+.dashboard-card__table td {
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: var(--border-thin) solid var(--border-light);
+}
+
+.dashboard-card__table thead th {
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--muted-light);
+}
+
+.dashboard-card__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.dashboard-card__table tbody tr:nth-child(even) td {
+  background: var(--muted);
+}
+
 .dashboard-card__info {
   font-size: 0.85rem;
   color: var(--ink-subtle);
