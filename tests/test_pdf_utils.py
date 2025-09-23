@@ -87,6 +87,9 @@ def test_render_html_to_pdf_raises_on_oserror(monkeypatch):
 
     monkeypatch.setitem(sys.modules, "weasyprint", failing_module)
 
+    def failing_chromium(html: str, base_url: str | None = None) -> bytes:
+        raise pdf_utils.PdfGenerationError(pdf_utils._CHROMIUM_DEPENDENCY_MESSAGE)
+
     def failing_fallback(html: str, base_url: str | None = None) -> bytes:
         raise pdf_utils.PdfGenerationError(pdf_utils._FALLBACK_DEPENDENCY_MESSAGE)
 
@@ -94,6 +97,11 @@ def test_render_html_to_pdf_raises_on_oserror(monkeypatch):
         pdf_utils,
         "_render_html_to_pdf_with_wkhtmltopdf",
         failing_fallback,
+    )
+    monkeypatch.setattr(
+        pdf_utils,
+        "_render_html_to_pdf_with_chromium",
+        failing_chromium,
     )
 
     with pytest.raises(pdf_utils.PdfGenerationError) as excinfo:
@@ -110,16 +118,24 @@ def test_render_html_to_pdf_uses_fallback_when_weasyprint_unavailable(monkeypatc
     def failing_weasyprint(html: str, base_url: str | None = None) -> bytes:
         raise pdf_utils.PdfGenerationError("weasyprint unavailable")
 
-    def successful_fallback(html: str, base_url: str | None = None) -> bytes:
+    def successful_chromium(html: str, base_url: str | None = None) -> bytes:
         assert html == "<p>Hello</p>"
         assert base_url == "http://example.com/"
         return b"fake-pdf"
+
+    def failing_wkhtmltopdf(html: str, base_url: str | None = None) -> bytes:
+        raise pdf_utils.PdfGenerationError("wkhtmltopdf should not be used")
 
     monkeypatch.setattr(
         pdf_utils, "_render_html_to_pdf_with_weasyprint", failing_weasyprint
     )
     monkeypatch.setattr(
-        pdf_utils, "_render_html_to_pdf_with_wkhtmltopdf", successful_fallback
+        pdf_utils, "_render_html_to_pdf_with_chromium", successful_chromium
+    )
+    monkeypatch.setattr(
+        pdf_utils,
+        "_render_html_to_pdf_with_wkhtmltopdf",
+        failing_wkhtmltopdf,
     )
 
     result = pdf_utils.render_html_to_pdf("<p>Hello</p>", base_url="http://example.com/")
@@ -131,11 +147,17 @@ def test_render_html_to_pdf_raises_when_fallback_fails(monkeypatch):
     def failing_weasyprint(html: str, base_url: str | None = None) -> bytes:
         raise pdf_utils.PdfGenerationError("primary failure")
 
+    def failing_chromium(html: str, base_url: str | None = None) -> bytes:
+        raise pdf_utils.PdfGenerationError("chromium failure")
+
     def failing_fallback(html: str, base_url: str | None = None) -> bytes:
         raise pdf_utils.PdfGenerationError("fallback failure")
 
     monkeypatch.setattr(
         pdf_utils, "_render_html_to_pdf_with_weasyprint", failing_weasyprint
+    )
+    monkeypatch.setattr(
+        pdf_utils, "_render_html_to_pdf_with_chromium", failing_chromium
     )
     monkeypatch.setattr(
         pdf_utils, "_render_html_to_pdf_with_wkhtmltopdf", failing_fallback
@@ -157,3 +179,90 @@ def test_render_html_to_pdf_raises_on_macos(monkeypatch):
 
     message = str(excinfo.value)
     assert message == pdf_utils._MAC_UNSUPPORTED_MESSAGE
+
+
+class FakePage:
+    def __init__(self) -> None:
+        self.set_content_calls: list[dict[str, object]] = []
+        self.pdf_kwargs: dict[str, object] | None = None
+
+    def set_content(
+        self,
+        html: str,
+        *,
+        wait_until: str | None = None,
+        base_url: str | None = None,
+    ) -> None:
+        self.set_content_calls.append(
+            {"html": html, "wait_until": wait_until, "base_url": base_url}
+        )
+
+    def pdf(self, **kwargs):
+        self.pdf_kwargs = kwargs
+        return b"fake-pdf"
+
+
+class FakeBrowser:
+    def __init__(self, page: FakePage) -> None:
+        self.page = page
+        self.closed = False
+
+    def new_page(self) -> FakePage:
+        return self.page
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class FakeChromium:
+    def __init__(self, browser: FakeBrowser) -> None:
+        self.browser = browser
+        self.launch_calls: list[dict[str, object]] = []
+
+    def launch(self, **kwargs) -> FakeBrowser:
+        self.launch_calls.append(kwargs)
+        return self.browser
+
+
+class FakePlaywrightContext:
+    def __init__(self, chromium: FakeChromium) -> None:
+        self.chromium = chromium
+
+    def __enter__(self) -> "FakePlaywrightContext":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:  # pragma: no cover - passthrough
+        return None
+
+
+def test_render_html_to_pdf_with_chromium_uses_css_page_size(monkeypatch):
+    fake_page = FakePage()
+    fake_browser = FakeBrowser(fake_page)
+    fake_chromium = FakeChromium(fake_browser)
+    context = FakePlaywrightContext(fake_chromium)
+
+    def fake_sync_playwright():
+        return context
+
+    sync_api_module = types.ModuleType("playwright.sync_api")
+    sync_api_module.sync_playwright = fake_sync_playwright
+    playwright_module = types.ModuleType("playwright")
+    playwright_module.sync_api = sync_api_module
+
+    monkeypatch.setitem(sys.modules, "playwright", playwright_module)
+    monkeypatch.setitem(sys.modules, "playwright.sync_api", sync_api_module)
+
+    result = pdf_utils._render_html_to_pdf_with_chromium(
+        "<p>Hello</p>", base_url="http://example.com/"
+    )
+
+    assert result == b"fake-pdf"
+    assert fake_page.pdf_kwargs is not None
+    assert fake_page.pdf_kwargs.get("prefer_css_page_size") is True
+    assert fake_page.pdf_kwargs.get("print_background") is True
+    assert fake_page.pdf_kwargs.get("margin") == {
+        "top": "0",
+        "right": "0",
+        "bottom": "0",
+        "left": "0",
+    }
