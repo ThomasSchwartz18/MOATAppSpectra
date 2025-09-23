@@ -17,6 +17,7 @@ from functools import wraps
 import csv
 import io
 import os
+from pathlib import Path
 from urllib.parse import urlparse
 import re
 import json
@@ -76,6 +77,18 @@ from fi_utils import parse_fi_rejections
 # Helpers for AOI Grades analytics
 from collections import defaultdict, Counter
 from statistics import mean
+
+
+def _load_report_css() -> str:
+    """Load the shared report stylesheet so it can be inlined."""
+
+    static_folder = current_app.static_folder or ''
+    css_path = Path(static_folder) / 'css' / 'report.css'
+    try:
+        return css_path.read_text(encoding='utf-8')
+    except OSError as exc:  # pragma: no cover - log & fall back to default styling
+        current_app.logger.warning("Unable to load report CSS: %s", exc)
+    return ""
 
 
 def _normalize_header(value: str | None) -> str:
@@ -2980,6 +2993,8 @@ def export_integrated_report():
         payload.setdefault('operatorSummary', payload.get('summary', {}))
         payload.setdefault('modelSummary', {'avgFalseCalls': 0.0})
 
+    report_css = _load_report_css()
+
     html = render_template(
         'report/integrated/index.html',
         show_cover=show_cover,
@@ -2995,6 +3010,7 @@ def export_integrated_report():
         contact=contact,
         confidentiality=confidentiality,
         generated_at=generated_at,
+        report_css=report_css,
         **payload,
         **charts,
     )
@@ -3052,6 +3068,8 @@ def export_aoi_daily_report():
     payload.update(charts)
 
     show_cover = str(request.args.get('show_cover', 'false')).lower() not in {'0', 'false', 'no'}
+    report_css = _load_report_css()
+
     html = render_template(
         'report/aoi_daily/index.html',
         day=day.isoformat(),
@@ -3060,6 +3078,7 @@ def export_aoi_daily_report():
         end=end,
         generated_at=generated_at,
         contact=contact,
+        report_css=report_css,
         **payload,
     )
 
@@ -3516,6 +3535,8 @@ def export_operator_report():
         payload.setdefault('operatorSummary', payload.get('summary', {}))
         payload.setdefault('modelSummary', {'avgFalseCalls': 0.0})
 
+    report_css = _load_report_css()
+
     html = render_template(
         'report/operator/index.html',
         show_cover=show_cover,
@@ -3532,6 +3553,7 @@ def export_operator_report():
         confidentiality=confidentiality,
         generated_at=generated_at,
         operator=operator,
+        report_css=report_css,
         **payload,
     )
 
