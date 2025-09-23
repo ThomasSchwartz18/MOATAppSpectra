@@ -230,7 +230,10 @@ def test_render_html_to_pdf_on_macos_includes_message_when_fallbacks_fail(monkey
         pdf_utils.render_html_to_pdf("<p>Hello</p>")
 
     message = str(excinfo.value)
-    assert pdf_utils._MAC_UNSUPPORTED_MESSAGE in message
+    assert (
+        "WeasyPrint PDF rendering is skipped on macOS; attempting Chromium and "
+        "wkhtmltopdf fallbacks instead." in message
+    )
     assert "chromium failure" in message
     assert pdf_utils._FALLBACK_DEPENDENCY_MESSAGE in message
 
