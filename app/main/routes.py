@@ -21,7 +21,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 import re
 import json
-from datetime import datetime, date, timezone
+from datetime import datetime, date, timezone, timedelta
 from zoneinfo import ZoneInfo
 from openpyxl import load_workbook
 import xlrd
@@ -166,10 +166,29 @@ def _compare_headers(
 def _parse_date(val):
     if not val:
         return None
-    try:
-        return datetime.fromisoformat(str(val)).date()
-    except Exception:
+
+    if isinstance(val, datetime):
+        return val.date()
+
+    if isinstance(val, date):
+        return val
+
+    text = str(val).strip()
+    if not text:
         return None
+
+    if text.endswith("Z"):
+        text = text[:-1] + "+00:00"
+
+    try:
+        parsed = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+
+    if isinstance(parsed, datetime):
+        return parsed.date()
+
+    return parsed
 
 
 def _aoi_passed(row):
@@ -2016,6 +2035,84 @@ def daily_reports_preview():
         'start_date': start_date,
         'end_date': end_date,
     })
+
+
+@main_bp.route('/bug_reports_preview', methods=['GET'])
+def bug_reports_preview():
+    """Return recent bug report counts grouped by status."""
+
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+
+    rows, error = fetch_bug_reports()
+    if error:
+        abort(500, description=error)
+
+    today = datetime.now(timezone.utc).date()
+    window_days = 7
+    start = today - timedelta(days=window_days - 1)
+
+    normalized_counts: Counter[str] = Counter()
+    display_labels: dict[str, str] = {}
+    observed_dates: list[date] = []
+
+    for row in rows or []:
+        created = _parse_date(row.get('created_at'))
+        if not created or created < start or created > today:
+            continue
+
+        observed_dates.append(created)
+
+        raw_status = str(row.get('status') or '').strip() or 'Unknown'
+        normalized = raw_status.lower()
+        display = raw_status if raw_status.lower() != raw_status else raw_status.title()
+
+        normalized_counts[normalized] += 1
+        display_labels.setdefault(normalized, display)
+
+    total_reports = sum(normalized_counts.values())
+
+    resolved_statuses = {'resolved', 'closed', 'done', 'completed', 'fixed'}
+    resolved_reports = sum(
+        count for status, count in normalized_counts.items() if status in resolved_statuses
+    )
+    active_reports = total_reports - resolved_reports
+
+    ordered_statuses = sorted(
+        normalized_counts.items(), key=lambda item: (-item[1], display_labels.get(item[0], ''))
+    )
+
+    labels = [display_labels.get(status, status.title()) for status, _ in ordered_statuses]
+    values = [count for _, count in ordered_statuses]
+
+    status_counts = {
+        display_labels.get(status, status.title()): count for status, count in normalized_counts.items()
+    }
+
+    start_date = min(observed_dates).isoformat() if observed_dates else None
+    end_date = max(observed_dates).isoformat() if observed_dates else None
+
+    summary = {
+        'total_reports': total_reports,
+        'resolved_reports': resolved_reports,
+        'active_reports': active_reports,
+        'status_counts': status_counts,
+        'window_days': window_days,
+    }
+    if start_date:
+        summary['start_date'] = start_date
+    if end_date:
+        summary['end_date'] = end_date
+
+    return jsonify(
+        {
+            'labels': labels,
+            'values': values,
+            'start_date': start_date,
+            'end_date': end_date,
+            'summary': summary,
+        }
+    )
 
 
 @main_bp.route('/forecast_preview', methods=['GET'])

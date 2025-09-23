@@ -352,6 +352,13 @@ p {
   height: 140px !important;
 }
 
+.dashboard-card__info {
+  font-size: 0.85rem;
+  color: var(--ink-subtle);
+  margin: 0;
+  line-height: 1.4;
+}
+
 .dashboard-card:hover {
   border-color: var(--accent);
   box-shadow: var(--shadow-ambient);

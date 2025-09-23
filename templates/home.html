@@ -28,6 +28,16 @@
       <canvas id="assemblyForecastPreview"></canvas>
     </div>
   </a>
+  <a
+    class="dashboard-link"
+    href="{{ url_for('main.analysis_tracker_logs', tab='bug-reports') }}"
+  >
+    <div class="dashboard-card">
+      <h2>Bug Reports</h2>
+      <canvas id="bugReportsPreview"></canvas>
+      <p id="bugReportsInfo" class="dashboard-card__info">Loading bug report summary…</p>
+    </div>
+  </a>
 </section>
 {% if user_role == 'ADMIN' and code_errors %}
 <section class="admin-diagnostics">

@@ -92,7 +92,14 @@ const appTracker = (() => {
 
 window.APP_TRACKER = appTracker;
 
-function renderLinePreview({ endpoint, canvasId, infoId, onClickHref }) {
+function renderLinePreview({
+  endpoint,
+  canvasId,
+  infoId,
+  onClickHref,
+  chartOptions,
+  summaryFormatter,
+}) {
   const canvas = document.getElementById(canvasId);
   if (!canvas) return;
 
@@ -174,10 +181,42 @@ function renderLinePreview({ endpoint, canvasId, infoId, onClickHref }) {
                   ticks: { display: true },
                   border: { display: true },
                 },
-              },
+          },
         },
         plugins: [],
       };
+
+      if (chartOptions) {
+        if (chartOptions.type) {
+          chartConfig.type = chartOptions.type;
+        }
+        if (chartOptions.dataset) {
+          Object.assign(chartConfig.data.datasets[0], chartOptions.dataset);
+        }
+        if (chartOptions.options) {
+          const nextOptions = { ...chartOptions.options };
+          if (chartOptions.options.plugins) {
+            nextOptions.plugins = {
+              ...(chartConfig.options.plugins || {}),
+              ...chartOptions.options.plugins,
+            };
+          }
+          if (chartOptions.options.scales) {
+            nextOptions.scales = {
+              ...(chartConfig.options.scales || {}),
+              ...chartOptions.options.scales,
+            };
+          }
+
+          chartConfig.options = {
+            ...chartConfig.options,
+            ...nextOptions,
+          };
+        }
+        if (Array.isArray(chartOptions.plugins)) {
+          chartConfig.plugins.push(...chartOptions.plugins);
+        }
+      }
 
       if (isFalseCallPreview) {
         chartConfig.plugins.push({
@@ -221,13 +260,39 @@ function renderLinePreview({ endpoint, canvasId, infoId, onClickHref }) {
       if (infoId) {
         const infoEl = document.getElementById(infoId);
         if (infoEl) {
-          if (isFalseCallPreview) {
+          let summaryText = '';
+          if (typeof summaryFormatter === 'function') {
+            summaryText = summaryFormatter(data);
+          }
+
+          if (!summaryText && data && data.summary) {
+            const summary = data.summary;
+            const hasCounts = ['total_reports', 'active_reports', 'resolved_reports'].every(
+              (key) => typeof summary[key] === 'number'
+            );
+
+            if (hasCounts) {
+              const rangeStart = summary.start_date || data.start_date || 'N/A';
+              const rangeEnd = summary.end_date || data.end_date || 'N/A';
+              const total = Number(summary.total_reports || 0);
+              const resolved = Number(summary.resolved_reports || 0);
+              const active = Number(summary.active_reports || 0);
+              summaryText = `${rangeStart} to ${rangeEnd} | ${total} reports | ${resolved} resolved / ${active} active`;
+            }
+          }
+
+          if (!summaryText && isFalseCallPreview) {
             const avg = Number.isFinite(Number(data.overall_avg))
               ? Number(data.overall_avg).toFixed(2)
               : '0';
             const start = data.start_date || 'N/A';
             const end = data.end_date || 'N/A';
             infoEl.textContent = `${start} to ${end} | Avg False Calls: ${avg}`;
+            return;
+          }
+
+          if (summaryText) {
+            infoEl.textContent = summaryText;
           } else if (data && Object.prototype.hasOwnProperty.call(data, 'avg_yield')) {
             const avgYield = Number.isFinite(Number(data.avg_yield))
               ? Number(data.avg_yield).toFixed(1)
@@ -266,6 +331,48 @@ document.addEventListener('DOMContentLoaded', () => {
       endpoint: '/forecast_preview',
       canvasId: 'assemblyForecastPreview',
       onClickHref: '/tools/assembly-forecast',
+    },
+    {
+      endpoint: '/bug_reports_preview',
+      canvasId: 'bugReportsPreview',
+      infoId: 'bugReportsInfo',
+      onClickHref: '/analysis/tracker-logs?tab=bug-reports',
+      chartOptions: {
+        type: 'bar',
+        dataset: {
+          borderColor: '#0d9ba8',
+          backgroundColor: 'rgba(13, 155, 168, 0.35)',
+          borderWidth: 1,
+        },
+        options: {
+          plugins: {
+            tooltip: { enabled: true },
+          },
+          scales: {
+            x: {
+              title: { display: true, text: 'Status' },
+              grid: { display: false },
+            },
+            y: {
+              beginAtZero: true,
+              title: { display: true, text: 'Reports' },
+              ticks: { precision: 0 },
+            },
+          },
+        },
+      },
+      summaryFormatter(data) {
+        if (!data || !data.summary) return '';
+        const { summary } = data;
+        const start = summary.start_date || data.start_date || 'N/A';
+        const end = summary.end_date || data.end_date || 'N/A';
+        const total = Number(summary.total_reports || 0);
+        const resolved = Number(summary.resolved_reports || 0);
+        const active = Number(summary.active_reports || 0);
+        const windowDays = Number(summary.window_days || 0);
+        const windowLabel = windowDays > 0 ? `${windowDays}-day` : 'Recent';
+        return `${start} to ${end} | ${windowLabel} summary: ${total} reports (${resolved} resolved / ${active} active)`;
+      },
     },
   ];
 
