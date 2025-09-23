@@ -298,3 +298,59 @@ def test_home_admin_renders_diagnostics(app_instance, monkeypatch):
     html = response.data.decode("utf-8")
     assert "Supabase service offline" in html
     assert "Table missing" in html
+
+
+def test_admin_employee_portal_route_renders_employee_template(app_instance):
+    client = app_instance.test_client()
+
+    _login(client, role="ADMIN")
+    response = client.get("/admin/employee-portal")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Employee Portal" in html
+    assert "Select your area" in html
+
+
+def test_admin_employee_portal_requires_admin_role(app_instance):
+    client = app_instance.test_client()
+
+    _login(client, role="USER")
+    response = client.get("/admin/employee-portal")
+
+    assert response.status_code == 403
+
+
+def test_admin_employee_portal_link_visible_for_admin(app_instance, monkeypatch):
+    client = app_instance.test_client()
+
+    with app_instance.app_context():
+        from app.main import routes
+
+        monkeypatch.setattr(
+            routes,
+            "_summarize_supabase_status",
+            lambda: {"status": "Connected", "tables": [], "checked_at": None},
+        )
+        monkeypatch.setattr(routes, "_fetch_configured_users", lambda: ([], None))
+        monkeypatch.setattr(routes, "fetch_bug_reports", lambda: ([], None))
+        monkeypatch.setattr(routes, "_build_feature_cards", lambda records: ([], {}))
+        monkeypatch.setattr(routes, "_build_bug_options", lambda records: [])
+
+    _login(client, role="ADMIN")
+    response = client.get("/home")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "/admin/employee-portal" in html
+
+
+def test_employee_portal_link_hidden_for_non_admin(app_instance):
+    client = app_instance.test_client()
+
+    _login(client, role="EMPLOYEE")
+    response = client.get("/home")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "/admin/employee-portal" not in html
