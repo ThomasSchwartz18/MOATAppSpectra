@@ -788,6 +788,109 @@ def _get_tracker():
     return tracker
 
 
+def _tracker_local_zone():
+    tz_name = current_app.config.get("LOCAL_TIMEZONE", "America/Chicago")
+    try:
+        return ZoneInfo(tz_name)
+    except Exception:  # pragma: no cover - fallback if zone not available
+        return timezone.utc
+
+
+def _tracker_parse_timestamp(value):
+    if not value:
+        return None
+    cleaned = str(value).strip()
+    if cleaned.endswith("Z"):
+        cleaned = cleaned[:-1] + "+00:00"
+    try:
+        parsed = datetime.fromisoformat(cleaned)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def _tracker_format_timestamp(value, local_zone=None):
+    if not value:
+        return None
+    zone = local_zone or _tracker_local_zone()
+    try:
+        localized = value.astimezone(zone)
+    except Exception:
+        localized = value
+    return localized.strftime("%Y-%m-%d %H:%M:%S %Z")
+
+
+def _tracker_format_duration(seconds):
+    if seconds is None:
+        return "--"
+    remaining = max(0.0, float(seconds))
+    hours = int(remaining // 3600)
+    minutes = int((remaining % 3600) // 60)
+    secs = remaining % 60
+    parts: list[str] = []
+    if hours:
+        parts.append(f"{hours}h")
+    if minutes:
+        parts.append(f"{minutes}m")
+    parts.append(f"{secs:.0f}s")
+    return " ".join(parts)
+
+
+def _coerce_float(value):
+    if value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _derive_session_end(end_ts, events, *, local_zone=None):
+    logout_events = [
+        event
+        for event in events
+        if (event.get("name") or "").lower() in {"session_end", "logout"}
+    ]
+    derived_end_ts = None
+    derived_end_display = None
+    if logout_events:
+        last_logout = logout_events[-1]
+        derived_end_ts = last_logout.get("occurred")
+        derived_end_display = last_logout.get("occurred_display")
+    if derived_end_ts is None and end_ts is not None:
+        derived_end_ts = end_ts
+    if derived_end_ts is None and events:
+        last_event = events[-1]
+        derived_end_ts = last_event.get("occurred")
+        derived_end_display = last_event.get("occurred_display")
+    if derived_end_ts is not None and derived_end_display is None:
+        derived_end_display = _tracker_format_timestamp(derived_end_ts, local_zone)
+    return derived_end_ts, derived_end_display
+
+
+def _calculate_session_duration(start_ts, derived_end_ts, events, stored_duration):
+    duration_seconds = None
+    if start_ts and derived_end_ts:
+        try:
+            duration_seconds = max(0.0, (derived_end_ts - start_ts).total_seconds())
+        except Exception:
+            duration_seconds = None
+    if duration_seconds is None:
+        duration_seconds = _coerce_float(stored_duration)
+    if duration_seconds is None and start_ts:
+        reference_ts = derived_end_ts
+        if reference_ts is None and events:
+            reference_ts = events[-1].get("occurred")
+        if reference_ts:
+            try:
+                duration_seconds = max(
+                    0.0, (reference_ts - start_ts).total_seconds()
+                )
+            except Exception:
+                duration_seconds = None
+    return duration_seconds
+
+
 def _summarize_supabase_status():
     """Return metadata about the configured Supabase project."""
 
@@ -2113,6 +2216,181 @@ def bug_reports_preview():
             'summary': summary,
         }
     )
+
+
+@main_bp.route('/tracker_preview', methods=['GET'])
+def tracker_preview():
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+
+    tracker = _get_tracker()
+    local_zone = _tracker_local_zone()
+
+    limit = 25
+    session_rows = []
+    event_rows = []
+
+    with tracker._connect() as conn:
+        session_query = (
+            'SELECT session_token, start_time, end_time, duration_seconds '
+            'FROM sessions ORDER BY datetime(start_time) DESC LIMIT ?'
+        )
+        session_rows = conn.execute(session_query, (limit,)).fetchall()
+
+        tokens = [row['session_token'] for row in session_rows if row['session_token']]
+        if tokens:
+            placeholders = ','.join('?' for _ in tokens)
+            event_query = (
+                'SELECT session_token, event_name, context, metadata, occurred_at '
+                f'FROM click_events WHERE session_token IN ({placeholders}) '
+                'ORDER BY datetime(occurred_at) ASC, id ASC'
+            )
+            event_rows = conn.execute(event_query, tokens).fetchall()
+
+    def _loads(payload):
+        if not payload:
+            return None
+        try:
+            return json.loads(payload)
+        except Exception:
+            return None
+
+    events_by_session: dict[str, list[dict]] = {token: [] for token in {row['session_token'] for row in session_rows}}
+    for row in event_rows:
+        token = row['session_token']
+        occurred_dt = _tracker_parse_timestamp(row['occurred_at'])
+        context_payload = _loads(row['context'])
+        metadata_payload = _loads(row['metadata'])
+        label = None
+        href = None
+        if isinstance(context_payload, dict):
+            label = (context_payload.get('text') or '').strip() or None
+            href = context_payload.get('href')
+        events_by_session.setdefault(token, []).append(
+            {
+                'name': row['event_name'],
+                'occurred': occurred_dt,
+                'occurred_display': _tracker_format_timestamp(occurred_dt, local_zone)
+                or row['occurred_at'],
+                'href': href,
+                'label': label,
+                'context': context_payload,
+                'metadata': metadata_payload,
+            }
+        )
+
+    total_sessions = len(session_rows)
+    total_events = len(event_rows)
+    total_navigation = 0
+    total_backtracking = 0
+    durations: list[float] = []
+    start_times: list[datetime] = []
+    end_times: list[datetime] = []
+
+    for row in session_rows:
+        token = row['session_token']
+        events = events_by_session.get(token, [])
+        start_ts = _tracker_parse_timestamp(row['start_time'])
+        end_ts = _tracker_parse_timestamp(row['end_time'])
+        derived_end_ts, _ = _derive_session_end(end_ts, events, local_zone=local_zone)
+
+        navigation_events = [
+            event
+            for event in events
+            if (event.get('name') or '').lower() == 'navigate'
+        ]
+        total_navigation += len(navigation_events)
+
+        seen_hrefs: set[str] = set()
+        session_backtracking = 0
+        for event in navigation_events:
+            href = event.get('href')
+            if href:
+                if href in seen_hrefs:
+                    event['is_backtrack'] = True
+                    session_backtracking += 1
+                else:
+                    seen_hrefs.add(href)
+        total_backtracking += session_backtracking
+
+        duration_seconds = _calculate_session_duration(
+            start_ts,
+            derived_end_ts,
+            events,
+            row['duration_seconds'],
+        )
+
+        if duration_seconds is not None:
+            durations.append(duration_seconds)
+        if start_ts:
+            start_times.append(start_ts)
+        if derived_end_ts:
+            end_times.append(derived_end_ts)
+
+    average_duration = (
+        sum(durations) / len(durations)
+        if durations
+        else None
+    )
+    average_duration_label = _tracker_format_duration(average_duration)
+
+    first_start = min(start_times) if start_times else None
+    last_end = max(end_times) if end_times else None
+
+    def _to_iso(value):
+        if not value:
+            return None
+        try:
+            return value.astimezone(timezone.utc).isoformat()
+        except Exception:
+            return value.isoformat() if hasattr(value, 'isoformat') else None
+
+    start_iso = _to_iso(first_start)
+    end_iso = _to_iso(last_end)
+    start_display = _tracker_format_timestamp(first_start, local_zone)
+    end_display = _tracker_format_timestamp(last_end, local_zone)
+
+    if total_sessions:
+        summary_text = (
+            f"{start_display or 'N/A'} to {end_display or 'N/A'} | "
+            f"{total_sessions} sessions | {total_events} events | "
+            f"Avg session {average_duration_label}"
+        )
+    else:
+        summary_text = "No recent tracking sessions recorded."
+
+    labels = [
+        'Sessions',
+        'Events',
+        'Navigation',
+        'Backtracking',
+    ]
+    values = [
+        total_sessions,
+        total_events,
+        total_navigation,
+        total_backtracking,
+    ]
+
+    payload = {
+        'labels': labels,
+        'values': values,
+        'total_sessions': total_sessions,
+        'total_events': total_events,
+        'total_navigation_events': total_navigation,
+        'total_backtracking_events': total_backtracking,
+        'average_duration_seconds': average_duration,
+        'average_duration_label': average_duration_label,
+        'start_time': start_iso,
+        'end_time': end_iso,
+        'start_date': first_start.date().isoformat() if first_start else None,
+        'end_date': last_end.date().isoformat() if last_end else None,
+        'start_display': start_display,
+        'end_display': end_display,
+        'summary_text': summary_text,
+    }
+
+    return jsonify(payload)
 
 
 @main_bp.route('/forecast_preview', methods=['GET'])
@@ -4275,23 +4553,10 @@ def analysis_tracker_logs():
     if args.get('reset'):
         return redirect(url_for('main.analysis_tracker_logs'))
 
-    tz_name = current_app.config.get('LOCAL_TIMEZONE', 'America/Chicago')
-    try:
-        local_zone = ZoneInfo(tz_name)
-    except Exception:  # pragma: no cover - fallback to UTC if tz not available
-        local_zone = timezone.utc
+    requested_tab = (args.get('tab') or '').strip().lower()
+    active_tab = 'bug-reports' if requested_tab == 'bug-reports' else 'analytics'
 
-    def _parse_timestamp(value):
-        if not value:
-            return None
-        cleaned = str(value).strip()
-        if cleaned.endswith('Z'):
-            cleaned = cleaned[:-1] + '+00:00'
-        try:
-            parsed = datetime.fromisoformat(cleaned)
-        except ValueError:
-            return None
-        return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    local_zone = _tracker_local_zone()
 
     def _parse_date_arg(value, *, clamp_end: bool = False):
         if not value:
@@ -4307,30 +4572,6 @@ def analysis_tracker_logs():
         except ValueError:
             return None
         return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
-
-    def _format_timestamp(value):
-        if not value:
-            return None
-        try:
-            localized = value.astimezone(local_zone)
-        except Exception:
-            localized = value
-        return localized.strftime('%Y-%m-%d %H:%M:%S %Z')
-
-    def _format_duration(seconds):
-        if seconds is None:
-            return '--'
-        remaining = max(0, float(seconds))
-        hours = int(remaining // 3600)
-        minutes = int((remaining % 3600) // 60)
-        secs = remaining % 60
-        parts: list[str] = []
-        if hours:
-            parts.append(f"{hours}h")
-        if minutes:
-            parts.append(f"{minutes}m")
-        parts.append(f"{secs:.0f}s")
-        return ' '.join(parts)
 
     def _loads(payload):
         if not payload:
@@ -4408,7 +4649,7 @@ def analysis_tracker_logs():
 
     events_by_session: dict[str, list[dict]] = {token: [] for token in (tokens or [])}
     for row in event_rows:
-        occurred_dt = _parse_timestamp(row['occurred_at'])
+        occurred_dt = _tracker_parse_timestamp(row['occurred_at'])
         context_payload = _loads(row['context'])
         metadata_payload = _loads(row['metadata'])
         label = None
@@ -4421,7 +4662,8 @@ def analysis_tracker_logs():
                 'id': row['id'],
                 'name': row['event_name'],
                 'occurred': occurred_dt,
-                'occurred_display': _format_timestamp(occurred_dt) or row['occurred_at'],
+                'occurred_display': _tracker_format_timestamp(occurred_dt, local_zone)
+                or row['occurred_at'],
                 'context': context_payload,
                 'metadata': metadata_payload,
                 'label': label,
@@ -4434,31 +4676,13 @@ def analysis_tracker_logs():
     all_events: list[dict] = []
     for row in session_rows:
         token = row['session_token']
-        start_ts = _parse_timestamp(row['start_time'])
-        end_ts = _parse_timestamp(row['end_time'])
+        start_ts = _tracker_parse_timestamp(row['start_time'])
+        end_ts = _tracker_parse_timestamp(row['end_time'])
         events = events_by_session.get(token, [])
 
-        logout_events = [
-            event
-            for event in events
-            if (event.get('name') or '').lower() in {'session_end', 'logout'}
-        ]
-        logout_event = logout_events[-1] if logout_events else None
-
-        derived_end_ts = None
-        derived_end_display = None
-        if logout_event:
-            derived_end_ts = logout_event.get('occurred')
-            derived_end_display = logout_event.get('occurred_display')
-        if derived_end_ts is None and end_ts is not None:
-            derived_end_ts = end_ts
-            derived_end_display = _format_timestamp(end_ts)
-        if derived_end_ts is None and events:
-            last_event = events[-1]
-            derived_end_ts = last_event.get('occurred')
-            derived_end_display = last_event.get('occurred_display')
-        if derived_end_ts is not None and derived_end_display is None:
-            derived_end_display = _format_timestamp(derived_end_ts)
+        derived_end_ts, derived_end_display = _derive_session_end(
+            end_ts, events, local_zone=local_zone
+        )
 
         navigation_events = [ev for ev in events if ev['name'].lower() == 'navigate']
         seen_hrefs: set[str] = set()
@@ -4472,37 +4696,14 @@ def analysis_tracker_logs():
                 else:
                     seen_hrefs.add(href)
 
-        raw_duration = row['duration_seconds']
-        try:
-            stored_duration = float(raw_duration) if raw_duration is not None else None
-        except (TypeError, ValueError):
-            stored_duration = None
+        duration_seconds = _calculate_session_duration(
+            start_ts,
+            derived_end_ts,
+            events,
+            row['duration_seconds'],
+        )
 
-        duration_seconds = None
-        if start_ts and derived_end_ts:
-            try:
-                duration_seconds = max(
-                    0.0, (derived_end_ts - start_ts).total_seconds()
-                )
-            except Exception:
-                duration_seconds = None
-
-        if duration_seconds is None:
-            duration_seconds = stored_duration
-
-        if duration_seconds is None and start_ts:
-            reference_ts = derived_end_ts
-            if reference_ts is None and events:
-                reference_ts = events[-1]['occurred']
-            if reference_ts:
-                try:
-                    duration_seconds = max(
-                        0.0, (reference_ts - start_ts).total_seconds()
-                    )
-                except Exception:
-                    duration_seconds = None
-
-        duration_label = _format_duration(duration_seconds)
+        duration_label = _tracker_format_duration(duration_seconds)
         path = [
             {
                 'href': event.get('href'),
@@ -4519,7 +4720,7 @@ def analysis_tracker_logs():
             'user_id': row['user_id'],
             'username': row['username'],
             'role': row['user_role'],
-            'start_display': _format_timestamp(start_ts),
+            'start_display': _tracker_format_timestamp(start_ts, local_zone),
             'end_display': derived_end_display,
             'duration_seconds': duration_seconds,
             'duration_label': duration_label,
@@ -4590,7 +4791,7 @@ def analysis_tracker_logs():
         'total_events': total_events,
         'total_navigation': total_navigation,
         'total_backtracking': total_backtracking,
-        'avg_duration': _format_duration(avg_duration)
+        'avg_duration': _tracker_format_duration(avg_duration)
         if avg_duration is not None
         else '--',
     }
@@ -4673,8 +4874,8 @@ def analysis_tracker_logs():
         status_value = (record.get('status') or 'open').strip().lower()
         status_counter[status_value] += 1
 
-        created_at = _parse_timestamp(record.get('created_at'))
-        updated_at = _parse_timestamp(record.get('updated_at'))
+        created_at = _tracker_parse_timestamp(record.get('created_at'))
+        updated_at = _tracker_parse_timestamp(record.get('updated_at'))
 
         assignee_id = record.get('assignee_id')
         assignee_id_str = str(assignee_id) if assignee_id not in (None, '') else ''
@@ -4703,9 +4904,11 @@ def analysis_tracker_logs():
                 'assignee_token': assignee_id_str or 'unassigned',
                 'notes': record.get('notes') or '',
                 'created_at': created_at,
-                'created_display': _format_timestamp(created_at) or '—',
+                'created_display': _tracker_format_timestamp(created_at, local_zone)
+                or '—',
                 'updated_at': updated_at,
-                'updated_display': _format_timestamp(updated_at) or '—',
+                'updated_display': _tracker_format_timestamp(updated_at, local_zone)
+                or '—',
                 'raw': record,
             }
         )
@@ -4763,6 +4966,7 @@ def analysis_tracker_logs():
             {'value': value, 'label': value.replace('_', ' ').title()}
             for value in known_statuses
         ],
+        active_tab=active_tab,
     )
 
 

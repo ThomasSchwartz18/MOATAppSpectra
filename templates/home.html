@@ -38,6 +38,16 @@
       <p id="bugReportsInfo" class="dashboard-card__info">Loading bug report summary…</p>
     </div>
   </a>
+  <a
+    class="dashboard-link"
+    href="{{ url_for('main.analysis_tracker_logs', tab='analytics') }}"
+  >
+    <div class="dashboard-card">
+      <h2>Tracker Analytics</h2>
+      <canvas id="trackerAnalyticsPreview"></canvas>
+      <p id="trackerAnalyticsInfo" class="dashboard-card__info">Loading tracker analytics…</p>
+    </div>
+  </a>
 </section>
 {% if user_role == 'ADMIN' and code_errors %}
 <section class="admin-diagnostics">

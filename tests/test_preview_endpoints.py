@@ -1,5 +1,7 @@
 import os
+from contextlib import contextmanager
 from datetime import datetime, timedelta
+import json
 
 import pytest
 
@@ -32,8 +34,42 @@ def _recent_dates(count=3):
 
 
 def _assert_preview_keys(data):
-    for key in ("labels", "values", "start_date", "end_date"):
-        assert key in data
+    assert 'labels' in data
+    assert 'values' in data
+    assert ('start_date' in data) or ('start_time' in data)
+    assert ('end_date' in data) or ('end_time' in data)
+
+
+class _DummyCursor:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def fetchall(self):
+        return self._rows
+
+
+class _DummyConnection:
+    def __init__(self, session_rows, event_rows):
+        self._session_rows = session_rows
+        self._event_rows = event_rows
+
+    def execute(self, query, params=()):
+        query_lower = query.lower()
+        if 'from sessions' in query_lower:
+            return _DummyCursor(self._session_rows)
+        if 'from click_events' in query_lower:
+            return _DummyCursor(self._event_rows)
+        raise AssertionError(f'Unexpected query: {query}')
+
+
+class DummyTracker:
+    def __init__(self, session_rows, event_rows):
+        self._session_rows = session_rows
+        self._event_rows = event_rows
+
+    @contextmanager
+    def _connect(self):
+        yield _DummyConnection(self._session_rows, self._event_rows)
 
 
 def test_moat_preview_returns_summary(app_instance, monkeypatch):
@@ -163,6 +199,80 @@ def test_bug_reports_preview_returns_summary(app_instance, monkeypatch):
         assert summary["end_date"] == today.isoformat()
         assert set(data["labels"]) >= {"Open", "Resolved", "Closed"}
         assert len(data["labels"]) == len(data["values"])
+
+
+def test_tracker_preview_returns_summary(app_instance, monkeypatch):
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        from app.main import routes
+
+        session_rows = [
+            {
+                'session_token': 'abc',
+                'start_time': '2024-05-01T10:00:00+00:00',
+                'end_time': '2024-05-01T10:06:00+00:00',
+                'duration_seconds': 360,
+            },
+            {
+                'session_token': 'def',
+                'start_time': '2024-05-01T11:00:00+00:00',
+                'end_time': None,
+                'duration_seconds': None,
+            },
+        ]
+
+        event_rows = [
+            {
+                'session_token': 'abc',
+                'event_name': 'navigate',
+                'context': json.dumps({'href': '/dashboard', 'text': 'Dashboard'}),
+                'metadata': None,
+                'occurred_at': '2024-05-01T10:01:00+00:00',
+            },
+            {
+                'session_token': 'abc',
+                'event_name': 'navigate',
+                'context': json.dumps({'href': '/dashboard', 'text': 'Dashboard'}),
+                'metadata': None,
+                'occurred_at': '2024-05-01T10:02:30+00:00',
+            },
+            {
+                'session_token': 'def',
+                'event_name': 'navigate',
+                'context': json.dumps({'href': '/reports', 'text': 'Reports'}),
+                'metadata': None,
+                'occurred_at': '2024-05-01T11:01:15+00:00',
+            },
+            {
+                'session_token': 'def',
+                'event_name': 'click',
+                'context': None,
+                'metadata': None,
+                'occurred_at': '2024-05-01T11:02:30+00:00',
+            },
+        ]
+
+        tracker = DummyTracker(session_rows, event_rows)
+        monkeypatch.setattr(routes, '_get_tracker', lambda: tracker)
+
+        _login(client)
+        resp = client.get('/tracker_preview')
+        assert resp.status_code == 200
+
+        data = resp.get_json()
+        assert data
+        assert data['labels'] == ['Sessions', 'Events', 'Navigation', 'Backtracking']
+        assert data['values'][0] == len(session_rows)
+        assert data['total_sessions'] == len(session_rows)
+        assert data['total_events'] == len(event_rows)
+        assert data['total_navigation_events'] == 3
+        assert data['total_backtracking_events'] == 1
+        assert data['average_duration_seconds'] is not None
+        assert data['average_duration_label']
+        assert data['summary_text']
+        assert ('start_time' in data and data['start_time']) or (
+            'start_date' in data and data['start_date']
+        )
 
 
 def test_daily_reports_preview_returns_summary(app_instance, monkeypatch):
