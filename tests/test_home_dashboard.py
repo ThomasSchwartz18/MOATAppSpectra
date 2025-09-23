@@ -131,12 +131,32 @@ def _forecast_preview_patch():
     }
 
 
+def _bug_preview_patch():
+    today = _current_day()
+    rows = [
+        {
+            "status": "open",
+            "created_at": f"{today.isoformat()}T08:15:00+00:00",
+        },
+        {
+            "status": "resolved",
+            "created_at": f"{today.isoformat()}T12:30:00+00:00",
+        },
+        {
+            "status": "closed",
+            "created_at": f"{(today - timedelta(days=1)).isoformat()}T09:00:00+00:00",
+        },
+    ]
+    return {"fetch_bug_reports": _make_fetch(rows)}
+
+
 PREVIEW_CASES = [
     ("/moat_preview", _moat_preview_patch),
     ("/aoi_preview", _aoi_preview_patch),
     ("/fi_preview", _fi_preview_patch),
     ("/daily_reports_preview", _daily_preview_patch),
     ("/forecast_preview", _forecast_preview_patch),
+    ("/bug_reports_preview", _bug_preview_patch),
 ]
 
 
@@ -161,6 +181,9 @@ def test_home_dashboard_previews_return_expected_fields(
     assert {"values", "yields"} & payload.keys()
     assert "start_date" in payload
     assert "end_date" in payload
+    if endpoint == "/bug_reports_preview":
+        assert "summary" in payload
+        assert payload["summary"]["total_reports"] == 3
 
 
 def test_home_admin_renders_diagnostics(app_instance, monkeypatch):

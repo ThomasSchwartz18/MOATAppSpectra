@@ -120,6 +120,51 @@ def test_fi_preview_returns_summary(app_instance, monkeypatch):
         assert len(data["labels"]) == len(data["values"])
 
 
+def test_bug_reports_preview_returns_summary(app_instance, monkeypatch):
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        from app.main import routes
+
+        today, yesterday = _recent_dates(2)
+        bug_rows = [
+            {
+                "status": "Open",
+                "created_at": f"{today.isoformat()}T08:00:00+00:00",
+            },
+            {
+                "status": "resolved",
+                "created_at": f"{today.isoformat()}T12:00:00+00:00",
+            },
+            {
+                "status": "closed",
+                "created_at": f"{yesterday.isoformat()}T09:30:00+00:00",
+            },
+            {
+                "status": "open",
+                "created_at": f"{(today - timedelta(days=10)).isoformat()}T00:00:00+00:00",
+            },
+        ]
+
+        monkeypatch.setattr(routes, "fetch_bug_reports", lambda: (bug_rows, None))
+        _login(client)
+        resp = client.get("/bug_reports_preview")
+
+        assert resp.status_code == 200
+        data = resp.get_json()
+        _assert_preview_keys(data)
+        assert "summary" in data
+
+        summary = data["summary"]
+        assert summary["total_reports"] == 3
+        assert summary["resolved_reports"] == 2
+        assert summary["active_reports"] == 1
+        assert summary["window_days"] == 7
+        assert summary["start_date"] == yesterday.isoformat()
+        assert summary["end_date"] == today.isoformat()
+        assert set(data["labels"]) >= {"Open", "Resolved", "Closed"}
+        assert len(data["labels"]) == len(data["values"])
+
+
 def test_daily_reports_preview_returns_summary(app_instance, monkeypatch):
     client = app_instance.test_client()
     with app_instance.app_context():
