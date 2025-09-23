@@ -97,6 +97,7 @@ function renderLinePreview({
   canvasId,
   infoId,
   onClickHref,
+  chartType,
   chartOptions,
   summaryFormatter,
 }) {
@@ -132,8 +133,10 @@ function renderLinePreview({
           ? data.avg_false_calls
           : data.yields || data.avg_false_calls) || [];
 
+      const resolvedChartType = chartType || (chartOptions && chartOptions.type) || 'line';
+
       const chartConfig = {
-        type: 'line',
+        type: resolvedChartType,
         data: {
           labels,
           datasets: [
@@ -187,9 +190,6 @@ function renderLinePreview({
       };
 
       if (chartOptions) {
-        if (chartOptions.type) {
-          chartConfig.type = chartOptions.type;
-        }
         if (chartOptions.dataset) {
           Object.assign(chartConfig.data.datasets[0], chartOptions.dataset);
         }
@@ -216,6 +216,10 @@ function renderLinePreview({
         if (Array.isArray(chartOptions.plugins)) {
           chartConfig.plugins.push(...chartOptions.plugins);
         }
+      }
+
+      if (chartType) {
+        chartConfig.type = chartType;
       }
 
       if (isFalseCallPreview) {
@@ -265,19 +269,27 @@ function renderLinePreview({
             summaryText = summaryFormatter(data);
           }
 
-          if (!summaryText && data && data.summary) {
-            const summary = data.summary;
-            const hasCounts = ['total_reports', 'active_reports', 'resolved_reports'].every(
-              (key) => typeof summary[key] === 'number'
-            );
+          if (!summaryText && data) {
+            if (typeof data.summary === 'string') {
+              summaryText = data.summary;
+            } else if (typeof data.summary_text === 'string') {
+              summaryText = data.summary_text;
+            } else if (typeof data.summaryText === 'string') {
+              summaryText = data.summaryText;
+            } else if (data.summary) {
+              const summary = data.summary;
+              const hasCounts = ['total_reports', 'active_reports', 'resolved_reports'].every(
+                (key) => typeof summary[key] === 'number'
+              );
 
-            if (hasCounts) {
-              const rangeStart = summary.start_date || data.start_date || 'N/A';
-              const rangeEnd = summary.end_date || data.end_date || 'N/A';
-              const total = Number(summary.total_reports || 0);
-              const resolved = Number(summary.resolved_reports || 0);
-              const active = Number(summary.active_reports || 0);
-              summaryText = `${rangeStart} to ${rangeEnd} | ${total} reports | ${resolved} resolved / ${active} active`;
+              if (hasCounts) {
+                const rangeStart = summary.start_date || data.start_date || 'N/A';
+                const rangeEnd = summary.end_date || data.end_date || 'N/A';
+                const total = Number(summary.total_reports || 0);
+                const resolved = Number(summary.resolved_reports || 0);
+                const active = Number(summary.active_reports || 0);
+                summaryText = `${rangeStart} to ${rangeEnd} | ${total} reports | ${resolved} resolved / ${active} active`;
+              }
             }
           }
 
@@ -372,6 +384,48 @@ document.addEventListener('DOMContentLoaded', () => {
         const windowDays = Number(summary.window_days || 0);
         const windowLabel = windowDays > 0 ? `${windowDays}-day` : 'Recent';
         return `${start} to ${end} | ${windowLabel} summary: ${total} reports (${resolved} resolved / ${active} active)`;
+      },
+    },
+    {
+      endpoint: '/tracker_preview',
+      canvasId: 'trackerAnalyticsPreview',
+      infoId: 'trackerAnalyticsInfo',
+      onClickHref: '/analysis/tracker-logs?tab=analytics',
+      chartType: 'bar',
+      chartOptions: {
+        dataset: {
+          label: 'Recent activity',
+          borderColor: '#2563eb',
+          backgroundColor: 'rgba(37, 99, 235, 0.35)',
+          borderWidth: 1,
+        },
+        options: {
+          plugins: {
+            tooltip: { enabled: true },
+            legend: { display: false },
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+            },
+            y: {
+              beginAtZero: true,
+              ticks: { precision: 0 },
+              title: { display: true, text: 'Count' },
+            },
+          },
+        },
+      },
+      summaryFormatter(data) {
+        if (!data) return '';
+        const start = data.start_display || data.start_time || data.start_date || 'N/A';
+        const end = data.end_display || data.end_time || data.end_date || 'N/A';
+        const sessions = Number(data.total_sessions || 0);
+        const events = Number(data.total_events || 0);
+        const navigation = Number(data.total_navigation_events || 0);
+        const backtracks = Number(data.total_backtracking_events || 0);
+        const avg = (data.average_duration_label || '').trim() || '--';
+        return `${start} to ${end} | ${sessions} sessions, ${events} events | Nav ${navigation} / Backtracks ${backtracks} | Avg ${avg}`;
       },
     },
   ];
@@ -525,6 +579,25 @@ document.addEventListener('DOMContentLoaded', () => {
         }
       });
     });
+
+    const preferredTab = (container.dataset.initialTab || '').trim();
+    let initialTarget = null;
+    if (preferredTab) {
+      const matching = tabs.find((tab) => tab.dataset.tabTarget === preferredTab);
+      if (matching) {
+        initialTarget = matching.dataset.tabTarget;
+      }
+    }
+    if (!initialTarget) {
+      const explicitlyActive = tabs.find((tab) => tab.classList.contains('is-active'));
+      initialTarget = explicitlyActive ? explicitlyActive.dataset.tabTarget : null;
+    }
+    if (!initialTarget && tabs[0]) {
+      initialTarget = tabs[0].dataset.tabTarget;
+    }
+    if (initialTarget) {
+      activateTab(initialTarget);
+    }
   });
 
   const chatContainer = document.getElementById('bug-chat-container');

@@ -476,14 +476,33 @@
     <h1>Application Tracker Logs</h1>
     <p class="page-intro">Review recent application interaction sessions recorded by the in-app tracker. Use the filters to explore behaviour by role, event type, or backtracking activity.</p>
 
-    <div class="dashboard-tabs" data-tabs>
+    <div class="dashboard-tabs" data-tabs data-initial-tab="{{ active_tab }}">
       <div class="tab-nav" role="tablist" aria-label="Tracker views">
-        <button class="tab-link is-active" type="button" role="tab" aria-selected="true" tabindex="0" data-tab-target="analytics">Tracker Analytics</button>
-        <button class="tab-link" type="button" role="tab" aria-selected="false" tabindex="-1" data-tab-target="bug-reports">Bug Reports</button>
+        <button
+          class="tab-link {% if active_tab == 'analytics' %}is-active{% endif %}"
+          type="button"
+          role="tab"
+          aria-selected="{{ 'true' if active_tab == 'analytics' else 'false' }}"
+          tabindex="{{ '0' if active_tab == 'analytics' else '-1' }}"
+          data-tab-target="analytics"
+        >Tracker Analytics</button>
+        <button
+          class="tab-link {% if active_tab == 'bug-reports' %}is-active{% endif %}"
+          type="button"
+          role="tab"
+          aria-selected="{{ 'true' if active_tab == 'bug-reports' else 'false' }}"
+          tabindex="{{ '0' if active_tab == 'bug-reports' else '-1' }}"
+          data-tab-target="bug-reports"
+        >Bug Reports</button>
       </div>
 
       <div class="tab-panels">
-        <section class="tab-panel is-active" role="tabpanel" data-tab-panel="analytics" aria-hidden="false">
+        <section
+          class="tab-panel {% if active_tab == 'analytics' %}is-active{% endif %}"
+          role="tabpanel"
+          data-tab-panel="analytics"
+          aria-hidden="{{ 'false' if active_tab == 'analytics' else 'true' }}"
+        >
           <form class="filters" method="get">
             <label>
               Role
@@ -682,7 +701,12 @@
           {% endif %}
         </section>
 
-        <section class="tab-panel" role="tabpanel" data-tab-panel="bug-reports" aria-hidden="true">
+        <section
+          class="tab-panel {% if active_tab == 'bug-reports' %}is-active{% endif %}"
+          role="tabpanel"
+          data-tab-panel="bug-reports"
+          aria-hidden="{{ 'false' if active_tab == 'bug-reports' else 'true' }}"
+        >
           <header>
             <h2>Bug Reports</h2>
             <p>Monitor issues submitted by users and coordinate follow-up directly from this dashboard.</p>

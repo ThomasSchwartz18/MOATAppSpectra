@@ -3,6 +3,8 @@ import os
 os.environ.setdefault("USER_PASSWORD", "pw")
 os.environ.setdefault("ADMIN_PASSWORD", "pw")
 
+import json
+from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -30,6 +32,38 @@ def _login(client, role=None):
 
 def _make_fetch(rows, error=None):
     return lambda *args, rows=rows, error=error, **kwargs: (rows, error)
+
+
+class _TrackerCursor:
+    def __init__(self, rows):
+        self._rows = rows
+
+    def fetchall(self):
+        return self._rows
+
+
+class _TrackerConnection:
+    def __init__(self, session_rows, event_rows):
+        self._session_rows = session_rows
+        self._event_rows = event_rows
+
+    def execute(self, query, params=()):
+        query_lower = query.lower()
+        if 'from sessions' in query_lower:
+            return _TrackerCursor(self._session_rows)
+        if 'from click_events' in query_lower:
+            return _TrackerCursor(self._event_rows)
+        raise AssertionError(f'Unexpected query: {query}')
+
+
+class _TrackerStub:
+    def __init__(self, session_rows, event_rows):
+        self._session_rows = session_rows
+        self._event_rows = event_rows
+
+    @contextmanager
+    def _connect(self):
+        yield _TrackerConnection(self._session_rows, self._event_rows)
 
 
 def _current_day():
@@ -150,6 +184,51 @@ def _bug_preview_patch():
     return {"fetch_bug_reports": _make_fetch(rows)}
 
 
+def _tracker_preview_patch():
+    today = _current_day()
+    session_rows = [
+        {
+            'session_token': 'abc',
+            'start_time': f'{today.isoformat()}T09:00:00+00:00',
+            'end_time': f'{today.isoformat()}T09:05:00+00:00',
+            'duration_seconds': 300,
+        },
+        {
+            'session_token': 'def',
+            'start_time': f'{today.isoformat()}T10:00:00+00:00',
+            'end_time': None,
+            'duration_seconds': None,
+        },
+    ]
+
+    event_rows = [
+        {
+            'session_token': 'abc',
+            'event_name': 'navigate',
+            'context': json.dumps({'href': '/home', 'text': 'Home'}),
+            'metadata': None,
+            'occurred_at': f'{today.isoformat()}T09:01:30+00:00',
+        },
+        {
+            'session_token': 'abc',
+            'event_name': 'navigate',
+            'context': json.dumps({'href': '/home', 'text': 'Home'}),
+            'metadata': None,
+            'occurred_at': f'{today.isoformat()}T09:02:45+00:00',
+        },
+        {
+            'session_token': 'def',
+            'event_name': 'navigate',
+            'context': json.dumps({'href': '/reports', 'text': 'Reports'}),
+            'metadata': None,
+            'occurred_at': f'{today.isoformat()}T10:02:00+00:00',
+        },
+    ]
+
+    tracker = _TrackerStub(session_rows, event_rows)
+    return {'_get_tracker': lambda: tracker}
+
+
 PREVIEW_CASES = [
     ("/moat_preview", _moat_preview_patch),
     ("/aoi_preview", _aoi_preview_patch),
@@ -157,6 +236,7 @@ PREVIEW_CASES = [
     ("/daily_reports_preview", _daily_preview_patch),
     ("/forecast_preview", _forecast_preview_patch),
     ("/bug_reports_preview", _bug_preview_patch),
+    ("/tracker_preview", _tracker_preview_patch),
 ]
 
 
@@ -179,11 +259,16 @@ def test_home_dashboard_previews_return_expected_fields(
     assert payload is not None
     assert "labels" in payload
     assert {"values", "yields"} & payload.keys()
-    assert "start_date" in payload
-    assert "end_date" in payload
+    assert ("start_date" in payload) or ("start_time" in payload)
+    assert ("end_date" in payload) or ("end_time" in payload)
     if endpoint == "/bug_reports_preview":
         assert "summary" in payload
         assert payload["summary"]["total_reports"] == 3
+    if endpoint == "/tracker_preview":
+        assert payload["total_sessions"] == 2
+        assert payload["total_navigation_events"] == 3
+        assert payload["total_backtracking_events"] == 1
+        assert payload["summary_text"]
 
 
 def test_home_admin_renders_diagnostics(app_instance, monkeypatch):
