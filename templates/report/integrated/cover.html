@@ -2,7 +2,9 @@
     <br>
     <header>
         <h1>
-            <img src="{{ logo_url or url_for('static', filename='images/company-logo.png') }}" alt="Company logo" class="company-logo-pdf"/>
+            {% if logo_url %}
+            <img src="{{ logo_url }}" alt="Company logo" class="company-logo-pdf"/>
+            {% endif %}
             {{ title or 'AOI Integrated Report' }}
         </h1>
     </header>

@@ -180,7 +180,7 @@ def test_operator_cover_page(app_instance, monkeypatch):
         assert resp.status_code == 200
         html = resp.data.decode()
         assert "cover-page" in html
-        assert "/static/images/company-logo.png" in html
+        assert "http://localhost/static/images/company-logo.png" in html
         assert "Alice" in html
 
         resp = client.get(

@@ -2974,7 +2974,9 @@ def export_integrated_report():
     report_date = _get('report_date')
     period = _get('period')
     author = _get('author')
-    logo_url = _get('logo_url')
+    logo_url = _get('logo_url') or url_for(
+        'static', filename='images/company-logo.png', _external=True
+    )
     footer_left = _get('footer_left')
     report_id = _get('report_id')
     contact = _get('contact', 'tschwartz@4spectra.com')
@@ -3070,6 +3072,10 @@ def export_aoi_daily_report():
     show_cover = str(request.args.get('show_cover', 'false')).lower() not in {'0', 'false', 'no'}
     report_css = _load_report_css()
 
+    logo_url = request.args.get('logo_url') or url_for(
+        'static', filename='images/company-logo.png', _external=True
+    )
+
     html = render_template(
         'report/aoi_daily/index.html',
         day=day.isoformat(),
@@ -3078,6 +3084,7 @@ def export_aoi_daily_report():
         end=end,
         generated_at=generated_at,
         contact=contact,
+        logo_url=logo_url,
         report_css=report_css,
         **payload,
     )
@@ -3516,7 +3523,9 @@ def export_operator_report():
     report_date = _get('report_date')
     period = _get('period')
     author = _get('author')
-    logo_url = _get('logo_url') or url_for('static', filename='images/company-logo.png')
+    logo_url = _get('logo_url') or url_for(
+        'static', filename='images/company-logo.png', _external=True
+    )
     footer_left = _get('footer_left')
     report_id = _get('report_id')
     contact = _get('contact', 'tschwartz@4spectra.com')

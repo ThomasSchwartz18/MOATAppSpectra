@@ -35,7 +35,9 @@ def _mock_report(monkeypatch):
     def fake_render(template, **context):
         tpl = (
             "{% if show_cover %}"
-            "<section class='report-section cover-page'>cover</section>"
+            "<section class='report-section cover-page'>"
+            "{% if logo_url %}<img class='logo' src='{{ logo_url }}'/>{% endif %}"
+            "cover</section>"
             "{% endif %}"
             "{% if show_summary %}"
             "<section class='report-section summary-page{% if show_cover %} summary-after-cover{% endif %}'>"
@@ -122,6 +124,21 @@ def test_cover_contains_toc_when_summary_enabled(app_instance, monkeypatch):
         assert "<div class='summary'>" in summary_content
         assert "Table of Contents" in summary_content
         assert summary_content.index("<div class='summary'>") < summary_content.index("Table of Contents")
+
+
+def test_integrated_export_uses_absolute_logo_url(app_instance, monkeypatch):
+    _mock_report(monkeypatch)
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        with client.session_transaction() as sess:
+            sess["username"] = "tester"
+        resp = client.get(
+            "/reports/integrated/export?format=html",
+            json={"show_cover": True, "show_summary": False},
+        )
+        assert resp.status_code == 200
+        html = resp.data.decode()
+        assert "http://localhost/static/images/company-logo.png" in html
 
 
 def test_data_keys_present_in_pdf(app_instance, monkeypatch):
