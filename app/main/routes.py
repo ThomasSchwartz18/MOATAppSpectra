@@ -2366,11 +2366,7 @@ def tracker_preview():
     end_display = _tracker_format_timestamp(last_end, local_zone)
 
     if total_sessions:
-        summary_text = (
-            f"{start_display or 'N/A'} to {end_display or 'N/A'} | "
-            f"{total_sessions} sessions | {total_events} events | "
-            f"Avg session {average_duration_label}"
-        )
+        summary_text = f"Average Time: {average_duration_label}"
     else:
         summary_text = "No recent tracking sessions recorded."
 

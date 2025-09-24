@@ -268,7 +268,10 @@ def test_home_dashboard_previews_return_expected_fields(
         assert payload["total_sessions"] == 2
         assert payload["total_navigation_events"] == 3
         assert payload["total_backtracking_events"] == 1
-        assert payload["summary_text"]
+        assert (
+            payload["summary_text"]
+            == f"Average Time: {payload['average_duration_label']}"
+        )
 
 
 def test_home_admin_renders_diagnostics(app_instance, monkeypatch):

@@ -269,7 +269,7 @@ def test_tracker_preview_returns_summary(app_instance, monkeypatch):
         assert data['total_backtracking_events'] == 1
         assert data['average_duration_seconds'] is not None
         assert data['average_duration_label']
-        assert data['summary_text']
+        assert data['summary_text'] == f"Average Time: {data['average_duration_label']}"
         assert ('start_time' in data and data['start_time']) or (
             'start_date' in data and data['start_date']
         )
