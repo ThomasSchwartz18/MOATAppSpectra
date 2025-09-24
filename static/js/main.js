@@ -451,7 +451,6 @@ document.addEventListener('DOMContentLoaded', () => {
   renderTablePreview({
     endpoint: '/bug_reports_preview',
     tableId: 'bugReportsPreviewTable',
-    infoId: 'bugReportsInfo',
     summaryFormatter(data) {
       if (!data || !data.summary) return '';
       const { summary } = data;
