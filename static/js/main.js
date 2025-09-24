@@ -480,20 +480,30 @@ document.addEventListener('DOMContentLoaded', () => {
     infoId: 'trackerAnalyticsInfo',
     summaryFormatter(data) {
       if (!data) return '';
-      const start = data.start_display || data.start_time || data.start_date || 'N/A';
-      const end = data.end_display || data.end_time || data.end_date || 'N/A';
-      const sessions = Number(data.total_sessions || 0);
-      const events = Number(data.total_events || 0);
-      const navigation = Number(data.total_navigation_events || 0);
-      const backtracks = Number(data.total_backtracking_events || 0);
-      const avg = (data.average_duration_label || '').trim() || '--';
-      return [
-        `${start} to ${end}`,
-        `${sessions} sessions`,
-        `${events} events`,
-        `Nav ${navigation} / Backtracks ${backtracks}`,
-        `Avg ${avg}`,
-      ].join(' | ');
+
+      const trimmedAvg = (data.average_duration_label || '').trim();
+      if (trimmedAvg) {
+        return `Average Time: ${trimmedAvg}`;
+      }
+
+      const seconds = Number(data.average_duration_seconds);
+      if (Number.isFinite(seconds)) {
+        const totalSeconds = Math.max(0, seconds);
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const secs = Math.round(totalSeconds % 60);
+        const parts = [];
+        if (hours) {
+          parts.push(`${hours}h`);
+        }
+        if (minutes) {
+          parts.push(`${minutes}m`);
+        }
+        parts.push(`${secs}s`);
+        return `Average Time: ${parts.join(' ')}`;
+      }
+
+      return 'Average Time: --';
     },
     emptyMessage: 'No recent tracker activity.',
     valueFormatter(value) {
