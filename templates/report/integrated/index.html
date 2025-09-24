@@ -7,22 +7,24 @@
     <style>{{ report_css|safe }}</style>
 </head>
 <body>
-    {% if show_cover %}
-        {% include 'report/integrated/cover.html' %}
-    {% endif %}
-    {% if show_summary %}
-        {% include 'report/summary_toc.html' %}
-    {% endif %}
-    {% include 'report/integrated/yield_trend.html' %}
-    {% include 'report/integrated/operator_reject.html' %}
-    {% include 'report/integrated/model_false_calls.html' %}
-    {% include 'report/integrated/fc_vs_ng_rate.html' %}
-    {% include 'report/integrated/fc_ng_ratio.html' %}
-    {% include 'report/integrated/defect_intelligence.html' %}
-    {% include 'report/integrated/operator_reliability.html' %}
-    {% include 'report/integrated/operator_production.html' %}
-    {% include 'report/integrated/low_yield_assemblies.html' %}
-    {% include 'report/integrated/capa_action_register.html' %}
-    {% include 'report/integrated/appendix.html' %}
+    <main class="report-page">
+        {% if show_cover %}
+            {% include 'report/integrated/cover.html' %}
+        {% endif %}
+        {% if show_summary %}
+            {% include 'report/summary_toc.html' %}
+        {% endif %}
+        {% include 'report/integrated/yield_trend.html' %}
+        {% include 'report/integrated/operator_reject.html' %}
+        {% include 'report/integrated/model_false_calls.html' %}
+        {% include 'report/integrated/fc_vs_ng_rate.html' %}
+        {% include 'report/integrated/fc_ng_ratio.html' %}
+        {% include 'report/integrated/defect_intelligence.html' %}
+        {% include 'report/integrated/operator_reliability.html' %}
+        {% include 'report/integrated/operator_production.html' %}
+        {% include 'report/integrated/low_yield_assemblies.html' %}
+        {% include 'report/integrated/capa_action_register.html' %}
+        {% include 'report/integrated/appendix.html' %}
+    </main>
 </body>
 </html>

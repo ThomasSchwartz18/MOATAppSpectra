@@ -46,6 +46,16 @@ body {
     font-size: 13px;
 }
 
+.report-page {
+    max-width: 8.5in;
+    width: 100%;
+    margin: 0 auto;
+}
+
+.report-page > * {
+    width: 100%;
+}
+
 h1,
 h2,
 h3,
