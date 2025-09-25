@@ -741,6 +741,49 @@ p {
   resize: vertical;
 }
 
+.content select,
+.content .field-row select,
+.modal select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: var(--surface);
+  border: var(--border-thin) solid var(--border-muted);
+  border-radius: 10px;
+  padding: 11px 42px 11px 16px;
+  color: var(--ink);
+  font-size: 0.95rem;
+  line-height: 1.4;
+  min-height: 42px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    0 1px 2px rgba(17, 24, 39, 0.08);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--border-strong) 50%),
+    linear-gradient(135deg, var(--border-strong) 50%, transparent 50%),
+    linear-gradient(to right, var(--border-muted), var(--border-muted));
+  background-position:
+    calc(100% - 22px) calc(50% - 4px),
+    calc(100% - 16px) calc(50% - 4px),
+    calc(100% - 2.8rem) 0.45rem;
+  background-size: 8px 8px, 8px 8px, 1px 70%;
+  background-repeat: no-repeat;
+}
+
+.content select:hover,
+.content .field-row select:hover,
+.modal select:hover {
+  border-color: var(--border-hover);
+}
+
+.content select:focus,
+.content .field-row select:focus,
+.modal select:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
 .full-width {
   grid-column: 1 / -1;
 }
@@ -751,16 +794,70 @@ p {
   flex-wrap: wrap;
 }
 
+.content button,
+.content input[type='button'],
+.content input[type='submit'],
+.modal button,
+.modal input[type='button'],
+.modal input[type='submit'] {
+  font-family: var(--font-base);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 12px 20px;
+  border-radius: 999px;
+  border: var(--border-thin) solid var(--border-muted);
+  background: linear-gradient(180deg, var(--surface), var(--muted-light));
+  color: var(--ink);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  transition: transform 0.18s ease, box-shadow 0.18s ease,
+    border-color 0.18s ease, background-color 0.18s ease;
+}
+
+.content button:hover,
+.content button:focus,
+.content input[type='button']:hover,
+.content input[type='button']:focus,
+.content input[type='submit']:hover,
+.content input[type='submit']:focus,
+.modal button:hover,
+.modal button:focus,
+.modal input[type='button']:hover,
+.modal input[type='button']:focus,
+.modal input[type='submit']:hover,
+.modal input[type='submit']:focus {
+  border-color: var(--accent);
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.12);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.content button:disabled,
+.content input[type='button']:disabled,
+.content input[type='submit']:disabled,
+.modal button:disabled,
+.modal input[type='button']:disabled,
+.modal input[type='submit']:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  transform: none;
+  box-shadow: none;
+}
+
 button.primary,
 .primary {
   background: var(--accent);
   color: #fff;
   border: none;
-  padding: 12px 16px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  cursor: pointer;
-  transition: background 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 12px 24px rgba(10, 155, 168, 0.35);
+  transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
 button.primary:hover,
@@ -769,18 +866,16 @@ button.primary:focus,
 .primary:focus {
   background: var(--accent-strong);
   transform: translateY(-1px);
+  box-shadow: 0 16px 30px rgba(11, 107, 116, 0.3);
 }
 
 button.ghost,
 .ghost {
   background: transparent;
   border: var(--border-thin) solid var(--border);
-  padding: 12px 16px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
   color: var(--ink);
-  cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 button.ghost:hover,
@@ -790,6 +885,7 @@ button.ghost:focus,
   background: var(--muted);
   border-color: var(--accent);
   color: var(--accent-strong);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
 }
 
 .data-table {
@@ -842,7 +938,7 @@ textarea,
 input,
 select,
 button {
-  border-radius: 0;
+  border-radius: 10px;
 }
 
 @media (max-width: 1100px) {

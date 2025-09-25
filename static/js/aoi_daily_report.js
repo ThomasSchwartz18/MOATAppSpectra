@@ -1,4 +1,4 @@
-import { showSpinner, hideSpinner } from './utils.js';
+import { downloadFile } from './utils.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   const runBtn = document.getElementById('run-report');
@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .catch(() => alert('Failed to run report.'));
   });
 
-  downloadBtn?.addEventListener('click', () => {
+  downloadBtn?.addEventListener('click', async () => {
     const fmt = document.getElementById('file-format').value;
     const date = document.getElementById('report-date').value;
     if (!date) {
@@ -32,8 +32,8 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     const params = new URLSearchParams({ format: fmt, date, show_cover: 'true' });
-    showSpinner('download-report');
-    window.location = `/reports/aoi_daily/export?${params.toString()}`;
-    setTimeout(() => hideSpinner('download-report'), 3000);
+    await downloadFile(`/reports/aoi_daily/export?${params.toString()}`, {
+      buttonId: 'download-report',
+    });
   });
 });

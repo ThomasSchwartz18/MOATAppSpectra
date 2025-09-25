@@ -46,7 +46,7 @@ function getDropdownValues(className) {
     .filter((v) => v);
 }
 
-import { showSpinner, hideSpinner } from './utils.js';
+import { downloadFile } from './utils.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   const runBtn = document.getElementById('run-report');
@@ -83,7 +83,7 @@ document.addEventListener('DOMContentLoaded', () => {
       .catch(() => alert('Failed to run report.'));
   });
 
-  downloadBtn?.addEventListener('click', () => {
+  downloadBtn?.addEventListener('click', async () => {
     const fmt = document.getElementById('file-format').value;
     const start = document.getElementById('start-date').value;
     const end = document.getElementById('end-date').value;
@@ -94,9 +94,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (start) params.append('start_date', start);
     if (end) params.append('end_date', end);
     if (operator) params.append('operator', operator);
-    showSpinner('download-report');
-    window.location = `/reports/operator/export?${params.toString()}`;
-    setTimeout(() => hideSpinner('download-report'), 3000);
+    await downloadFile(`/reports/operator/export?${params.toString()}`, {
+      buttonId: 'download-report',
+    });
   });
 
   document.getElementById('email-report')?.addEventListener('click', () => {
