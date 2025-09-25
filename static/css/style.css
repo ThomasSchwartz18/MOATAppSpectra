@@ -535,7 +535,7 @@ p {
   align-items: center;
   margin-left: 6px;
   padding: 2px 8px;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--muted-dark);
   color: var(--accent-strong);
   font-size: 0.6rem;
@@ -548,7 +548,7 @@ p {
   background: rgba(192, 57, 43, 0.08);
   color: var(--danger);
   padding: 12px 16px;
-  border-radius: 8px;
+  border-radius: 0;
 }
 
 .feature-grid {
@@ -613,7 +613,7 @@ p {
   display: inline-flex;
   align-items: center;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: 0;
   font-size: 0.7rem;
   text-transform: uppercase;
   letter-spacing: 0.12em;
@@ -658,7 +658,7 @@ p {
   min-height: 72px;
   resize: vertical;
   padding: 10px;
-  border-radius: 8px;
+  border-radius: 0;
   border: var(--border-thin) solid var(--border-muted);
 }
 
@@ -749,7 +749,7 @@ p {
   -moz-appearance: none;
   background-color: var(--surface);
   border: var(--border-thin) solid var(--border-muted);
-  border-radius: 10px;
+  border-radius: 0;
   padding: 11px 42px 11px 16px;
   color: var(--ink);
   font-size: 0.95rem;
@@ -806,7 +806,7 @@ p {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   padding: 12px 20px;
-  border-radius: 999px;
+  border-radius: 0;
   border: var(--border-thin) solid var(--border-muted);
   background: linear-gradient(180deg, var(--surface), var(--muted-light));
   color: var(--ink);
@@ -938,7 +938,7 @@ textarea,
 input,
 select,
 button {
-  border-radius: 10px;
+  border-radius: 0;
 }
 
 @media (max-width: 1100px) {
@@ -1190,7 +1190,7 @@ button {
   margin-top: 8px;
   padding: 8px 12px;
   border-left: 4px solid var(--danger);
-  border-radius: 6px;
+  border-radius: 0;
   background: var(--muted);
   color: var(--danger);
   font-weight: 600;
@@ -1333,7 +1333,7 @@ body.employee-layout .content {
   align-items: center;
   gap: 6px;
   padding: 10px 18px;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--button-bg);
   color: var(--surface);
   text-decoration: none;
@@ -1470,7 +1470,7 @@ body.employee-layout .content {
 
 .inspection-progress {
   border: var(--border-thin) solid var(--border-strong);
-  border-radius: 12px;
+  border-radius: 0;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -1480,7 +1480,7 @@ body.employee-layout .content {
 
 .inspection-progress__track {
   background: var(--border-light);
-  border-radius: 999px;
+  border-radius: 0;
   height: 8px;
   overflow: hidden;
   position: relative;
@@ -1488,7 +1488,7 @@ body.employee-layout .content {
 
 .inspection-progress__bar {
   background: linear-gradient(90deg, var(--accent) 0%, var(--accent-strong) 100%);
-  border-radius: inherit;
+  border-radius: 0;
   height: 100%;
   width: 0%;
   transition: width 0.3s ease;
@@ -1706,7 +1706,7 @@ body.employee-layout .content {
 .employee-area-message {
   padding: 16px;
   background: var(--surface);
-  border-radius: 12px;
+  border-radius: 0;
   border: var(--border-thin) solid var(--border);
   color: var(--ink-subtle);
 }
@@ -1797,7 +1797,7 @@ body.employee-layout .content {
 .employee-field-grid select,
 .employee-field-full textarea {
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: 0;
   border: var(--border-thin) solid var(--border);
   font-size: 1rem;
   background: var(--surface);
@@ -1806,7 +1806,7 @@ body.employee-layout .content {
 .employee-submit {
   align-self: flex-start;
   padding: 12px 20px;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--button-bg);
   color: var(--surface);
   font-weight: 600;
@@ -1895,7 +1895,7 @@ body.employee-layout .content {
   position: relative;
   width: 44px;
   height: 24px;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--border-muted);
   transition: background 0.2s ease;
   flex-shrink: 0;
@@ -1907,7 +1907,7 @@ body.employee-layout .content {
   left: 2px;
   width: 20px;
   height: 20px;
-  border-radius: 999px;
+  border-radius: 0;
   background: var(--surface);
   box-shadow: var(--shadow-ambient);
   transition: transform 0.2s ease;
@@ -1938,7 +1938,7 @@ body.employee-layout .content {
   background: var(--button-bg);
   color: var(--surface);
   border: none;
-  border-radius: 32px;
+  border-radius: 0;
   font-weight: 600;
   font-size: 0.95rem;
   box-shadow: var(--shadow-soft);
@@ -1966,7 +1966,7 @@ body.employee-layout .content {
   max-width: calc(100vw - 32px);
   max-height: calc(100vh - 120px);
   background: var(--surface);
-  border-radius: 18px;
+  border-radius: 0;
   box-shadow: var(--shadow-soft);
   border: var(--border-thin) solid var(--border-muted);
   display: flex;
@@ -2042,7 +2042,7 @@ body.employee-layout .content {
 
 .bug-chat-message {
   padding: 10px 12px;
-  border-radius: 12px;
+  border-radius: 0;
   font-size: 0.9rem;
   line-height: 1.4;
   box-shadow: var(--shadow-ambient);
@@ -2097,7 +2097,7 @@ body.employee-layout .content {
 .bug-chat-field select {
   width: 100%;
   border: var(--border-thin) solid var(--border-muted);
-  border-radius: 8px;
+  border-radius: 0;
   padding: 10px 12px;
   font-size: 0.95rem;
   font-family: inherit;
@@ -2127,7 +2127,7 @@ body.employee-layout .content {
 .bug-chat-submit,
 .bug-chat-reset {
   padding: 10px 18px;
-  border-radius: 8px;
+  border-radius: 0;
   border: none;
   font-weight: 600;
   cursor: pointer;
@@ -2158,7 +2158,7 @@ body.employee-layout .content {
   border: none;
   padding: 12px;
   margin: 0;
-  border-radius: 8px;
+  border-radius: 0;
   background: #fff4d9;
   color: #8a650f;
   font-size: 0.9rem;

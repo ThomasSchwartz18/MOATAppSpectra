@@ -58,6 +58,7 @@
         <h3 class="inspection-sheet__heading" data-sheet-title></h3>
         <p class="inspection-sheet__subheading" data-sheet-subtitle hidden></p>
         <form class="inspection-sheet" data-sheet-form data-operator-username="{{ username or '' }}" novalidate>
+          <input type="hidden" name="program">
           <div class="inspection-progress" data-progress>
             <div class="inspection-progress__track">
               <div class="inspection-progress__bar" data-progress-bar></div>
@@ -103,12 +104,6 @@
                 <label class="inspection-field">
                   <span class="inspection-field__label">Customer</span>
                   <input type="text" name="customer" required>
-                </label>
-              </div>
-              <div class="inspection-step" data-step data-step-name="program">
-                <label class="inspection-field">
-                  <span class="inspection-field__label">Program</span>
-                  <input type="text" name="program" required>
                 </label>
               </div>
               <div class="inspection-step" data-step data-step-name="assembly">
@@ -214,11 +209,6 @@
               </button>
               <input type="hidden" name="operator_signature_acknowledged" data-signature-field>
               <span class="inspection-signature__hint">Select to confirm</span>
-            </div>
-            <div class="inspection-signature">
-              <span class="inspection-signature__label">Quality Approval</span>
-              <span class="inspection-signature__line" aria-hidden="true"></span>
-              <span class="inspection-signature__hint">QA review</span>
             </div>
           </section>
 

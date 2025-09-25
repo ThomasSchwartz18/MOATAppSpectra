@@ -419,6 +419,8 @@ function setupAoiArea(container) {
     return;
   }
 
+  const rejectionReasonSelects = new Set();
+
   picker.hidden = false;
   sheetPanel.hidden = true;
   if (sheetPlaceholder) {
@@ -445,8 +447,6 @@ function setupAoiArea(container) {
     SMT: 'Surface Mount Technology',
     TH: 'Through-Hole Assembly',
   };
-
-  const rejectionReasonSelects = new Set();
 
   function populateDefectSelect(select, selectedId = '') {
     if (!select) return;
