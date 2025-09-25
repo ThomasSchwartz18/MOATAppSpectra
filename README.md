@@ -56,7 +56,9 @@ retrieved MOAT row so that charts and exports display the original run date.
 Remove the helper once the source data is fixed.
 
 ## Run
-1. Install dependencies in your environment:
+1. Install dependencies in your environment. `pywebview` powers the desktop UI
+   wrapper and `pyinstaller` can be used to build frozen executables for the
+   desktop launcher:
    ```bash
    pip install -r requirements.txt
    ```
@@ -66,7 +68,13 @@ Remove the helper once the source data is fixed.
    ```
    The script loads variables from `.env`, builds the app factory, and launches a
    development server on `http://127.0.0.1:5000/`.
-3. Launch the AOI operator grading API when needed:
+3. Launch the desktop wrapper when you prefer to host the web UI inside a
+   native window via PyWebview:
+   ```bash
+   python desktop_main.py
+   ```
+   The script spins up the Flask application and renders it in a webview.
+4. Launch the AOI operator grading API when needed:
    ```bash
    uvicorn api_aoi_grading:app --reload --port 8080
    ```
