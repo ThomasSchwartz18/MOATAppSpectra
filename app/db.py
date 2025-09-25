@@ -48,6 +48,88 @@ def _apply_report_date_offset(rows: list[dict]) -> list[dict]:
     return rows
 
 
+def fetch_app_versions() -> tuple[list[dict] | None, str | None]:
+    """Return all recorded application release versions."""
+
+    supabase, error = _ensure_supabase_client()
+    if error:
+        return [], error
+
+    try:
+        response = (
+            supabase.table("app_versions")
+            .select("*")
+            .order("updated_at", desc=True)
+            .execute()
+        )
+        return response.data or [], None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to fetch app versions: {exc}"
+
+
+def fetch_app_version(platform: str) -> tuple[dict | None, str | None]:
+    """Return the release record for ``platform`` if available."""
+
+    if not platform:
+        return None, "Platform is required"
+
+    supabase, error = _ensure_supabase_client()
+    if error:
+        return None, error
+
+    try:
+        response = (
+            supabase.table("app_versions")
+            .select("*")
+            .eq("platform", platform)
+            .limit(1)
+            .execute()
+        )
+        records = response.data or []
+        return (records[0] if records else None), None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to fetch app version: {exc}"
+
+
+def upsert_app_version(
+    platform: str,
+    version: str,
+    *,
+    download_url: str | None = None,
+    checksum: str | None = None,
+    release_notes: str | None = None,
+) -> tuple[list[dict] | None, str | None]:
+    """Create or update a release entry for ``platform``."""
+
+    if not platform:
+        return None, "Platform is required"
+    if not version:
+        return None, "Version is required"
+
+    supabase, error = _ensure_supabase_client()
+    if error:
+        return None, error
+
+    payload = {
+        "platform": platform,
+        "version": version,
+        "download_url": download_url or None,
+        "checksum": checksum or None,
+        "release_notes": release_notes or None,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+    try:
+        response = (
+            supabase.table("app_versions")
+            .upsert(payload, on_conflict="platform")
+            .execute()
+        )
+        return response.data or [], None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to update app version: {exc}"
+
+
 def fetch_feature_states() -> tuple[list[dict] | None, str | None]:
     """Return all persisted feature availability records."""
 

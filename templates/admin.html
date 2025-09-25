@@ -44,6 +44,14 @@
           <ul>
             <li><strong>Supabase Connection</strong> &mdash; {{ overview.supabase_status }}</li>
             <li><strong>Tracked Tables Available</strong> &mdash; {{ available_tables|length }} / {{ overview.tracked_tables|length }}</li>
+            <li>
+              <strong>Current Release</strong> &mdash;
+              {% if overview.latest_app_version %}
+                {{ overview.latest_app_version.version }} ({{ overview.latest_app_version.platform }})
+              {% else %}
+                Not tracked
+              {% endif %}
+            </li>
             <li><strong>Users with Console Access</strong> &mdash; {{ overview.user_count }}</li>
             <li><strong>Last Connectivity Check</strong> &mdash; {{ overview.last_checked.strftime('%Y-%m-%d %H:%M UTC') }}</li>
           </ul>
@@ -95,6 +103,44 @@
             {% endfor %}
           </tbody>
         </table>
+      </div>
+      <div class="summary-block">
+        <h3>Application Releases</h3>
+        {% if app_version_error %}
+        <p class="feature-alert" role="alert">Release metadata unavailable: {{ app_version_error }}</p>
+        {% endif %}
+        {% if app_versions %}
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Platform</th>
+              <th>Version</th>
+              <th>Updated</th>
+              <th>Download</th>
+              <th>Checksum</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for version in app_versions %}
+            <tr>
+              <td>{{ version.platform }}</td>
+              <td>{{ version.version }}</td>
+              <td>{% if version.updated_at %}{{ version.updated_at }}{% else %}&mdash;{% endif %}</td>
+              <td>
+                {% if version.download_url %}
+                  <a href="{{ version.download_url }}" target="_blank" rel="noopener">Link</a>
+                {% else %}
+                  &mdash;
+                {% endif %}
+              </td>
+              <td>{% if version.checksum %}<code>{{ version.checksum }}</code>{% else %}&mdash;{% endif %}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p class="form-helper">No releases logged yet. Use the <code>app_versions</code> Supabase table to track the deployed web build and the desktop package distributed via your shared drive.</p>
+        {% endif %}
       </div>
       {% if supabase_status.error %}
       <div class="summary-block">

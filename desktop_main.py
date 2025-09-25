@@ -57,7 +57,11 @@ def run_desktop() -> None:
         raise
 
     url = f"http://{host}:{port}"
-    window = webview.create_window("MOAT App Spectra", url)
+    window = webview.create_window(
+        "MOAT App Spectra",
+        url,
+        fullscreen=True,
+    )
 
     shutdown_event = threading.Event()
 
