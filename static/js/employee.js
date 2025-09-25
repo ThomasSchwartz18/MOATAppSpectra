@@ -47,6 +47,73 @@ function setFeedback(element, message, type) {
   }
 }
 
+let defectCatalogData = null;
+let defectCatalogError = null;
+let defectCatalogRequest = null;
+
+function normalizeDefectEntry(entry) {
+  if (!entry || typeof entry !== 'object') return null;
+  const rawId = entry.id;
+  const rawName = entry.name;
+  const id = rawId == null ? '' : String(rawId).trim();
+  if (!id) return null;
+  const name = rawName == null ? '' : String(rawName).trim();
+  return { id, name };
+}
+
+function getDefectCatalog() {
+  return Array.isArray(defectCatalogData) ? defectCatalogData : [];
+}
+
+function ensureDefectCatalogLoaded() {
+  if (Array.isArray(defectCatalogData)) {
+    return Promise.resolve(defectCatalogData);
+  }
+  if (defectCatalogRequest) {
+    return defectCatalogRequest;
+  }
+  defectCatalogError = null;
+  defectCatalogRequest = fetch('/employee/defects', {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+  })
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error('Failed to load defect catalog');
+      }
+      return response.json();
+    })
+    .then((payload) => {
+      const entries = Array.isArray(payload && payload.defects)
+        ? payload.defects
+        : [];
+      const normalized = entries
+        .map((item) => normalizeDefectEntry(item))
+        .filter((item) => item);
+      defectCatalogData = normalized;
+      defectCatalogError = null;
+      return normalized;
+    })
+    .catch((error) => {
+      defectCatalogData = null;
+      defectCatalogError = error || new Error('Failed to load defect catalog');
+      throw defectCatalogError;
+    })
+    .finally(() => {
+      defectCatalogRequest = null;
+    });
+  return defectCatalogRequest;
+}
+
+function formatDefectOptionLabel(defect) {
+  if (!defect) return '';
+  const { id, name } = defect;
+  if (name) {
+    return `${id} — ${name}`;
+  }
+  return id;
+}
+
 function formatErrors(errors) {
   if (!errors) return '';
   if (typeof errors === 'string') return errors;
@@ -346,6 +413,7 @@ function setupAoiArea(container) {
   const signatureDefaultText = signatureDisplay ? signatureDisplay.textContent.trim() : 'Sign on file';
   const operatorUsername = sheetForm ? (sheetForm.dataset.operatorUsername || '').trim() : '';
   const operatorInput = sheetForm ? sheetForm.querySelector('input[name="operator"]') : null;
+  const programInput = sheetForm ? sheetForm.querySelector('input[name="program"]') : null;
 
   if (!picker || !sheetPanel || !sheetTitle || !sheetForm || !feedback || !backButton) {
     return;
@@ -377,6 +445,76 @@ function setupAoiArea(container) {
     SMT: 'Surface Mount Technology',
     TH: 'Through-Hole Assembly',
   };
+
+  const rejectionReasonSelects = new Set();
+
+  function populateDefectSelect(select, selectedId = '') {
+    if (!select) return;
+    const doc = select.ownerDocument || document;
+    const defects = getDefectCatalog();
+    const hasDefects = defects.length > 0;
+    const previous = selectedId || select.value || select.dataset.pendingSelection || '';
+    const placeholder = doc.createElement('option');
+    placeholder.value = '';
+    placeholder.disabled = true;
+    if (defectCatalogError) {
+      placeholder.textContent = 'Unable to load defects';
+      select.disabled = true;
+    } else if (!hasDefects) {
+      placeholder.textContent = 'Loading defects...';
+      select.disabled = true;
+    } else {
+      placeholder.textContent = 'Select defect';
+      select.disabled = false;
+    }
+
+    select.innerHTML = '';
+    select.appendChild(placeholder);
+
+    if (hasDefects) {
+      defects.forEach((defect) => {
+        const option = doc.createElement('option');
+        option.value = defect.id;
+        option.textContent = formatDefectOptionLabel(defect);
+        if (defect.id === previous) {
+          option.selected = true;
+          placeholder.selected = false;
+        }
+        select.appendChild(option);
+      });
+    } else {
+      placeholder.selected = true;
+    }
+
+    if (!select.value && previous && hasDefects) {
+      const match = defects.find((item) => item.id === previous);
+      if (match) {
+        select.value = previous;
+        placeholder.selected = false;
+      }
+    }
+
+    if (!hasDefects && previous) {
+      select.dataset.pendingSelection = previous;
+    } else {
+      delete select.dataset.pendingSelection;
+    }
+  }
+
+  function refreshDefectSelects() {
+    rejectionReasonSelects.forEach((select) => {
+      const current = select.value || select.dataset.pendingSelection || '';
+      populateDefectSelect(select, current);
+    });
+  }
+
+  ensureDefectCatalogLoaded()
+    .then(() => {
+      refreshDefectSelects();
+    })
+    .catch(() => {
+      refreshDefectSelects();
+    });
 
   function updateRejectionEmptyState() {
     if (!rejectionRowsContainer) return;
@@ -412,7 +550,13 @@ function setupAoiArea(container) {
       const reasonInput = row.querySelector('[data-rejection-reason]');
       const quantityInput = row.querySelector('[data-rejection-quantity]');
       const ref = refInput ? refInput.value.trim() : '';
-      const reason = reasonInput ? reasonInput.value.trim() : '';
+      const reasonId = reasonInput ? reasonInput.value.trim() : '';
+      let reasonLabel = '';
+      if (reasonInput && reasonInput.selectedIndex >= 0) {
+        const option = reasonInput.options[reasonInput.selectedIndex];
+        reasonLabel = option && option.textContent ? option.textContent.trim() : '';
+      }
+      const reason = reasonLabel || reasonId;
       const quantityRaw = quantityInput ? quantityInput.value : '';
       const quantityNumber = quantityRaw === '' ? Number.NaN : Number(quantityRaw);
       const isQuantityValid = Number.isFinite(quantityNumber) && Number.isInteger(quantityNumber) && quantityNumber > 0;
@@ -420,6 +564,7 @@ function setupAoiArea(container) {
         row,
         ref,
         reason,
+        reasonId,
         quantity: quantityNumber,
         isQuantityValid,
       };
@@ -430,11 +575,12 @@ function setupAoiArea(container) {
     if (!rejectionHiddenInput) return;
     const rows = collectRejectionRowData();
     const requireDetails = Boolean(rejectionSection && !rejectionSection.hidden);
-    const validEntries = rows.filter((entry) => entry.ref && entry.reason && entry.isQuantityValid);
+    const validEntries = rows.filter((entry) => entry.ref && entry.reasonId && entry.isQuantityValid);
     if (requireDetails && validEntries.length === rows.length && validEntries.length > 0) {
-      const serialized = validEntries.map(({ ref, reason, quantity }) => ({
+      const serialized = validEntries.map(({ ref, reason, reasonId, quantity }) => ({
         ref,
         reason,
+        reason_id: reasonId,
         quantity,
       }));
       rejectionHiddenInput.value = JSON.stringify(serialized);
@@ -452,8 +598,13 @@ function setupAoiArea(container) {
     if (!rejectionRowsContainer) return;
     const rows = Array.from(rejectionRowsContainer.querySelectorAll('[data-rejection-row]'));
     rows.forEach((row) => {
+      const reasonSelect = row.querySelector('[data-rejection-reason]');
+      if (reasonSelect) {
+        rejectionReasonSelects.delete(reasonSelect);
+      }
       row.remove();
     });
+    rejectionReasonSelects.clear();
     updateRejectionEmptyState();
     syncRejectionDetails();
   }
@@ -521,8 +672,12 @@ function setupAoiArea(container) {
     if (refInput && defaults.ref) {
       refInput.value = defaults.ref;
     }
-    if (reasonInput && defaults.reason) {
-      reasonInput.value = defaults.reason;
+    if (reasonInput) {
+      if (defaults.reason_id) {
+        reasonInput.value = defaults.reason_id;
+      } else if (defaults.reason) {
+        reasonInput.value = defaults.reason;
+      }
     }
     if (quantityInput && Number.isFinite(defaults.quantity)) {
       quantityInput.value = String(defaults.quantity);
@@ -533,6 +688,9 @@ function setupAoiArea(container) {
       if (targetRow) {
         markRowValidity(targetRow, true);
       }
+      if (event.target && event.target.hasAttribute && event.target.hasAttribute('data-rejection-reason')) {
+        delete event.target.dataset.pendingSelection;
+      }
       syncRejectionDetails();
     };
 
@@ -541,6 +699,12 @@ function setupAoiArea(container) {
       refInput.addEventListener('change', handleRowChange);
     }
     if (reasonInput) {
+      const pendingSelection = defaults.reason_id || defaults.reason || '';
+      if (pendingSelection) {
+        reasonInput.dataset.pendingSelection = pendingSelection;
+      }
+      rejectionReasonSelects.add(reasonInput);
+      populateDefectSelect(reasonInput, pendingSelection);
       reasonInput.addEventListener('input', handleRowChange);
       reasonInput.addEventListener('change', handleRowChange);
     }
@@ -550,6 +714,9 @@ function setupAoiArea(container) {
     }
     if (removeButton) {
       removeButton.addEventListener('click', () => {
+        if (reasonInput) {
+          rejectionReasonSelects.delete(reasonInput);
+        }
         row.remove();
         updateRejectionEmptyState();
         syncRejectionDetails();
@@ -576,13 +743,18 @@ function setupAoiArea(container) {
     let valid = true;
     const entries = [];
     rows.forEach((entry) => {
-      const rowValid = Boolean(entry.ref) && Boolean(entry.reason) && entry.isQuantityValid;
+      const rowValid = Boolean(entry.ref) && Boolean(entry.reasonId) && entry.isQuantityValid;
       markRowValidity(entry.row, rowValid);
       if (!rowValid) {
         valid = false;
         return;
       }
-      entries.push({ ref: entry.ref, reason: entry.reason, quantity: entry.quantity });
+      entries.push({
+        ref: entry.ref,
+        reason: entry.reason,
+        reason_id: entry.reasonId,
+        quantity: entry.quantity,
+      });
     });
     if (!valid || !entries.length) {
       return { valid: false, entries: [] };
@@ -670,6 +842,19 @@ function setupAoiArea(container) {
       if (wizard) {
         wizard.reset({ focus: true });
       }
+      if (programInput) {
+        programInput.value = activeSheet || '';
+        programInput.readOnly = Boolean(activeSheet);
+        const eventOptions = { bubbles: true };
+        programInput.dispatchEvent(new Event('input', eventOptions));
+        programInput.dispatchEvent(new Event('change', eventOptions));
+      }
+      refreshDefectSelects();
+      ensureDefectCatalogLoaded().then(() => {
+        refreshDefectSelects();
+      }).catch(() => {
+        refreshDefectSelects();
+      });
     });
   });
 
@@ -691,6 +876,9 @@ function setupAoiArea(container) {
     if (sheetSubtitle) {
       sheetSubtitle.textContent = '';
       sheetSubtitle.hidden = true;
+    }
+    if (programInput) {
+      programInput.readOnly = false;
     }
     if (wizard) {
       wizard.reset();
