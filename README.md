@@ -56,7 +56,9 @@ retrieved MOAT row so that charts and exports display the original run date.
 Remove the helper once the source data is fixed.
 
 ## Run
-1. Install dependencies in your environment:
+1. Install dependencies in your environment. `pywebview` powers the desktop UI
+   wrapper and `pyinstaller` can be used to build frozen executables for the
+   desktop launcher:
    ```bash
    pip install -r requirements.txt
    ```
@@ -66,7 +68,17 @@ Remove the helper once the source data is fixed.
    ```
    The script loads variables from `.env`, builds the app factory, and launches a
    development server on `http://127.0.0.1:5000/`.
-3. Launch the AOI operator grading API when needed:
+3. Launch the desktop wrapper when you prefer to host the web UI inside a
+   native window via PyWebview. This is also the quickest way to smoke test the
+   desktop experience because it exercises the embedded server and window stack
+   end-to-end:
+   ```bash
+   python desktop_main.py
+   ```
+   A PyWebview window titled "MOAT App Spectra" will appear once the embedded
+   Flask server finishes booting. Use the same credentials configured via
+   `USER_PASSWORD`, `ADMIN_PASSWORD`, or the Supabase user table to sign in.
+4. Launch the AOI operator grading API when needed:
    ```bash
    uvicorn api_aoi_grading:app --reload --port 8080
    ```
@@ -112,3 +124,46 @@ The fallback runner also honours `app.config["WKHTMLTOPDF_CMD"]` if you prefer
 to configure the command within the Flask application. With the binary
 configured, PDF generation will transparently switch to wkhtmltopdf whenever
 WeasyPrint fails to load.
+
+### Desktop smoke test
+Follow this checklist to confirm the desktop experience works after changes to
+the launcher or its dependencies:
+
+1. Ensure environment variables are set (for example via `.env`) so the Flask
+   app can start and at least one set of credentials is available.
+2. Install Python dependencies and optional native requirements as described in
+   the [Run](#run) section.
+3. Start the desktop wrapper:
+   ```bash
+   python desktop_main.py
+   ```
+   A PyWebview window titled "MOAT App Spectra" should appear once the embedded
+   Flask server finishes booting.
+4. Sign in with a known account and navigate a couple of dashboard pages to
+   verify routing, Supabase connectivity, and static asset loading work as
+   expected.
+5. Close the window and confirm the terminal process exits cleanly (the launcher
+   shuts down the embedded Flask server on window close).
+
+### Creating a desktop shortcut / application bundle
+Running `python desktop_main.py` is sufficient for day-to-day validation, but
+you can also package the launcher as a double-clickable application using
+PyInstaller once you are ready to hand it to non-technical teammates:
+
+1. Ensure dependencies are installed and run PyInstaller in windowed mode so the
+   terminal does not appear alongside the desktop window:
+   ```bash
+   pyinstaller desktop_main.py --name "MOATAppSpectra" --windowed --add-data "static:static" --add-data "templates:templates"
+   ```
+   Adjust `--add-data` paths as needed so the bundled executable can locate
+   Flask assets.
+2. On Windows, copy the generated `.exe` from `dist/MOATAppSpectra/` to a
+   convenient location and use **Send to → Desktop (create shortcut)** from the
+   context menu.
+3. On macOS and Linux, the build produces an executable inside `dist/`. Copy it
+   to `~/Applications` (macOS) or `~/bin` (Linux) and create a shortcut/desktop
+   entry that points to the binary (for example, create a `.desktop` file on
+   GNOME or drag the binary onto the dock on macOS).
+
+Re-run PyInstaller after code or asset changes so the packaged application stays
+in sync with the web app.
