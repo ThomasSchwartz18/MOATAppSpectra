@@ -73,6 +73,9 @@ Remove the helper once the source data is fixed.
    ```bash
    python desktop_main.py
    ```
+   The script spins up the Flask application and renders it in a webview. Use
+   the same credentials configured via `USER_PASSWORD`, `ADMIN_PASSWORD`, or the
+   Supabase user table to sign in.
    The script spins up the Flask application and renders it in a webview.
 4. Launch the AOI operator grading API when needed:
    ```bash
@@ -120,3 +123,23 @@ The fallback runner also honours `app.config["WKHTMLTOPDF_CMD"]` if you prefer
 to configure the command within the Flask application. With the binary
 configured, PDF generation will transparently switch to wkhtmltopdf whenever
 WeasyPrint fails to load.
+
+### Desktop smoke test
+Follow this checklist to confirm the desktop experience works after changes to
+the launcher or its dependencies:
+
+1. Ensure environment variables are set (for example via `.env`) so the Flask
+   app can start and at least one set of credentials is available.
+2. Install Python dependencies and optional native requirements as described in
+   the [Run](#run) section.
+3. Start the desktop wrapper:
+   ```bash
+   python desktop_main.py
+   ```
+   A PyWebview window titled "MOAT App Spectra" should appear once the embedded
+   Flask server finishes booting.
+4. Sign in with a known account and navigate a couple of dashboard pages to
+   verify routing, Supabase connectivity, and static asset loading work as
+   expected.
+5. Close the window and confirm the terminal process exits cleanly (the launcher
+   shuts down the embedded Flask server on window close).
