@@ -180,7 +180,9 @@
                       <input type="text" data-rejection-ref placeholder="e.g. R15" autocomplete="off">
                     </td>
                     <td data-label="Rejection Reason">
-                      <input type="text" data-rejection-reason placeholder="e.g. Bent lead" autocomplete="off">
+                      <select data-rejection-reason>
+                        <option value="" disabled selected>Loading defects...</option>
+                      </select>
                     </td>
                     <td data-label="Quantity">
                       <input type="number" data-rejection-quantity min="1" step="1" placeholder="0">
