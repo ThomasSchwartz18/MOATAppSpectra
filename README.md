@@ -56,7 +56,9 @@ retrieved MOAT row so that charts and exports display the original run date.
 Remove the helper once the source data is fixed.
 
 ## Run
-1. Install dependencies in your environment:
+1. Install dependencies in your environment. `pywebview` powers the desktop UI
+   wrapper and `pyinstaller` can be used to build frozen executables for the
+   desktop launcher:
    ```bash
    pip install -r requirements.txt
    ```
@@ -66,7 +68,15 @@ Remove the helper once the source data is fixed.
    ```
    The script loads variables from `.env`, builds the app factory, and launches a
    development server on `http://127.0.0.1:5000/`.
-3. Launch the AOI operator grading API when needed:
+3. Launch the desktop wrapper when you prefer to host the web UI inside a
+   native window via PyWebview:
+   ```bash
+   python desktop_main.py
+   ```
+   The script spins up the Flask application and renders it in a webview. Use
+   the same credentials configured via `USER_PASSWORD`, `ADMIN_PASSWORD`, or the
+   Supabase user table to sign in.
+4. Launch the AOI operator grading API when needed:
    ```bash
    uvicorn api_aoi_grading:app --reload --port 8080
    ```
@@ -112,3 +122,23 @@ The fallback runner also honours `app.config["WKHTMLTOPDF_CMD"]` if you prefer
 to configure the command within the Flask application. With the binary
 configured, PDF generation will transparently switch to wkhtmltopdf whenever
 WeasyPrint fails to load.
+
+### Desktop smoke test
+Follow this checklist to confirm the desktop experience works after changes to
+the launcher or its dependencies:
+
+1. Ensure environment variables are set (for example via `.env`) so the Flask
+   app can start and at least one set of credentials is available.
+2. Install Python dependencies and optional native requirements as described in
+   the [Run](#run) section.
+3. Start the desktop wrapper:
+   ```bash
+   python desktop_main.py
+   ```
+   A PyWebview window titled "MOAT App Spectra" should appear once the embedded
+   Flask server finishes booting.
+4. Sign in with a known account and navigate a couple of dashboard pages to
+   verify routing, Supabase connectivity, and static asset loading work as
+   expected.
+5. Close the window and confirm the terminal process exits cleanly (the launcher
+   shuts down the embedded Flask server on window close).
