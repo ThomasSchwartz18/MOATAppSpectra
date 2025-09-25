@@ -76,6 +76,7 @@ Remove the helper once the source data is fixed.
    The script spins up the Flask application and renders it in a webview. Use
    the same credentials configured via `USER_PASSWORD`, `ADMIN_PASSWORD`, or the
    Supabase user table to sign in.
+   The script spins up the Flask application and renders it in a webview.
 4. Launch the AOI operator grading API when needed:
    ```bash
    uvicorn api_aoi_grading:app --reload --port 8080
