@@ -37,6 +37,7 @@ except Exception:  # pragma: no cover
     plt = None
 
 from app.db import (
+    fetch_app_versions,
     delete_app_user,
     fetch_aoi_reports,
     fetch_combined_reports,
@@ -793,6 +794,7 @@ TRACKED_SUPABASE_TABLES = {
     "app_users": "Application login accounts managed from this console.",
     "bug_reports": "In-app feedback collected to triage feature issues and bugs.",
     "defects": "Defect catalog entries referenced when analysing bug submissions.",
+    "app_versions": "Release ledger aligning desktop and web deployments.",
 }
 
 
@@ -1146,6 +1148,17 @@ def admin_panel():
         bug_records = []
         feature_bug_error = str(exc)
 
+    app_versions_data: list[dict] | None = None
+    app_version_error: str | None = None
+    try:
+        app_versions_data, app_version_error = fetch_app_versions()
+    except Exception as exc:  # pragma: no cover - defensive safeguard
+        app_versions_data = []
+        app_version_error = str(exc)
+
+    app_versions = app_versions_data or []
+    latest_version = app_versions[0] if app_versions else None
+
     feature_cards, _ = _build_feature_cards(bug_records)
     feature_state_error = getattr(g, '_feature_state_error', None)
     bug_options = _build_bug_options(bug_records)
@@ -1154,6 +1167,7 @@ def admin_panel():
         "user_count": len(users),
         "tracked_tables": supabase_status["tables"],
         "last_checked": supabase_status["checked_at"],
+        "latest_app_version": latest_version,
     }
     missing_feeds = {
         "roles": (
@@ -1166,8 +1180,16 @@ def admin_panel():
             "service to manage them from this console."
         ),
     }
+    if not app_versions:
+        missing_feeds["app_versions"] = (
+            "Capture release numbers, download links, and checksums in a Supabase "
+            "table named `app_versions` so the desktop build stays aligned with "
+            "the web deployment, even if binaries live on a shared drive."
+        )
     if supabase_user_error:
         flash(supabase_user_error, "warning")
+    if app_version_error:
+        flash(app_version_error, "warning")
 
     return render_template(
         'admin.html',
@@ -1181,6 +1203,8 @@ def admin_panel():
         feature_bug_options=bug_options,
         feature_state_error=feature_state_error,
         feature_bug_error=feature_bug_error,
+        app_versions=app_versions,
+        app_version_error=app_version_error,
         active_tab=active_tab,
     )
 
