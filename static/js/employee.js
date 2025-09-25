@@ -406,6 +406,7 @@ function setupAoiArea(container) {
   const rejectionRowTemplate = sheetForm ? sheetForm.querySelector('[data-rejection-row-template]') : null;
   const addRejectionRowButton = sheetForm ? sheetForm.querySelector('[data-action="add-rejection-row"]') : null;
   const rejectionHiddenInput = sheetForm ? sheetForm.querySelector('[data-rejection-json]') : null;
+  const rejectionReasonSelects = new Set();
   const operatorSignature = sheetForm ? sheetForm.querySelector('[data-operator-signature]') : null;
   const signatureControl = operatorSignature ? operatorSignature.querySelector('[data-action="operator-signature"]') : null;
   const signatureDisplay = operatorSignature ? operatorSignature.querySelector('[data-signature-display]') : null;
