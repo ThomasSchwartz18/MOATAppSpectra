@@ -447,6 +447,8 @@ function setupAoiArea(container) {
     TH: 'Through-Hole Assembly',
   };
 
+  const rejectionReasonSelects = new Set();
+
   function populateDefectSelect(select, selectedId = '') {
     if (!select) return;
     const doc = select.ownerDocument || document;
