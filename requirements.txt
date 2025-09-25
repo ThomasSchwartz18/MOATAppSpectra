@@ -11,3 +11,5 @@ numpy
 weasyprint
 pdfkit
 matplotlib
+pywebview
+pyinstaller
