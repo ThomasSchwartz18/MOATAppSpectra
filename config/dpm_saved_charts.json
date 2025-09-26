@@ -1,0 +1,122 @@
+[
+  {
+    "id": "daily_window_yield_by_line",
+    "name": "Daily Window Yield % by Line",
+    "description": "Day-to-day true process yield by AOI window, per line. Quickly exposes drift/spikes.",
+    "chart_type": "line",
+    "mappings": {
+      "x": "d",
+      "y": "window_yield_pct",
+      "series": "line"
+    },
+    "sql": "SELECT\n  report_date::date AS d,\n  line,\n  SUM(COALESCE(total_windows, windows_per_board * total_boards)) AS windows,\n  SUM(ng_windows) AS ng_windows,\n  (SUM(COALESCE(total_windows, windows_per_board * total_boards)) - SUM(ng_windows))\n    / NULLIF(SUM(COALESCE(total_windows, windows_per_board * total_boards)),0) * 100.0 AS window_yield_pct\nFROM dpm_reports\nGROUP BY 1,2\nORDER BY 1,2;"
+  },
+  {
+    "id": "weekly_dpm_trend_by_assembly",
+    "name": "Weekly DPM Trend by Assembly",
+    "description": "Defects per million windows over time for each assembly—spot the worst offenders and improvement after fixes.",
+    "chart_type": "line",
+    "mappings": {
+      "x": "wk",
+      "y": "dpm",
+      "series": "model_name"
+    },
+    "sql": "WITH w AS (\n  SELECT\n    date_trunc('week', report_date)::date AS wk,\n    model_name,\n    SUM(COALESCE(total_windows, windows_per_board * total_boards)) AS windows,\n    SUM(ng_windows) AS ng_windows\n  FROM dpm_reports\n  GROUP BY 1,2\n)\nSELECT\n  wk,\n  model_name,\n  ng_windows / NULLIF(windows,0) * 1e6 AS dpm\nFROM w\nORDER BY wk, model_name;"
+  },
+  {
+    "id": "top10_assemblies_by_dpm",
+    "name": "Top 10 Assemblies by DPM (selected period)",
+    "description": "Pareto-style ranking—where most true defects are concentrated.",
+    "chart_type": "bar_horizontal",
+    "mappings": {
+      "x": "dpm",
+      "y": "model_name"
+    },
+    "sql": "WITH f AS (\n  SELECT\n    model_name,\n    SUM(COALESCE(total_windows, windows_per_board * total_boards)) AS windows,\n    SUM(ng_windows) AS ng_windows\n  FROM dpm_reports\n  WHERE report_date >= :from AND report_date < :to\n  GROUP BY 1\n)\nSELECT\n  model_name,\n  ng_windows / NULLIF(windows,0) * 1e6 AS dpm\nFROM f\nORDER BY dpm DESC NULLS LAST\nLIMIT 10;"
+  },
+  {
+    "id": "line_yield_comparison_for_assembly",
+    "name": "Line vs Line Window Yield for a Selected Assembly",
+    "description": "For one assembly, which line produces better yield (process quality) across a period.",
+    "chart_type": "bar",
+    "mappings": {
+      "x": "line",
+      "y": "window_yield_pct"
+    },
+    "sql": "SELECT\n  line,\n  SUM(COALESCE(total_windows, windows_per_board * total_boards)) AS windows,\n  SUM(ng_windows) AS ng_windows,\n  (SUM(COALESCE(total_windows, windows_per_board * total_boards)) - SUM(ng_windows))\n    / NULLIF(SUM(COALESCE(total_windows, windows_per_board * total_boards)),0) * 100.0 AS window_yield_pct\nFROM dpm_reports\nWHERE model_name = :model\n  AND report_date >= :from AND report_date < :to\nGROUP BY line\nORDER BY line;"
+  },
+  {
+    "id": "defects_per_board_by_line_daily",
+    "name": "Defects per Board (u-chart friendly) by Line",
+    "description": "Normalized defects load per board—great for SPC and workload impact.",
+    "chart_type": "line",
+    "mappings": {
+      "x": "d",
+      "y": "defects_per_board",
+      "series": "line"
+    },
+    "sql": "SELECT\n  report_date::date AS d,\n  line,\n  SUM(total_boards) AS boards,\n  SUM(ng_windows) AS ngw,\n  SUM(ng_windows) / NULLIF(SUM(total_boards),0) AS defects_per_board\nFROM dpm_reports\nGROUP BY 1,2\nORDER BY 1,2;"
+  },
+  {
+    "id": "windows_per_board_vs_dpm_scatter",
+    "name": "Windows/Board vs DPM (scatter)",
+    "description": "Normalization check—are high DPM values just because programs have far more windows, or is the process really worse?",
+    "chart_type": "scatter",
+    "mappings": {
+      "x": "windows_per_board",
+      "y": "dpm",
+      "series": "line",
+      "label": "model_name"
+    },
+    "sql": "WITH g AS (\n  SELECT\n    model_name,\n    line,\n    SUM(total_boards) AS boards,\n    SUM(COALESCE(total_windows, windows_per_board * total_boards)) AS windows,\n    SUM(ng_windows) AS ngw\n  FROM dpm_reports\n  WHERE report_date >= :from AND report_date < :to\n  GROUP BY 1,2\n)\nSELECT\n  model_name,\n  line,\n  windows / NULLIF(boards,0) AS windows_per_board,\n  ngw / NULLIF(windows,0) * 1e6 AS dpm\nFROM g\nWHERE boards > 0 AND windows > 0;"
+  },
+  {
+    "id": "yield_heatmap_line_by_assembly",
+    "name": "Yield Heatmap (Line × Assembly)",
+    "description": "“In-sync” view—who’s great/struggling per assembly across lines.",
+    "chart_type": "heatmap",
+    "mappings": {
+      "row": "model_name",
+      "col": "line",
+      "value": "window_yield_pct"
+    },
+    "sql": "WITH base AS (\n  SELECT\n    line,\n    model_name,\n    SUM(COALESCE(total_windows, windows_per_board * total_boards)) AS windows,\n    SUM(ng_windows) AS ngw\n  FROM dpm_reports\n  WHERE report_date >= :from AND report_date < :to\n  GROUP BY 1,2\n)\nSELECT\n  line,\n  model_name,\n  (windows - ngw) / NULLIF(windows,0) * 100.0 AS window_yield_pct\nFROM base;"
+  },
+  {
+    "id": "rolling7_window_yield_by_line",
+    "name": "Rolling 7-Day Average Yield (per Line)",
+    "description": "Smoothed trend; separates signal from day-to-day noise.",
+    "chart_type": "line",
+    "mappings": {
+      "x": "d",
+      "y": "window_yield_pct_roll7",
+      "series": "line"
+    },
+    "sql": "WITH d AS (\n  SELECT\n    report_date::date AS d,\n    line,\n    SUM(COALESCE(total_windows, windows_per_board * total_boards)) AS windows,\n    SUM(ng_windows) AS ngw\n  FROM dpm_reports\n  GROUP BY 1,2\n),\nx AS (\n  SELECT\n    d,\n    line,\n    (windows - ngw) / NULLIF(windows,0) * 100.0 AS window_yield_pct\n  FROM d\n)\nSELECT\n  d,\n  line,\n  AVG(window_yield_pct) OVER (\n    PARTITION BY line\n    ORDER BY d\n    ROWS BETWEEN 6 PRECEDING AND CURRENT ROW\n  ) AS window_yield_pct_roll7\nFROM x\nORDER BY d, line;"
+  },
+  {
+    "id": "throughput_vs_quality_by_line",
+    "name": "Throughput vs Quality: Boards Inspected vs Yield (bubble)",
+    "description": "Which lines sustain high quality and high throughput.",
+    "chart_type": "bubble",
+    "mappings": {
+      "x": "boards",
+      "y": "window_yield_pct",
+      "label": "line"
+    },
+    "sql": "WITH s AS (\n  SELECT\n    line,\n    SUM(total_boards) AS boards,\n    SUM(COALESCE(total_windows, windows_per_board * total_boards)) AS windows,\n    SUM(ng_windows) AS ngw\n  FROM dpm_reports\n  WHERE report_date >= :from AND report_date < :to\n  GROUP BY 1\n)\nSELECT\n  line,\n  boards,\n  (windows - ngw) / NULLIF(windows,0) * 100.0 AS window_yield_pct\nFROM s;"
+  },
+  {
+    "id": "spc_u_chart_defects_per_board",
+    "name": "Control Chart (u-Chart approximation) – Defects/Board per Line",
+    "description": "SPC-style alerting for special-cause variation by line.",
+    "chart_type": "line_with_bands",
+    "mappings": {
+      "x": "d",
+      "y": "u_value",
+      "series": "line"
+    },
+    "sql": "SELECT\n  report_date::date AS d,\n  line,\n  SUM(total_boards) AS boards,\n  SUM(ng_windows) AS ngw,\n  SUM(ng_windows) / NULLIF(SUM(total_boards),0) AS u_value -- defects/board\nFROM dpm_reports\nGROUP BY 1,2\nORDER BY 1,2;",
+    "notes": "Compute mean and UCL/LCL per line after fetching results: UCL = ū + 3 * sqrt(ū / n_i), LCL = max(0, ū - 3 * sqrt(ū / n_i)), where n_i is the boards inspected on that day."
+  }
+]
