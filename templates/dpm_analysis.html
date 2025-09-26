@@ -1,0 +1,238 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>DPM Analysis</h2>
+
+  <div class="analysis-grid">
+    <!-- Left: Builder / Upload Tabs -->
+    <div class="analysis-left section-card">
+      <div class="tab-bar">
+        <div class="tab active" data-target="builder-tab">Chart Builder</div>
+        {% if user_role == 'ADMIN' %}
+        <div class="tab" data-target="upload-tab">Upload</div>
+        {% endif %}
+      </div>
+
+      <div id="builder-tab" class="tab-content" style="display:block;">
+      <div class="section-title">Chart Builder</div>
+      <div class="field-row">
+        <div class="field">
+          <label for="chart-title">Chart Title</label>
+          <input id="chart-title" placeholder="Chart title" />
+        </div>
+        <div class="field">
+          <label for="chart-type">Chart Type</label>
+          <select id="chart-type">
+            <option value="line">Line</option>
+            <option value="bar">Bar</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field">
+          <label for="chart-description">Chart Description</label>
+          <textarea id="chart-description" placeholder="Describe this chart"></textarea>
+        </div>
+      </div>
+
+    <div class="section-title" style="margin-top:10px;">Data Range</div>
+    <div class="field-row">
+      <div class="field">
+        <label for="start-date">Start Date</label>
+        <input type="date" id="start-date" />
+        <small>or token e.g. today-5d</small>
+      </div>
+      <div class="field">
+        <label for="end-date">End Date</label>
+        <input type="date" id="end-date" />
+        <small>or token e.g. today-1d</small>
+      </div>
+    </div>
+
+      <div class="section-title" style="margin-top:10px;">Filters</div>
+      <div class="field-row">
+        <div class="field" style="min-width:180px;">
+          <label for="filter-model-contains">Model Name contains</label>
+          <input id="filter-model-contains" placeholder="e.g. TH or SMT" />
+        </div>
+        <div class="field">
+          <label>Quick Tokens</label>
+          <div>
+            <label><input type="checkbox" id="filter-has-th" /> TH</label>
+            <label style="margin-left:8px;"><input type="checkbox" id="filter-has-smt" /> SMT</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field" id="wrap-assembly" style="min-width:180px;">
+          <label for="filter-assembly">Assembly</label>
+          <select id="filter-assembly"></select>
+        </div>
+        <div class="field" id="wrap-rev" style="min-width:160px;">
+          <label for="filter-rev">Revision</label>
+          <select id="filter-rev" disabled></select>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field" style="min-width:180px;">
+          <label>Line</label>
+          <div id="filter-lines"></div>
+          <button type="button" id="add-line">Add another line</button>
+        </div>
+        <div class="field" style="min-width:200px;">
+          <label for="filter-min-boards">Min Total Boards (per Model)</label>
+          <input type="number" id="filter-min-boards" value="7" min="0" />
+          <small>Exclude models with fewer boards</small>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field" style="min-width:200px;">
+          <label for="sort-column">Sort By</label>
+          <select id="sort-column">
+            <option value="">(None)</option>
+            <option value="__y__">Y Value</option>
+          </select>
+        </div>
+        <div class="field" style="min-width:140px;">
+          <label for="sort-dir">Direction</label>
+          <select id="sort-dir">
+            <option value="asc">Ascending</option>
+            <option value="desc" selected>Descending</option>
+          </select>
+        </div>
+      </div>
+
+    <div class="section-title" style="margin-top:10px;">Appearance</div>
+    <div class="field-row">
+      <div class="field">
+        <label for="line-color">Line/Bar Color</label>
+        <input type="color" id="line-color" value="#000000" />
+      </div>
+      <div class="field">
+        <label for="point-style">Point Style</label>
+        <select id="point-style">
+          <option value="circle">Circle</option>
+          <option value="rect">Square</option>
+          <option value="triangle">Triangle</option>
+          <option value="cross">Cross</option>
+          <option value="star">Star</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="point-radius">Point Radius</label>
+        <input type="number" id="point-radius" value="3" min="0" max="12" />
+      </div>
+      <div class="field">
+        <label for="line-tension">Line Tension</label>
+        <input type="number" id="line-tension" value="0" min="0" max="0.5" step="0.1" />
+      </div>
+    </div>
+
+    <div class="section-title" style="margin-top:10px;">Axes</div>
+    <div class="field-row">
+      <div class="field">
+        <label for="x-title">X Axis Title</label>
+        <input id="x-title" placeholder="X Axis Title" />
+      </div>
+      <div class="field">
+        <label for="y-title">Y Axis Title</label>
+        <input id="y-title" placeholder="Y Axis Title" />
+      </div>
+      <div class="field">
+        <label for="show-tooltips">Tooltips</label>
+        <select id="show-tooltips">
+          <option value="yes" selected>Show</option>
+          <option value="no">Hide</option>
+        </select>
+      </div>
+    </div>
+
+      <div class="field-row" style="margin-top:12px;">
+        <div class="field" style="flex:1;">
+          <label for="save-name">Save As</label>
+          <input id="save-name" placeholder="Chart name" />
+        </div>
+        <button type="button" id="save-chart">Save</button>
+        <button type="button" id="run-chart">Run</button>
+      </div>
+    </div> <!-- end builder-tab -->
+    {% if user_role == 'ADMIN' %}
+    <div id="upload-tab" class="tab-content" style="display:none;">
+      <form id="upload-form">
+        <div class="field-row">
+          <div class="field" style="flex:1;">
+            <label for="upload-xlsx">XLSX File</label>
+            <input type="file" id="upload-xlsx" accept=".xlsx" />
+          </div>
+        </div>
+        <button type="submit" id="upload-button">Upload</button>
+      </form>
+    </div>
+    {% endif %}
+    </div>
+
+  <!-- Top Right: Saved Queries + Search -->
+  <div class="analysis-top-right section-card">
+    <div class="section-title">Saved Charts</div>
+    <div class="field-row" style="margin-bottom:8px;">
+      <div class="field" style="flex:1;">
+        <label for="saved-search">Search</label>
+        <input id="saved-search" placeholder="Filter saved charts" />
+      </div>
+    </div>
+    <ul id="saved-list" style="margin:0;padding-left:16px;"></ul>
+    <small>Select a preset to load its metric.</small>
+  </div>
+
+  <!-- Bottom Right: Results -->
+    <div class="analysis-bottom-right section-card">
+      <div class="section-title">Results: <span id="result-chart-name"></span></div>
+      <div class="field-row" style="margin-bottom:6px;">
+        <button type="button" id="expand-chart">Expand</button>
+        <button type="button" id="download-pdf">Download PDF</button>
+        <span class="spinner" id="download-spinner" hidden></span>
+        <button type="button" id="copy-image">Copy Image</button>
+      </div>
+      <p class="pdf-host-warning">PDF generation requires a Linux or Windows host. macOS is not supported.</p>
+      <div class="preview-card" style="height: 300px;">
+        <canvas id="dpmChart"></canvas>
+      </div>
+      <div id="dpm-info" class="preview-info" style="margin-top:4px;"></div>
+      <div id="chart-description-result" class="preview-info" style="margin-top:4px;"></div>
+      <small>Control limits shown: mean (blue), UCL/LCL (red/green).</small>
+    </div>
+  </div>
+
+<!-- Modal for Expanded View + Data Table -->
+<div id="chart-modal" class="modal-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div id="modal-title">Chart Detail</div>
+      <button id="modal-close" class="modal-close">Close</button>
+    </div>
+    <div class="modal-chart-box">
+      <canvas id="dpmChartExpanded"></canvas>
+    </div>
+    <div class="field-row" style="margin-top:10px;">
+      <button type="button" id="modal-download-chart">Download Chart</button>
+      <button type="button" id="modal-download-csv">Download CSV</button>
+      </div>
+    <div style="margin-top:10px;" class="section-title">Data</div>
+    <table class="data-table">
+      <thead><tr><th>Date</th><th>Value</th></tr></thead>
+      <tbody id="data-tbody"></tbody>
+    </table>
+  </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.5.28/dist/jspdf.plugin.autotable.min.js"></script>
+<script type="module" src="{{ url_for('static', filename='js/dpm.js') }}"></script>
+{% endblock %}
