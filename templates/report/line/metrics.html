@@ -16,12 +16,15 @@
     <thead>
       <tr>
         <th>Line</th>
-        <th>Yield %</th>
+        <th>Window Yield %</th>
+        <th>Part Yield %</th>
         <th>Confirmed Defects</th>
         <th>False Calls / Board</th>
-        <th>PPM</th>
-        <th>DPM</th>
+        <th>False Call PPM</th>
+        <th>False Call DPM</th>
+        <th>Defect DPM</th>
         <th>Boards / Day</th>
+        <th>Total Windows</th>
         <th>Total Parts</th>
       </tr>
     </thead>
@@ -29,12 +32,39 @@
       {% for metric in lineMetrics %}
       <tr>
         <td>{{ metric.line }}</td>
-        <td>{{ metric.yield|round(2) }}</td>
+        <td>{{ (metric.windowYield if metric.windowYield is not none else metric.yield)|round(2) }}</td>
+        <td>
+          {% if metric.partYield is not none %}
+            {{ metric.partYield|round(2) }}
+          {% else %}
+            --
+          {% endif %}
+        </td>
         <td>{{ metric.confirmedDefects|round(0) }}</td>
         <td>{{ metric.falseCallsPerBoard|round(2) }}</td>
-        <td>{{ metric.ppm|round(2) }}</td>
-        <td>{{ metric.dpm|round(2) }}</td>
+        <td>
+          {% if metric.falseCallPpm is not none %}
+            {{ metric.falseCallPpm|round(2) }}
+          {% else %}
+            --
+          {% endif %}
+        </td>
+        <td>
+          {% if metric.falseCallDpm is not none %}
+            {{ metric.falseCallDpm|round(2) }}
+          {% else %}
+            --
+          {% endif %}
+        </td>
+        <td>
+          {% if metric.defectDpm is not none %}
+            {{ metric.defectDpm|round(2) }}
+          {% else %}
+            --
+          {% endif %}
+        </td>
         <td>{{ metric.boardsPerDay|round(2) }}</td>
+        <td>{{ metric.totalWindows|round(0) }}</td>
         <td>{{ metric.totalParts|round(0) }}</td>
       </tr>
       {% endfor %}

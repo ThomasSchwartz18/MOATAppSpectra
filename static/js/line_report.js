@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
   let reportData = null;
   let yieldChart = null;
   let falseCallChart = null;
-  let ppmChart = null;
+  let qualityChart = null;
   let trendChart = null;
 
   if (downloadControls) downloadControls.style.display = 'none';
@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function clearCharts() {
     yieldChart?.destroy();
     falseCallChart?.destroy();
-    ppmChart?.destroy();
+    qualityChart?.destroy();
     trendChart?.destroy();
   }
 
@@ -73,12 +73,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${metric.line}</td>
-        <td>${fmtPercent(metric.yield)}</td>
+        <td>${fmtPercent(metric.windowYield ?? metric.yield)}</td>
+        <td>${fmtPercent(metric.partYield)}</td>
         <td>${fmtNumber(metric.confirmedDefects)}</td>
         <td>${fmtNumber(metric.falseCallsPerBoard)}</td>
-        <td>${fmtNumber(metric.ppm)}</td>
-        <td>${fmtNumber(metric.dpm)}</td>
+        <td>${fmtNumber(metric.falseCallPpm)}</td>
+        <td>${fmtNumber(metric.falseCallDpm)}</td>
+        <td>${fmtNumber(metric.defectDpm)}</td>
         <td>${fmtNumber(metric.boardsPerDay)}</td>
+        <td>${fmtNumber(metric.totalWindows)}</td>
         <td>${fmtNumber(metric.totalParts)}</td>
       `;
       tbody.appendChild(tr);
@@ -89,7 +92,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderLineCharts(metrics) {
     const yieldCtx = document.getElementById('lineYieldChart')?.getContext('2d');
     const falseCallCtx = document.getElementById('lineFalseCallChart')?.getContext('2d');
-    const ppmCtx = document.getElementById('linePpmChart')?.getContext('2d');
+    const qualityCtx = document.getElementById('linePpmChart')?.getContext('2d');
     clearCharts();
     if (yieldCtx) {
       yieldChart = new Chart(yieldCtx, {
@@ -98,8 +101,8 @@ document.addEventListener('DOMContentLoaded', () => {
           labels: metrics.map((m) => m.line),
           datasets: [
             {
-              label: 'Yield %',
-              data: metrics.map((m) => m.yield),
+              label: 'Window Yield %',
+              data: metrics.map((m) => m.windowYield ?? m.yield ?? null),
               backgroundColor: '#0ea5e9',
             },
           ],
@@ -107,7 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
         options: {
           responsive: true,
           plugins: { legend: { display: false } },
-          scales: { y: { title: { display: true, text: 'Yield %' } } },
+          scales: { y: { title: { display: true, text: 'Window Yield %' } } },
         },
       });
     }
@@ -131,20 +134,20 @@ document.addEventListener('DOMContentLoaded', () => {
         },
       });
     }
-    if (ppmCtx) {
-      ppmChart = new Chart(ppmCtx, {
+    if (qualityCtx) {
+      qualityChart = new Chart(qualityCtx, {
         type: 'bar',
         data: {
           labels: metrics.map((m) => m.line),
           datasets: [
             {
-              label: 'PPM',
-              data: metrics.map((m) => m.ppm),
+              label: 'False Call PPM (parts)',
+              data: metrics.map((m) => m.falseCallPpm ?? null),
               backgroundColor: '#1d4ed8',
             },
             {
-              label: 'DPM',
-              data: metrics.map((m) => m.dpm),
+              label: 'Defect DPM (windows)',
+              data: metrics.map((m) => m.defectDpm ?? null),
               backgroundColor: '#059669',
             },
           ],
@@ -153,7 +156,7 @@ document.addEventListener('DOMContentLoaded', () => {
           responsive: true,
           scales: {
             y: {
-              title: { display: true, text: 'Parts per Million' },
+              title: { display: true, text: 'Events per Million' },
             },
           },
         },
@@ -178,10 +181,11 @@ document.addEventListener('DOMContentLoaded', () => {
         <thead>
           <tr>
             <th>Line</th>
-            <th>Yield %</th>
+            <th>Window Yield %</th>
             <th>False Calls / Board</th>
-            <th>PPM</th>
-            <th>DPM</th>
+            <th>False Call PPM</th>
+            <th>False Call DPM</th>
+            <th>Defect DPM</th>
           </tr>
         </thead>
         <tbody></tbody>
@@ -191,10 +195,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const row = document.createElement('tr');
         row.innerHTML = `
           <td>${line}</td>
-          <td>${fmtPercent(metrics.yield)}</td>
+          <td>${fmtPercent(metrics.windowYield ?? metrics.yield)}</td>
           <td>${fmtNumber(metrics.falseCallsPerBoard)}</td>
-          <td>${fmtNumber(metrics.ppm)}</td>
-          <td>${fmtNumber(metrics.dpm)}</td>
+          <td>${fmtNumber(metrics.falseCallPpm)}</td>
+          <td>${fmtNumber(metrics.falseCallDpm)}</td>
+          <td>${fmtNumber(metrics.defectDpm)}</td>
         `;
         tbody.appendChild(row);
       });
@@ -277,7 +282,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const labels = lineTrends.length ? lineTrends[0].entries.map((entry) => entry.date) : [];
     const datasets = lineTrends.map((trend) => ({
       label: trend.line,
-      data: trend.entries.map((entry) => entry.yield ?? null),
+      data: trend.entries.map((entry) => entry.windowYield ?? entry.yield ?? null),
       spanGaps: true,
       tension: 0.15,
     }));
@@ -289,7 +294,7 @@ document.addEventListener('DOMContentLoaded', () => {
           responsive: true,
           plugins: { legend: { position: 'bottom' } },
           scales: {
-            y: { title: { display: true, text: 'Yield %' } },
+            y: { title: { display: true, text: 'Window Yield %' } },
           },
         },
       });
@@ -338,7 +343,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const kpiList = document.createElement('ul');
     kpiList.className = 'insight-list';
     if (benchmarking.bestYield) {
-      kpiList.innerHTML += `<li>Best Yield: ${benchmarking.bestYield.line} (${fmtPercent(benchmarking.bestYield.yield)})</li>`;
+      const bestYieldValue = benchmarking.bestYield.windowYield ?? benchmarking.bestYield.partYield ?? benchmarking.bestYield.yield;
+      kpiList.innerHTML += `<li>Best Window Yield: ${benchmarking.bestYield.line} (${fmtPercent(bestYieldValue)})</li>`;
     }
     if (benchmarking.lowestFalseCalls) {
       kpiList.innerHTML += `<li>Lowest False Calls / Board: ${benchmarking.lowestFalseCalls.line} (${fmtNumber(benchmarking.lowestFalseCalls.falseCallsPerBoard)})</li>`;
@@ -354,10 +360,11 @@ document.addEventListener('DOMContentLoaded', () => {
       <thead>
         <tr>
           <th>Line</th>
-          <th>Yield Δ vs Avg</th>
-          <th>False Call Δ</th>
-          <th>PPM Δ</th>
-          <th>DPM Δ</th>
+          <th>Window Yield Δ</th>
+          <th>False Call Δ (/board)</th>
+          <th>False Call PPM Δ</th>
+          <th>False Call DPM Δ</th>
+          <th>Defect DPM Δ</th>
         </tr>
       </thead>
       <tbody></tbody>
@@ -367,10 +374,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const row = document.createElement('tr');
       row.innerHTML = `
         <td>${entry.line}</td>
-        <td>${fmtNumber(entry.yieldDelta)}</td>
+        <td>${fmtNumber(entry.windowYieldDelta)}</td>
         <td>${fmtNumber(entry.falseCallDelta)}</td>
-        <td>${fmtNumber(entry.ppmDelta)}</td>
-        <td>${fmtNumber(entry.dpmDelta)}</td>
+        <td>${fmtNumber(entry.falseCallPpmDelta)}</td>
+        <td>${fmtNumber(entry.falseCallDpmDelta)}</td>
+        <td>${fmtNumber(entry.defectDpmDelta)}</td>
       `;
       tbody.appendChild(row);
     });
@@ -378,7 +386,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const avg = document.createElement('p');
     avg.className = 'kpi-summary';
-    avg.textContent = `Company averages — Yield: ${fmtPercent(averages.yield)}, False Calls / Board: ${fmtNumber(averages.falseCallsPerBoard)}, PPM: ${fmtNumber(averages.ppm)}, DPM: ${fmtNumber(averages.dpm)}`;
+    avg.textContent = `Company averages — Window Yield: ${fmtPercent(averages.windowYield ?? averages.yield)}, False Calls / Board: ${fmtNumber(averages.falseCallsPerBoard)}, False Call PPM: ${fmtNumber(averages.falseCallPpm)}, False Call DPM: ${fmtNumber(averages.falseCallDpm)}, Defect DPM: ${fmtNumber(averages.defectDpm)}`;
     container.appendChild(avg);
 
     showSection(sections.benchmarking);

@@ -7,20 +7,40 @@
       <thead>
         <tr>
           <th>Line</th>
-          <th>Yield %</th>
+          <th>Window Yield %</th>
           <th>False Calls / Board</th>
-          <th>PPM</th>
-          <th>DPM</th>
+          <th>False Call PPM</th>
+          <th>False Call DPM</th>
+          <th>Defect DPM</th>
         </tr>
       </thead>
       <tbody>
         {% for line, metrics in assembly.lines.items() %}
         <tr>
           <td>{{ line }}</td>
-          <td>{{ metrics.yield|default(0)|round(2) }}</td>
+          <td>{{ (metrics.windowYield if metrics.windowYield is not none else metrics.yield)|default(0)|round(2) }}</td>
           <td>{{ metrics.falseCallsPerBoard|default(0)|round(2) }}</td>
-          <td>{{ metrics.ppm|default(0)|round(2) }}</td>
-          <td>{{ metrics.dpm|default(0)|round(2) }}</td>
+          <td>
+            {% if metrics.falseCallPpm is not none %}
+              {{ metrics.falseCallPpm|round(2) }}
+            {% else %}
+              --
+            {% endif %}
+          </td>
+          <td>
+            {% if metrics.falseCallDpm is not none %}
+              {{ metrics.falseCallDpm|round(2) }}
+            {% else %}
+              --
+            {% endif %}
+          </td>
+          <td>
+            {% if metrics.defectDpm is not none %}
+              {{ metrics.defectDpm|round(2) }}
+            {% else %}
+              --
+            {% endif %}
+          </td>
         </tr>
         {% endfor %}
       </tbody>
