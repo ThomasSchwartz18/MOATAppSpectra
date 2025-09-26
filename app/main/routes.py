@@ -48,6 +48,7 @@ from app.db import (
     fetch_moat,
     fetch_moat_dpm,
     fetch_recent_moat,
+    fetch_recent_moat_dpm,
     fetch_saved_queries,
     fetch_dpm_saved_queries,
     fetch_saved_aoi_queries,
@@ -433,6 +434,13 @@ FEATURE_REGISTRY = [
         "category": "analysis",
         "description": "Monitor AOI false-call performance and long-term yield trends.",
         "default_message": "PPM Analysis is temporarily unavailable while we perform maintenance.",
+    },
+    {
+        "slug": "analysis_dpm",
+        "label": "DPM Analysis",
+        "category": "analysis",
+        "description": "Track defect-per-million trends and compare AOI performance by line or model.",
+        "default_message": "DPM Analysis is temporarily unavailable while we perform maintenance.",
     },
     {
         "slug": "analysis_aoi_grades",
@@ -2086,6 +2094,17 @@ def upload_ppm_reports():
     return jsonify({'inserted': len(rows)}), 201
 
 
+@main_bp.route('/moat_dpm', methods=['GET'])
+@feature_required('analysis_dpm')
+def get_moat_dpm_data():
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    data, error = fetch_moat_dpm()
+    if error:
+        abort(500, description=error)
+    return jsonify(data)
+
+
 @main_bp.route('/moat', methods=['GET'])
 def get_moat_data():
     if 'username' not in session:
@@ -2110,7 +2129,9 @@ def add_moat_data():
 def moat_preview():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
-    data, error = fetch_recent_moat()
+    source = (request.args.get('source') or '').strip().lower()
+    fetcher = fetch_recent_moat_dpm if source == 'dpm' else fetch_recent_moat
+    data, error = fetcher()
     if error:
         abort(500, description=error)
     if not data:
@@ -2609,7 +2630,7 @@ def dpm_analysis():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
     return render_template(
-        'ppm_analysis.html',
+        'dpm_analysis.html',
         username=session.get('username'),
         user_role=(session.get('role') or '').upper(),
     )

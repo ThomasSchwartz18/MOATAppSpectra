@@ -50,6 +50,7 @@
             <a href="#">Analysis <span class="arrow">&#9662;</span></a>
             <div class="dropdown" role="menu">
               {{ feature_nav_link('PPM Analysis', url_for('main.ppm_analysis'), 'analysis_ppm') }}
+              {{ feature_nav_link('DPM Analysis', url_for('main.dpm_analysis'), 'analysis_dpm') }}
               {{ feature_nav_link('AOI & FI Analysis', url_for('main.aoi_grades_page'), 'analysis_aoi_grades') }}
               {{ feature_nav_link('AOI Daily Reports', url_for('main.aoi_daily_reports'), 'analysis_aoi_daily') }}
               {{ feature_nav_link('FI Daily Reports', url_for('main.fi_daily_reports'), 'analysis_fi_daily') }}

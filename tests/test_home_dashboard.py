@@ -86,7 +86,11 @@ def _moat_preview_patch():
             "Report Date": (today - timedelta(days=1)).isoformat(),
         },
     ]
-    return {"fetch_recent_moat": _make_fetch(rows)}
+    fetcher = _make_fetch(rows)
+    return {
+        "fetch_recent_moat": fetcher,
+        "fetch_recent_moat_dpm": fetcher,
+    }
 
 
 def _aoi_preview_patch():
@@ -231,6 +235,7 @@ def _tracker_preview_patch():
 
 PREVIEW_CASES = [
     ("/moat_preview", _moat_preview_patch),
+    ("/moat_preview?source=dpm", _moat_preview_patch),
     ("/aoi_preview", _aoi_preview_patch),
     ("/fi_preview", _fi_preview_patch),
     ("/daily_reports_preview", _daily_preview_patch),

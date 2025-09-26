@@ -423,6 +423,11 @@ function renderTablePreview({
 document.addEventListener('DOMContentLoaded', () => {
   const previewConfigs = [
     {
+      endpoint: '/moat_preview?source=dpm',
+      canvasId: 'dpmAnalysisPreview',
+      onClickHref: '/analysis/dpm?preset=avg_false_calls_per_assembly',
+    },
+    {
       endpoint: '/moat_preview',
       canvasId: 'ppmAnalysisPreview',
       onClickHref: '/analysis/ppm?preset=avg_false_calls_per_assembly',

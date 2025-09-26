@@ -4,6 +4,12 @@
 <h1>Previews</h1>
 <h3><i>(click to see further insight)</i></h3>
 <section class="dashboard-grid">
+  <a class="dashboard-link" href="{{ url_for('main.dpm_analysis') }}">
+    <div class="dashboard-card">
+      <h2>DPM Analysis</h2>
+      <canvas id="dpmAnalysisPreview"></canvas>
+    </div>
+  </a>
   <a class="dashboard-link" href="{{ url_for('main.ppm_analysis') }}">
     <div class="dashboard-card">
       <h2>PPM Analysis</h2>

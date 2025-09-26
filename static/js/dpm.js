@@ -1,11 +1,11 @@
 import { showSpinner, hideSpinner } from './utils.js';
 
-let ppmChartInstance = null;
-let ppmChartExpandedInstance = null;
+let dpmChartInstance = null;
+let dpmChartExpandedInstance = null;
 let currentData = { labels: [], values: [], datasets: [] };
 let savedQueriesCache = [];
 
-// Inferred columns/types from /moat
+// Inferred columns/types from /moat_dpm
 let allColumns = [];
 let columnTypes = {}; // { colName: 'temporal'|'numeric'|'categorical'|'boolean' }
 
@@ -139,13 +139,13 @@ function renderChart(targetId, labels, values, cfg) {
     ],
   };
 
-  if (targetId === 'ppmChart' && ppmChartInstance) ppmChartInstance.destroy();
-  if (targetId === 'ppmChartExpanded' && ppmChartExpandedInstance) ppmChartExpandedInstance.destroy();
+  if (targetId === 'dpmChart' && dpmChartInstance) dpmChartInstance.destroy();
+  if (targetId === 'dpmChartExpanded' && dpmChartExpandedInstance) dpmChartExpandedInstance.destroy();
 
   // eslint-disable-next-line no-undef
   const instance = new Chart(ctx, { type: cfg.type, data, options: buildOptions(cfg), plugins: [controlLinesPlugin] });
-  if (targetId === 'ppmChart') ppmChartInstance = instance;
-  if (targetId === 'ppmChartExpanded') ppmChartExpandedInstance = instance;
+  if (targetId === 'dpmChart') dpmChartInstance = instance;
+  if (targetId === 'dpmChartExpanded') dpmChartExpandedInstance = instance;
 }
 
 // Render multiple datasets (series) against shared labels
@@ -172,8 +172,8 @@ function renderChartMulti(targetId, labels, datasets, cfg) {
     borderWidth: 2,
   }));
 
-  if (targetId === 'ppmChart' && ppmChartInstance) ppmChartInstance.destroy();
-  if (targetId === 'ppmChartExpanded' && ppmChartExpandedInstance) ppmChartExpandedInstance.destroy();
+  if (targetId === 'dpmChart' && dpmChartInstance) dpmChartInstance.destroy();
+  if (targetId === 'dpmChartExpanded' && dpmChartExpandedInstance) dpmChartExpandedInstance.destroy();
 
   // eslint-disable-next-line no-undef
   const baseOpts = buildOptions(cfg);
@@ -183,8 +183,8 @@ function renderChartMulti(targetId, labels, datasets, cfg) {
     options: { ...baseOpts, plugins: { ...baseOpts.plugins, legend: { display: true } } },
     plugins: [controlLinesPlugin],
   });
-  if (targetId === 'ppmChart') ppmChartInstance = instance;
-  if (targetId === 'ppmChartExpanded') ppmChartExpandedInstance = instance;
+  if (targetId === 'dpmChart') dpmChartInstance = instance;
+  if (targetId === 'dpmChartExpanded') dpmChartExpandedInstance = instance;
 }
 
 function fillTable(labels, values) {
@@ -202,7 +202,7 @@ function fillTable(labels, values) {
 }
 
 function updateInfo(labels, values) {
-  const info = document.getElementById('ppm-info');
+  const info = document.getElementById('dpm-info');
   const avg = values.length ? (values.reduce((a, b) => a + b, 0) / values.length).toFixed(4) : '0';
   info.textContent = `${labels[0] || ''} to ${labels[labels.length - 1] || ''} | Avg: ${avg}`;
 }
@@ -213,8 +213,8 @@ function expandModal(show) {
   if (show) {
     document.getElementById('modal-title').textContent = document.getElementById('chart-title').value || 'Chart Detail';
     const cfg = collectChartConfig();
-    if (ppmChartExpandedInstance) ppmChartExpandedInstance.destroy();
-    const expandedCanvas = document.getElementById('ppmChartExpanded');
+    if (dpmChartExpandedInstance) dpmChartExpandedInstance.destroy();
+    const expandedCanvas = document.getElementById('dpmChartExpanded');
     const box = expandedCanvas.parentElement;
     const rect = box.getBoundingClientRect();
     if (rect.width && rect.height) {
@@ -226,7 +226,7 @@ function expandModal(show) {
     const opts = { ...meta.options };
     if (opts.scales && opts.scales.x && opts.scales.x.ticks) opts.scales.x.ticks.display = true;
     // eslint-disable-next-line no-undef
-    ppmChartExpandedInstance = new Chart(ctx, { type: meta.type, data: { labels: meta.labels, datasets: meta.datasets }, options: opts, plugins: (activePreset?.kind==='line-control' ? [controlLinesPlugin] : []) });
+    dpmChartExpandedInstance = new Chart(ctx, { type: meta.type, data: { labels: meta.labels, datasets: meta.datasets }, options: opts, plugins: (activePreset?.kind==='line-control' ? [controlLinesPlugin] : []) });
     const vals = meta.datasets[0] && Array.isArray(meta.datasets[0].data) ? meta.datasets[0].data : currentData.values;
     fillTable(meta.labels || currentData.labels, vals);
   }
@@ -330,7 +330,7 @@ function filterSavedList() {
 }
 
 function loadSavedQueries() {
-  fetch('/analysis/ppm/saved')
+  fetch('/analysis/dpm/saved')
     .then((res) => res.json())
     .then((rows) => {
       const server = Array.isArray(rows)
@@ -377,7 +377,7 @@ function runChart() {
   runner
     .then((result) => {
       const cfg = collectChartConfig();
-      const canvasEl = document.getElementById('ppmChart');
+      const canvasEl = document.getElementById('dpmChart');
 
       if (hasCustom) {
         const labels = result.labels || [];
@@ -389,9 +389,9 @@ function runChart() {
         const width = Math.max(container.clientWidth, labels.length * minPerLabel);
         canvasEl.style.width = width + 'px';
         if (datasets.length > 1) {
-          renderChartMulti('ppmChart', labels, datasets, chartCfg);
+          renderChartMulti('dpmChart', labels, datasets, chartCfg);
         } else {
-          renderChart('ppmChart', labels, datasets[0]?.data || [], chartCfg);
+          renderChart('dpmChart', labels, datasets[0]?.data || [], chartCfg);
         }
         currentData = { labels, values: datasets[0]?.data || [], datasets, metaLookup: result.metaLookup };
         window.currentChartMeta = { labels, datasets, type: chartType, options: buildOptions(chartCfg), metaLookup: result.metaLookup };
@@ -446,16 +446,16 @@ function runChart() {
         const container = canvasEl.parentElement; const minPerLabel = 120; const width = Math.max(container.clientWidth, labels.length * minPerLabel); canvasEl.style.width = width + 'px';
       }
 
-      if (ppmChartInstance) ppmChartInstance.destroy();
+      if (dpmChartInstance) dpmChartInstance.destroy();
       // eslint-disable-next-line no-undef
-      ppmChartInstance = new Chart(ctx, { type: chartType, data: { labels, datasets }, options, plugins: (result.kind==='line-control' ? [controlLinesPlugin] : []) });
+      dpmChartInstance = new Chart(ctx, { type: chartType, data: { labels, datasets }, options, plugins: (result.kind==='line-control' ? [controlLinesPlugin] : []) });
       currentData = { labels, values: datasets[0]?.data || [], datasets, metaLookup: result.metaLookup };
       window.currentChartMeta = { labels, datasets, type: chartType, options, metaLookup: result.metaLookup };
       updateInfo(labels, datasets[0]?.data || []);
       if (title) document.getElementById('modal-title').textContent = title;
       document.getElementById('chart-description-result').textContent = description;
     })
-    .catch(() => { document.getElementById('ppm-info').textContent = 'Failed to build chart.'; });
+    .catch(() => { document.getElementById('dpm-info').textContent = 'Failed to build chart.'; });
 }
 
 // Flexible builder: group by arbitrary X, optional series, aggregation choice
@@ -469,9 +469,9 @@ async function runChartFlexible() {
   const xBin = document.getElementById('x-binning').value || 'none';
   const xSort = document.getElementById('x-cat-sort').value || 'alpha-asc';
 
-  const rows = await fetch('/moat').then((r) => r.json());
+  const rows = await fetch('/moat_dpm').then((r) => r.json());
   if (!rows || !rows.length) return { labels: [], datasets: [], firstValues: [], metaLookup: {} };
-  const cols = window.__ppm_cols__ || resolveColumns(rows);
+  const cols = window.__dpm_cols__ || resolveColumns(rows);
 
   // Value per row
   const valueFn = (row) => {
@@ -650,7 +650,7 @@ function uniqueSorted(arr) {
 }
 
 function initFiltersUI() {
-  fetch('/moat')
+  fetch('/moat_dpm')
     .then((r) => r.json())
     .then((rows) => {
       if (!Array.isArray(rows) || rows.length === 0) return;
@@ -692,7 +692,7 @@ function initFiltersUI() {
         addBtn.addEventListener('click', () => { linesWrap.appendChild(mkSelect()); });
       }
       // Store for later filtering
-      window.__ppm_cols__ = cols;
+      window.__dpm_cols__ = cols;
       // Populate Sort-By selector
       const sortSel = document.getElementById('sort-column');
       if (sortSel) {
@@ -721,9 +721,9 @@ function readFilters() {
 }
 
 async function runPresetChart() {
-  const rows = await fetch('/moat').then((r)=>r.json());
+  const rows = await fetch('/moat_dpm').then((r)=>r.json());
   if (!activePreset) setPreset('avg_fc_per_board');
-  const cols = window.__ppm_cols__ || resolveColumns(rows);
+  const cols = window.__dpm_cols__ || resolveColumns(rows);
   const f = readFilters();
   const kind = activePreset.kind || 'line-control';
   // filter rows
@@ -1079,7 +1079,7 @@ function updateXTypeUI() {
   };
 
   if (!columnTypes[xCol]) {
-    fetch('/moat')
+    fetch('/moat_dpm')
       .then((res) => res.json())
       .then((rows) => {
         const { cols, types } = inferTypes(rows);
@@ -1094,7 +1094,7 @@ function updateXTypeUI() {
 }
 
 function initColumnsUI() {
-  fetch('/moat')
+  fetch('/moat_dpm')
     .then((res) => res.json())
     .then((rows) => {
       const { cols, types } = inferTypes(rows);
@@ -1145,7 +1145,7 @@ function saveQuery() {
     line_color: cfg.line_color,
   };
   const method = existing ? 'PUT' : 'POST';
-  fetch('/analysis/ppm/saved', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+  fetch('/analysis/dpm/saved', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
     .then((res) => { if (!res.ok) throw new Error('save failed'); return res.json(); })
     .then((rows) => {
       document.getElementById('save-name').value='';
@@ -1158,7 +1158,7 @@ function saveQuery() {
 }
 
 async function copyChartImage() {
-  const canvas = document.getElementById('ppmChart');
+  const canvas = document.getElementById('dpmChart');
   if (!navigator.clipboard || !navigator.clipboard.write) {
     alert('Clipboard API not supported in this browser.');
     return;
@@ -1173,7 +1173,7 @@ async function copyChartImage() {
 }
 
 function downloadExpandedChart() {
-  const canvas = document.getElementById('ppmChartExpanded');
+  const canvas = document.getElementById('dpmChartExpanded');
   if (!canvas) return;
   const link = document.createElement('a');
   const title = document.getElementById('chart-title').value || 'chart';
@@ -1301,7 +1301,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const fd = new FormData();
       fd.append('file', fileInput.files[0]);
       try {
-        const res = await fetch('/ppm_reports/upload', { method: 'POST', body: fd });
+        const res = await fetch('/dpm_reports/upload', { method: 'POST', body: fd });
         if (!res.ok) {
           const text = await res.text();
           throw new Error(text || 'Upload failed');
