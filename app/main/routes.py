@@ -46,12 +46,16 @@ from app.db import (
     fetch_app_users,
     fetch_fi_reports,
     fetch_moat,
+    fetch_moat_dpm,
     fetch_recent_moat,
     fetch_saved_queries,
+    fetch_dpm_saved_queries,
     fetch_saved_aoi_queries,
     fetch_saved_fi_queries,
     insert_saved_query,
+    insert_dpm_saved_query,
     update_saved_query,
+    update_dpm_saved_query,
     insert_saved_aoi_query,
     update_saved_aoi_query,
     insert_saved_fi_query,
@@ -63,6 +67,7 @@ from app.db import (
     insert_fi_report,
     insert_moat,
     insert_moat_bulk,
+    insert_moat_dpm_bulk,
     fetch_bug_reports,
     update_bug_report_status,
     fetch_feature_states,
@@ -1883,6 +1888,107 @@ def upload_fi_reports():
     return jsonify({'inserted': inserted}), 201
 
 
+@main_bp.route('/dpm_reports/upload', methods=['POST'])
+@admin_required
+@feature_required('analysis_dpm')
+def upload_dpm_reports():
+    """Upload an XLS or XLSX DPM report and store rows in the MOAT DPM table."""
+
+    uploaded = request.files.get('file')
+    if not uploaded or uploaded.filename == '':
+        abort(400, description='No file provided')
+
+    base = os.path.splitext(os.path.basename(uploaded.filename))[0]
+    m = re.match(
+        r"^DPMReportControl\s+(\d{4}-\d{2}-\d{2})(?:\s+to\s+(\d{4}-\d{2}-\d{2}))?\s+(L\w+)$",
+        base,
+        re.IGNORECASE,
+    )
+    if not m:
+        abort(
+            400,
+            description=(
+                'Filename must be "DPMReportControl YYYY-MM-DD LX" or '
+                '"DPMReportControl YYYY-MM-DD to YYYY-MM-DD LX"'
+            ),
+        )
+
+    start_date, end_date, line = m.groups()
+    report_date = None
+
+    try:
+        uploaded.stream.seek(0)
+        if uploaded.filename.lower().endswith('.xls'):
+            book = xlrd.open_workbook(file_contents=uploaded.stream.read())
+            sheet = book.sheet_by_index(0)
+
+            def cell(r, c):
+                try:
+                    return sheet.cell_value(r - 1, c - 1)
+                except IndexError:
+                    return None
+
+            raw_date = cell(2, 1)
+        else:
+            wb = load_workbook(uploaded.stream, data_only=True)
+            sheet = wb.active
+
+            def cell(r, c):
+                return sheet.cell(row=r, column=c).value
+
+            raw_date = cell(2, 1)
+
+        if raw_date:
+            if isinstance(raw_date, datetime):
+                report_date = raw_date.date().isoformat()
+            elif isinstance(raw_date, date):
+                report_date = raw_date.isoformat()
+            elif isinstance(raw_date, str):
+                try:
+                    report_date = (
+                        datetime.strptime(raw_date.strip(), "%m/%d/%Y").date().isoformat()
+                    )
+                except ValueError:
+                    pass
+    except Exception as exc:
+        abort(400, description=f'Failed to read Excel file: {exc}')
+
+    if not report_date:
+        report_date = start_date
+
+    rows = []
+    row_idx = 7
+    while True:
+        model = cell(row_idx, 2)
+        if model in (None, ''):
+            row_idx += 1
+            continue
+        if str(model).strip().lower() == 'total':
+            break
+        rows.append({
+            'Model Name': model,
+            'Total Boards': cell(row_idx, 3) or 0,
+            'Total Parts/Board': cell(row_idx, 4) or 0,
+            'Total Parts': cell(row_idx, 5) or 0,
+            'NG Parts': cell(row_idx, 6) or 0,
+            'NG PPM': cell(row_idx, 7) or 0,
+            'FalseCall Parts': cell(row_idx, 8) or 0,
+            'FalseCall PPM': cell(row_idx, 9) or 0,
+            'Report Date': report_date,
+            'Line': line,
+        })
+        row_idx += 1
+
+    if not rows:
+        return jsonify({'inserted': 0}), 200
+
+    _, error = insert_moat_dpm_bulk(rows)
+    if error:
+        abort(500, description=error)
+
+    return jsonify({'inserted': len(rows)}), 201
+
+
 @main_bp.route('/ppm_reports/upload', methods=['POST'])
 @admin_required
 @feature_required('analysis_ppm')
@@ -2495,6 +2601,114 @@ def forecast_preview():
         'start_date': start_date,
         'end_date': end_date,
     })
+
+
+@main_bp.route('/analysis/dpm', methods=['GET'])
+@feature_required('analysis_dpm')
+def dpm_analysis():
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    return render_template(
+        'ppm_analysis.html',
+        username=session.get('username'),
+        user_role=(session.get('role') or '').upper(),
+    )
+
+
+@main_bp.route('/analysis/dpm/data', methods=['GET'])
+@feature_required('analysis_dpm')
+def dpm_data():
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+
+    chart_type = request.args.get('type', 'avg_false_calls_per_assembly')
+    start = request.args.get('start_date')
+    end = request.args.get('end_date')
+
+    data, error = fetch_moat_dpm()
+    if error:
+        abort(500, description=error)
+    if not data:
+        return jsonify({"labels": [], "values": []})
+
+    from collections import defaultdict
+    from datetime import datetime
+
+    def parse_date(d):
+        if not d:
+            return None
+        try:
+            return datetime.fromisoformat(str(d)).date()
+        except Exception:
+            return None
+
+    grouped = defaultdict(lambda: {"falsecall": 0, "boards": 0})
+    for row in data:
+        date = row.get('Report Date') or row.get('report_date')
+        dt = parse_date(date)
+        if not dt:
+            continue
+        if start:
+            sdt = parse_date(start)
+            if sdt and dt < sdt:
+                continue
+        if end:
+            edt = parse_date(end)
+            if edt and dt > edt:
+                continue
+        fc = row.get('FalseCall Parts') or row.get('falsecall_parts') or 0
+        boards = row.get('Total Boards') or row.get('total_boards') or 0
+        grouped[dt]["falsecall"] += fc
+        grouped[dt]["boards"] += boards
+
+    ordered_dates = sorted(list(grouped.keys()))
+    labels = [d.isoformat() for d in ordered_dates]
+    values = []
+    for d in ordered_dates:
+        g = grouped[d]
+        values.append((g["falsecall"] / g["boards"]) if g["boards"] else 0)
+
+    return jsonify({"labels": labels, "values": values, "type": chart_type})
+
+
+@main_bp.route('/analysis/dpm/saved', methods=['GET', 'POST', 'PUT'])
+@feature_required('analysis_dpm')
+def dpm_saved_queries():
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+
+    if request.method == 'GET':
+        data, error = fetch_dpm_saved_queries()
+        if error:
+            abort(500, description=error)
+        return jsonify(data)
+
+    payload = request.get_json() or {}
+    keys = [
+        "name",
+        "type",
+        "params",
+        "description",
+        "start_date",
+        "end_date",
+        "value_source",
+        "x_column",
+        "y_agg",
+        "chart_type",
+        "line_color",
+    ]
+    payload = {k: payload.get(k) for k in keys if k in payload}
+    overwrite = request.method == 'PUT' or request.args.get('overwrite')
+    if overwrite:
+        name = payload.get('name')
+        data, error = update_dpm_saved_query(name, payload)
+        status = 200
+    else:
+        data, error = insert_dpm_saved_query(payload)
+        status = 201
+    if error:
+        abort(500, description=error)
+    return jsonify(data), status
 
 
 @main_bp.route('/analysis/ppm', methods=['GET'])

@@ -450,6 +450,36 @@ def fetch_recent_moat(days: int = 7):
         return None, f"Failed to fetch recent MOAT data: {exc}"
 
 
+def fetch_moat_dpm():
+    """Retrieve MOAT DPM data from the database."""
+
+    supabase = _get_client()
+    try:
+        response = supabase.table("moat_dpm").select("*").execute()
+        data = _apply_report_date_offset(response.data)
+        return data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to fetch MOAT DPM data: {exc}"
+
+
+def fetch_recent_moat_dpm(days: int = 7):
+    """Retrieve recent MOAT DPM data for the past ``days`` days."""
+
+    supabase = _get_client()
+    start_date = (datetime.utcnow() - timedelta(days=days)).date().isoformat()
+    try:
+        response = (
+            supabase.table("moat_dpm")
+            .select("*")
+            .gte("Report Date", start_date)
+            .execute()
+        )
+        data = _apply_report_date_offset(response.data)
+        return data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to fetch recent MOAT DPM data: {exc}"
+
+
 def fetch_defect_catalog() -> tuple[list[dict[str, str]] | None, str | None]:
     """Return the list of known defects with identifiers and names."""
 
@@ -550,6 +580,28 @@ def insert_moat_bulk(rows: list[dict]):
         return None, f"Failed to insert MOAT data: {exc}"
 
 
+def insert_moat_dpm(data: dict):
+    """Insert a single MOAT DPM record."""
+
+    supabase = _get_client()
+    try:
+        response = supabase.table("moat_dpm").insert(data).execute()
+        return response.data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to insert MOAT DPM data: {exc}"
+
+
+def insert_moat_dpm_bulk(rows: list[dict]):
+    """Insert multiple MOAT DPM records."""
+
+    supabase = _get_client()
+    try:
+        response = supabase.table("moat_dpm").insert(rows).execute()
+        return response.data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to insert MOAT DPM data: {exc}"
+
+
 def fetch_saved_queries():
     """Retrieve saved chart queries for PPM analysis.
 
@@ -584,6 +636,25 @@ def fetch_saved_queries():
         return None, f"Failed to fetch saved queries: {exc}"
 
 
+def fetch_dpm_saved_queries():
+    """Retrieve saved chart queries for DPM analysis."""
+
+    supabase = _get_client()
+    try:
+        response = (
+            supabase.table("dpm_saved_queries")
+            .select(
+                "id,name,type,description,start_date,end_date,value_source,x_column,y_agg,"
+                "chart_type,line_color,params,created_at"
+            )
+            .order("created_at", desc=True)
+            .execute()
+        )
+        return response.data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to fetch DPM saved queries: {exc}"
+
+
 def insert_saved_query(data: dict):
     """Insert a saved chart query definition into Supabase.
 
@@ -597,6 +668,17 @@ def insert_saved_query(data: dict):
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to save chart query: {exc}"
+
+
+def insert_dpm_saved_query(data: dict):
+    """Insert a saved DPM chart query definition into Supabase."""
+
+    supabase = _get_client()
+    try:
+        response = supabase.table("dpm_saved_queries").insert(data).execute()
+        return response.data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to save DPM chart query: {exc}"
 
 
 def update_saved_query(name: str, data: dict):
@@ -618,6 +700,22 @@ def update_saved_query(name: str, data: dict):
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to update saved query: {exc}"
+
+
+def update_dpm_saved_query(name: str, data: dict):
+    """Update or upsert a saved DPM chart query definition by ``name``."""
+
+    supabase = _get_client()
+    try:
+        payload = {**data, "name": name}
+        response = (
+            supabase.table("dpm_saved_queries")
+            .upsert(payload, on_conflict="name")
+            .execute()
+        )
+        return response.data, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to update DPM saved query: {exc}"
 
 
 def fetch_saved_aoi_queries():
