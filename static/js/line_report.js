@@ -58,6 +58,20 @@ document.addEventListener('DOMContentLoaded', () => {
     return formatter.format(value);
   }
 
+  function getDefectsPerBoard(metric = {}) {
+    return metric.defectsPerBoard
+      ?? metric.confirmedDefectsPerBoard
+      ?? metric.defectPerBoard
+      ?? null;
+  }
+
+  function getDefectsPerBoardDelta(metric = {}) {
+    return metric.defectsPerBoardDelta
+      ?? metric.confirmedDefectsPerBoardDelta
+      ?? metric.defectPerBoardDelta
+      ?? null;
+  }
+
   function clearCharts() {
     yieldChart?.destroy();
     falseCallChart?.destroy();
@@ -75,9 +89,9 @@ document.addEventListener('DOMContentLoaded', () => {
         <td>${metric.line}</td>
         <td>${fmtPercent(metric.windowYield ?? metric.yield)}</td>
         <td>${fmtPercent(metric.partYield)}</td>
-        <td>${fmtNumber(metric.confirmedDefects)}</td>
+        <td>${fmtNumber(metric.confirmedDefects, 0)}</td>
+        <td>${fmtNumber(getDefectsPerBoard(metric))}</td>
         <td>${fmtNumber(metric.falseCallsPerBoard)}</td>
-        <td>${fmtNumber(metric.falseCallPpm)}</td>
         <td>${fmtNumber(metric.falseCallDpm)}</td>
         <td>${fmtNumber(metric.defectDpm)}</td>
         <td>${fmtNumber(metric.boardsPerDay)}</td>
@@ -92,7 +106,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderLineCharts(metrics) {
     const yieldCtx = document.getElementById('lineYieldChart')?.getContext('2d');
     const falseCallCtx = document.getElementById('lineFalseCallChart')?.getContext('2d');
-    const qualityCtx = document.getElementById('linePpmChart')?.getContext('2d');
+    const qualityCtx = document.getElementById('lineQualityChart')?.getContext('2d');
     clearCharts();
     if (yieldCtx) {
       yieldChart = new Chart(yieldCtx, {
@@ -141,12 +155,12 @@ document.addEventListener('DOMContentLoaded', () => {
           labels: metrics.map((m) => m.line),
           datasets: [
             {
-              label: 'False Call PPM (parts)',
-              data: metrics.map((m) => m.falseCallPpm ?? null),
+              label: 'False Call DPM',
+              data: metrics.map((m) => m.falseCallDpm ?? null),
               backgroundColor: '#1d4ed8',
             },
             {
-              label: 'Defect DPM (windows)',
+              label: 'Defect DPM',
               data: metrics.map((m) => m.defectDpm ?? null),
               backgroundColor: '#059669',
             },
@@ -156,7 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
           responsive: true,
           scales: {
             y: {
-              title: { display: true, text: 'Events per Million' },
+              title: { display: true, text: 'Defects per Million' },
             },
           },
         },
@@ -182,8 +196,8 @@ document.addEventListener('DOMContentLoaded', () => {
           <tr>
             <th>Line</th>
             <th>Window Yield %</th>
+            <th>Defects / Board</th>
             <th>False Calls / Board</th>
-            <th>False Call PPM</th>
             <th>False Call DPM</th>
             <th>Defect DPM</th>
           </tr>
@@ -196,8 +210,8 @@ document.addEventListener('DOMContentLoaded', () => {
         row.innerHTML = `
           <td>${line}</td>
           <td>${fmtPercent(metrics.windowYield ?? metrics.yield)}</td>
+          <td>${fmtNumber(getDefectsPerBoard(metrics))}</td>
           <td>${fmtNumber(metrics.falseCallsPerBoard)}</td>
-          <td>${fmtNumber(metrics.falseCallPpm)}</td>
           <td>${fmtNumber(metrics.falseCallDpm)}</td>
           <td>${fmtNumber(metrics.defectDpm)}</td>
         `;
@@ -361,8 +375,8 @@ document.addEventListener('DOMContentLoaded', () => {
         <tr>
           <th>Line</th>
           <th>Window Yield Δ</th>
+          <th>Defects / Board Δ</th>
           <th>False Call Δ (/board)</th>
-          <th>False Call PPM Δ</th>
           <th>False Call DPM Δ</th>
           <th>Defect DPM Δ</th>
         </tr>
@@ -375,8 +389,8 @@ document.addEventListener('DOMContentLoaded', () => {
       row.innerHTML = `
         <td>${entry.line}</td>
         <td>${fmtNumber(entry.windowYieldDelta)}</td>
+        <td>${fmtNumber(getDefectsPerBoardDelta(entry))}</td>
         <td>${fmtNumber(entry.falseCallDelta)}</td>
-        <td>${fmtNumber(entry.falseCallPpmDelta)}</td>
         <td>${fmtNumber(entry.falseCallDpmDelta)}</td>
         <td>${fmtNumber(entry.defectDpmDelta)}</td>
       `;
@@ -386,7 +400,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const avg = document.createElement('p');
     avg.className = 'kpi-summary';
-    avg.textContent = `Company averages — Window Yield: ${fmtPercent(averages.windowYield ?? averages.yield)}, False Calls / Board: ${fmtNumber(averages.falseCallsPerBoard)}, False Call PPM: ${fmtNumber(averages.falseCallPpm)}, False Call DPM: ${fmtNumber(averages.falseCallDpm)}, Defect DPM: ${fmtNumber(averages.defectDpm)}`;
+    avg.textContent = `Company averages — Window Yield: ${fmtPercent(averages.windowYield ?? averages.yield)}, Defects / Board: ${fmtNumber(averages.defectsPerBoard)}, False Calls / Board: ${fmtNumber(averages.falseCallsPerBoard)}, False Call DPM: ${fmtNumber(averages.falseCallDpm)}, Defect DPM: ${fmtNumber(averages.defectDpm)}`;
     container.appendChild(avg);
 
     showSection(sections.benchmarking);
