@@ -1,0 +1,49 @@
+<section class="report-cover">
+  <div class="cover-header">
+    <img src="{{ logo_url }}" alt="Logo" class="cover-logo" />
+    <div class="cover-meta">
+      <h1>{{ title or 'Line Report' }}</h1>
+      {% if subtitle %}<p class="cover-subtitle">{{ subtitle }}</p>{% endif %}
+    </div>
+  </div>
+  <dl class="cover-details">
+    <div>
+      <dt>Report Date</dt>
+      <dd>{{ report_date or generated_at }}</dd>
+    </div>
+    <div>
+      <dt>Period</dt>
+      <dd>
+        {% if period %}
+          {{ period }}
+        {% elif start or end %}
+          {{ start or '—' }} to {{ end or '—' }}
+        {% else %}
+          Custom Range
+        {% endif %}
+      </dd>
+    </div>
+    {% if author %}
+    <div>
+      <dt>Prepared By</dt>
+      <dd>{{ author }}</dd>
+    </div>
+    {% endif %}
+    {% if contact %}
+    <div>
+      <dt>Contact</dt>
+      <dd>{{ contact }}</dd>
+    </div>
+    {% endif %}
+    {% if report_id %}
+    <div>
+      <dt>Report ID</dt>
+      <dd>{{ report_id }}</dd>
+    </div>
+    {% endif %}
+  </dl>
+  <footer class="cover-footer">
+    <span>{{ confidentiality }}</span>
+    {% if footer_left %}<span>{{ footer_left }}</span>{% endif %}
+  </footer>
+</section>

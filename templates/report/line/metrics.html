@@ -1,0 +1,43 @@
+<section class="report-section">
+  <h2>Line-Level Performance</h2>
+  <figure class="report-figure">
+    <img src="{{ lineYieldImg }}" alt="Yield by Line" />
+    <figcaption>Yield performance across AOI lines.</figcaption>
+  </figure>
+  <figure class="report-figure">
+    <img src="{{ lineFalseCallImg }}" alt="False Calls by Line" />
+    <figcaption>False-call rate per board.</figcaption>
+  </figure>
+  <figure class="report-figure">
+    <img src="{{ linePpmImg }}" alt="PPM vs DPM" />
+    <figcaption>Comparison of false-call PPM and confirmed-defect DPM.</figcaption>
+  </figure>
+  <table class="report-table">
+    <thead>
+      <tr>
+        <th>Line</th>
+        <th>Yield %</th>
+        <th>Confirmed Defects</th>
+        <th>False Calls / Board</th>
+        <th>PPM</th>
+        <th>DPM</th>
+        <th>Boards / Day</th>
+        <th>Total Parts</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for metric in lineMetrics %}
+      <tr>
+        <td>{{ metric.line }}</td>
+        <td>{{ metric.yield|round(2) }}</td>
+        <td>{{ metric.confirmedDefects|round(0) }}</td>
+        <td>{{ metric.falseCallsPerBoard|round(2) }}</td>
+        <td>{{ metric.ppm|round(2) }}</td>
+        <td>{{ metric.dpm|round(2) }}</td>
+        <td>{{ metric.boardsPerDay|round(2) }}</td>
+        <td>{{ metric.totalParts|round(0) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>

@@ -1,0 +1,50 @@
+<section class="report-section">
+  <h2>Assembly vs Line Comparisons</h2>
+  {% for assembly in assemblyComparisons %}
+  <article class="report-card">
+    <h3>{{ assembly.assembly }}</h3>
+    <table class="report-table">
+      <thead>
+        <tr>
+          <th>Line</th>
+          <th>Yield %</th>
+          <th>False Calls / Board</th>
+          <th>PPM</th>
+          <th>DPM</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for line, metrics in assembly.lines.items() %}
+        <tr>
+          <td>{{ line }}</td>
+          <td>{{ metrics.yield|default(0)|round(2) }}</td>
+          <td>{{ metrics.falseCallsPerBoard|default(0)|round(2) }}</td>
+          <td>{{ metrics.ppm|default(0)|round(2) }}</td>
+          <td>{{ metrics.dpm|default(0)|round(2) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% set mixes = [] %}
+    {% for line, metrics in assembly.lines.items() %}
+      {% if metrics.defectMix %}
+        {% set mixes = mixes + [(line, metrics.defectMix)] %}
+      {% endif %}
+    {% endfor %}
+    {% if mixes %}
+    <div class="defect-mix-grid">
+      {% for item in mixes %}
+      <div>
+        <h4>{{ item[0] }} Defect Mix</h4>
+        <ul>
+          {% for defect, share in item[1].items()|sort(attribute=1, reverse=True)[:5] %}
+          <li>{{ defect }} — {{ (share * 100)|round(2) }}%</li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </article>
+  {% endfor %}
+</section>
