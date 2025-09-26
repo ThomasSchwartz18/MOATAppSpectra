@@ -339,15 +339,21 @@ function filterSavedList() {
     li.textContent = r.name || r.type || 'Saved Chart';
     li.title = r.description || '';
     li.style.cursor = 'pointer';
-      li.addEventListener('click', () => {
-        if (r.params) {
-          loadParamsIntoBuilder(r);
-          document.getElementById('chart-description-result').textContent = r.description || '';
-        } else if (r.id) {
-          setPreset(r.id);
-        }
+    li.addEventListener('click', () => {
+      if (r.params) {
+        loadParamsIntoBuilder(r);
+        document.getElementById('chart-description-result').textContent = r.description || '';
+        document.getElementById('saved-chart-sql').style.display = 'none';
         runChart();
-      });
+        return;
+      }
+      if (r.kind) {
+        setPreset(r.id);
+        runChart();
+        return;
+      }
+      displaySavedChartDetails(r);
+    });
     list.appendChild(li);
   });
 }
@@ -359,13 +365,50 @@ function loadSavedQueries() {
       const server = Array.isArray(rows)
         ? rows.map((r) => ({ ...r, description: r.description || r.params?.description || '' }))
         : [];
-      savedQueriesCache = presetsList().concat(server);
+      savedQueriesCache = server;
       filterSavedList();
     })
     .catch(() => {
-      savedQueriesCache = presetsList();
+      savedQueriesCache = [];
       filterSavedList();
     });
+}
+
+function displaySavedChartDetails(chart) {
+  const name = chart.name || chart.type || 'Saved Chart';
+  const desc = chart.description || '';
+  const mappings = chart.mappings || {};
+  const info = [];
+  if (chart.chart_type) info.push(`Chart Type: ${chart.chart_type}`);
+  const mappingEntries = Object.entries(mappings).map(([key, value]) => `${key} → ${value}`);
+  if (mappingEntries.length) info.push(`Mappings: ${mappingEntries.join(', ')}`);
+  if (chart.notes) info.push(chart.notes);
+
+  document.getElementById('result-chart-name').textContent = name;
+  document.getElementById('chart-title').value = name;
+  document.getElementById('chart-description').value = desc;
+  document.getElementById('chart-description-result').textContent = desc;
+  document.getElementById('dpm-info').textContent = info.join(' | ');
+
+  const sqlEl = document.getElementById('saved-chart-sql');
+  if (chart.sql) {
+    sqlEl.textContent = chart.sql;
+    sqlEl.style.display = 'block';
+  } else {
+    sqlEl.textContent = '';
+    sqlEl.style.display = 'none';
+  }
+
+  if (dpmChartInstance) {
+    dpmChartInstance.destroy();
+    dpmChartInstance = null;
+  }
+  if (dpmChartExpandedInstance) {
+    dpmChartExpandedInstance.destroy();
+    dpmChartExpandedInstance = null;
+  }
+  currentData = { labels: [], values: [], datasets: [] };
+  window.currentChartMeta = null;
 }
 
 function getDateInputs() {
@@ -402,6 +445,8 @@ function runChart() {
       const cfg = collectChartConfig();
       const canvasEl = document.getElementById('dpmChart');
 
+      document.getElementById('saved-chart-sql').style.display = 'none';
+
       if (hasCustom) {
         const labels = result.labels || [];
         const datasets = result.datasets || [];
@@ -429,6 +474,19 @@ function runChart() {
       let options = buildOptions({ ...cfg, xTickDisplay: false, metaLookup: result.metaLookup });
       let datasets = [];
       let labels = [];
+
+      if (result.kind === 'none') {
+        if (dpmChartInstance) {
+          dpmChartInstance.destroy();
+          dpmChartInstance = null;
+        }
+        document.getElementById('saved-chart-sql').style.display = 'none';
+        currentData = { labels: [], values: [], datasets: [] };
+        window.currentChartMeta = null;
+        document.getElementById('dpm-info').textContent = 'Select a saved chart or configure the builder to run.';
+        document.getElementById('chart-description-result').textContent = description;
+        return;
+      }
 
       if (result.kind === 'line-control') {
         labels = result.labels; datasets = [{ label: activePreset?.name || 'Series', data: result.values, borderColor: cfg.color, backgroundColor: cfg.color, pointRadius: cfg.pointRadius, pointStyle: cfg.pointStyle, fill: false, tension: cfg.tension, borderWidth: 2 }];
@@ -616,21 +674,16 @@ async function runChartFlexible() {
 let activePreset = null; // { id, name, kind, yTitle?, calc? }
 
 function presetsList() {
-  return [
-    { id: 'avg_fc_per_board', name: 'Avg False Calls per Board (by Model)', kind: 'line-control', yTitle: 'Avg False Calls/Board', calc: (agg) => (agg.boardSum ? agg.fcSum / agg.boardSum : 0), groupByModel: false },
-    { id: 'fc_parts_per_total_parts', name: 'False Call % of Windows (by Model)', kind: 'line-control', yTitle: 'False Call % of Windows', calc: (agg) => (agg.partsSum ? (agg.fcSum / agg.partsSum) * 100 : 0) },
-    { id: 'fc_rate_per_part', name: 'False Call Rate per Window (by Model)', kind: 'line-control', yTitle: 'False Call Rate per Window', calc: (agg) => (agg.partsSum ? (agg.fcSum / agg.partsSum) : 0) },
-    { id: 'fc_avg_and_ppm', name: 'Avg FC/Board + FC DPM (by Model)', kind: 'fc_avg_and_ppm' },
-    { id: 'pareto_ng_by_model', name: 'Pareto of Defects (NG Windows by Model)', kind: 'pareto' },
-    { id: 'scatter_fc_vs_ng', name: 'False Call vs True Defect (Scatter)', kind: 'scatter' },
-    { id: 'ng_rate_over_time_by_line', name: 'Defect Rate Over Time (DPM by Line)', kind: 'ts_ng_by_line' },
-    { id: 'fc_vs_ng_rate_over_time', name: 'False Call vs NG Rate Over Time', kind: 'ts_fc_vs_ng' },
-    { id: 'ratio_fc_to_ng', name: 'False Call / True NG Ratio (by Model)', kind: 'ratio_fc_ng' },
-  ];
+  return [];
 }
 
 function setPreset(id) {
-  const p = presetsList().find((x) => x.id === id) || presetsList()[0];
+  const presets = presetsList();
+  const p = presets.find((x) => x.id === id) || presets[0];
+  if (!p) {
+    activePreset = null;
+    return;
+  }
   activePreset = p;
   const titleEl = document.getElementById('chart-title');
   const yEl = document.getElementById('y-title');
@@ -750,8 +803,11 @@ function readFilters() {
 }
 
 async function runPresetChart() {
-  const rows = await fetch('/moat_dpm').then((r)=>r.json());
   if (!activePreset) setPreset('avg_fc_per_board');
+  if (!activePreset) {
+    return { kind: 'none', labels: [], values: [], metaLookup: {} };
+  }
+  const rows = await fetch('/moat_dpm').then((r)=>r.json());
   const cols = window.__dpm_cols__ || resolveColumns(rows);
   const f = readFilters();
   const kind = activePreset.kind || 'line-control';

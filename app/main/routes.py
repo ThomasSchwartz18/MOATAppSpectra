@@ -99,6 +99,27 @@ def _load_report_css() -> str:
     return ""
 
 
+def _load_local_dpm_saved_charts() -> list[dict]:
+    """Return built-in DPM saved chart definitions for offline use."""
+
+    try:
+        config_dir = Path(current_app.root_path).parent / 'config'
+        json_path = config_dir / 'dpm_saved_charts.json'
+        if not json_path.exists():
+            return []
+        with json_path.open(encoding='utf-8') as handle:
+            payload = json.load(handle)
+        if isinstance(payload, list):
+            return payload
+        current_app.logger.warning(
+            "dpm_saved_charts.json is not a list; ignoring fallback definitions",
+        )
+        return []
+    except OSError as exc:  # pragma: no cover - filesystem issues
+        current_app.logger.warning("Unable to load local DPM saved charts: %s", exc)
+        return []
+
+
 def _normalize_header(value: str | None) -> str:
     """Normalize a CSV header by trimming whitespace and lowercasing."""
 
@@ -2755,8 +2776,15 @@ def dpm_saved_queries():
     if request.method == 'GET':
         data, error = fetch_dpm_saved_queries()
         if error:
+            fallback = _load_local_dpm_saved_charts()
+            if fallback:
+                return jsonify(fallback)
             abort(500, description=error)
-        return jsonify(data)
+        if not data:
+            fallback = _load_local_dpm_saved_charts()
+            if fallback:
+                return jsonify(fallback)
+        return jsonify(data or [])
 
     payload = request.get_json() or {}
     keys = [
