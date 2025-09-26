@@ -5,7 +5,8 @@
       <h3>Top Lines</h3>
       <ul>
         {% if benchmarking.bestYield %}
-        <li><strong>Best Yield:</strong> {{ benchmarking.bestYield.line }} ({{ benchmarking.bestYield.yield|round(2) }}%)</li>
+        {% set best_yield = benchmarking.bestYield.windowYield if benchmarking.bestYield.windowYield is not none else benchmarking.bestYield.partYield if benchmarking.bestYield.partYield is not none else benchmarking.bestYield.yield %}
+        <li><strong>Best Window Yield:</strong> {{ benchmarking.bestYield.line }} ({{ best_yield|round(2) }}%)</li>
         {% endif %}
         {% if benchmarking.lowestFalseCalls %}
         <li><strong>Lowest False Calls:</strong> {{ benchmarking.lowestFalseCalls.line }} ({{ benchmarking.lowestFalseCalls.falseCallsPerBoard|round(2) }})</li>
@@ -18,10 +19,11 @@
     <article>
       <h3>Company Averages</h3>
       <ul>
-        <li>Yield: {{ companyAverages.yield|round(2) }}%</li>
+        <li>Window Yield: {{ (companyAverages.windowYield if companyAverages.windowYield is not none else companyAverages.yield)|round(2) }}%</li>
         <li>False Calls / Board: {{ companyAverages.falseCallsPerBoard|round(2) }}</li>
-        <li>PPM: {{ companyAverages.ppm|round(2) }}</li>
-        <li>DPM: {{ companyAverages.dpm|round(2) }}</li>
+        <li>False Call PPM: {{ (companyAverages.falseCallPpm if companyAverages.falseCallPpm is not none else 0)|round(2) }}</li>
+        <li>False Call DPM: {{ (companyAverages.falseCallDpm if companyAverages.falseCallDpm is not none else 0)|round(2) }}</li>
+        <li>Defect DPM: {{ (companyAverages.defectDpm if companyAverages.defectDpm is not none else 0)|round(2) }}</li>
       </ul>
     </article>
     <article>
@@ -30,7 +32,7 @@
         {% set drift = (trendInsights.lineDrift or [])[:3] %}
         {% if drift %}
           {% for item in drift %}
-          <li>{{ item.line }} yield drifted {{ item.change|round(2) }} pts ({{ item.start|round(2) }}% → {{ item.end|round(2) }}%).</li>
+          <li>{{ item.line }} window yield drifted {{ item.change|round(2) }} pts ({{ item.start|round(2) }}% → {{ item.end|round(2) }}%).</li>
           {% endfor %}
         {% else %}
           <li>No significant yield drift detected across lines.</li>

@@ -100,16 +100,24 @@ def test_line_report_api_returns_expected_metrics(app_instance, monkeypatch):
     payload = response.get_json()
     assert payload["lineMetrics"]
     metrics = {item["line"]: item for item in payload["lineMetrics"]}
-    assert pytest.approx(metrics["L1"]["yield"], rel=1e-3) == 93.18
+    assert pytest.approx(metrics["L1"]["windowYield"], rel=1e-3) == 95.0
+    assert pytest.approx(metrics["L1"]["partYield"], rel=1e-3) == 93.181818
     assert pytest.approx(metrics["L1"]["falseCallsPerBoard"], rel=1e-3) == 0.3636
-    assert pytest.approx(metrics["L1"]["ppm"], rel=1e-4) == 36363.6363
-    assert pytest.approx(metrics["L1"]["dpm"], rel=1e-4) == 50000.0
+    assert pytest.approx(metrics["L1"]["falseCallPpm"], rel=1e-4) == 36363.6363
+    assert pytest.approx(metrics["L1"]["falseCallDpm"], rel=1e-4) == 21875.0
+    assert pytest.approx(metrics["L1"]["defectDpm"], rel=1e-4) == 50000.0
+    assert metrics["L1"]["confirmedDefects"] == pytest.approx(16.0)
     assert pytest.approx(metrics["L1"]["boardsPerDay"], rel=1e-3) == 11.0
+    assert metrics["L1"]["totalWindows"] == pytest.approx(320.0)
 
     assert payload["assemblyComparisons"]
     asmA = next(item for item in payload["assemblyComparisons"] if item["assembly"] == "AsmA")
-    assert asmA["lines"]["L2"]["yield"] == pytest.approx(95.0)
-    assert payload["benchmarking"]["bestYield"]["line"] == "L2"
+    assert asmA["lines"]["L2"]["windowYield"] == pytest.approx(93.75)
+    assert payload["benchmarking"]["bestYield"]["line"] == "L1"
+
+    averages = payload["companyAverages"]
+    assert averages["windowYield"] == pytest.approx(94.75)
+    assert averages["defectDpm"] == pytest.approx(52500.0)
 
 
 def test_line_report_export_handles_pdf_error(app_instance, monkeypatch):
@@ -120,7 +128,15 @@ def test_line_report_export_handles_pdf_error(app_instance, monkeypatch):
         "lineTrends": [],
         "trendInsights": {},
         "benchmarking": {"lineVsCompany": []},
-        "companyAverages": {"yield": 0, "falseCallsPerBoard": 0, "ppm": 0, "dpm": 0},
+        "companyAverages": {
+            "windowYield": 0,
+            "partYield": 0,
+            "yield": 0,
+            "falseCallsPerBoard": 0,
+            "falseCallPpm": 0,
+            "falseCallDpm": 0,
+            "defectDpm": 0,
+        },
     })
     monkeypatch.setattr(routes, "_generate_line_report_charts", lambda payload: {})
     monkeypatch.setattr(routes, "render_template", lambda template, **context: "<html></html>")

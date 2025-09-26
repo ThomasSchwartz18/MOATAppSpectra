@@ -4,20 +4,22 @@
     <thead>
       <tr>
         <th>Line</th>
-        <th>Yield Δ vs Avg</th>
-        <th>False Call Δ</th>
-        <th>PPM Δ</th>
-        <th>DPM Δ</th>
+        <th>Window Yield Δ</th>
+        <th>False Call Δ (/board)</th>
+        <th>False Call PPM Δ</th>
+        <th>False Call DPM Δ</th>
+        <th>Defect DPM Δ</th>
       </tr>
     </thead>
     <tbody>
       {% for entry in benchmarking.lineVsCompany %}
       <tr>
         <td>{{ entry.line }}</td>
-        <td>{{ entry.yieldDelta|round(2) }}</td>
+        <td>{{ entry.windowYieldDelta|round(2) }}</td>
         <td>{{ entry.falseCallDelta|round(2) }}</td>
-        <td>{{ entry.ppmDelta|round(2) }}</td>
-        <td>{{ entry.dpmDelta|round(2) }}</td>
+        <td>{{ entry.falseCallPpmDelta|round(2) }}</td>
+        <td>{{ entry.falseCallDpmDelta|round(2) }}</td>
+        <td>{{ entry.defectDpmDelta|round(2) }}</td>
       </tr>
       {% endfor %}
     </tbody>

@@ -3255,6 +3255,7 @@ def _line_bucket() -> dict[str, object]:
         'ng_windows': 0.0,
         'false_call_windows': 0.0,
         'ppm_values': [],
+        'fc_dpm_values': [],
         'dpm_values': [],
         'dates': set(),
         'defects': defaultdict(float),
@@ -3331,6 +3332,7 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
         'total_boards': 0.0,
         'total_windows': 0.0,
         'ng_windows': 0.0,
+        'false_call_windows': 0.0,
     }
 
     def _within_range(dt: date | None) -> bool:
@@ -3413,7 +3415,7 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
         if dpm_value:
             bucket['dpm_values'].append(dpm_value)
         if fc_dpm:
-            bucket['ppm_values'].append(fc_dpm)
+            bucket['fc_dpm_values'].append(fc_dpm)
         if dt:
             bucket['dates'].add(dt)
             day_bucket = line_daily[line][dt]
@@ -3438,6 +3440,7 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
 
         overall['total_windows'] += windows
         overall['ng_windows'] += ng_windows
+        overall['false_call_windows'] += fc_windows
 
     def _line_metrics(line: str, info: dict[str, object]) -> dict[str, object]:
         parts = info['total_parts']
@@ -3447,29 +3450,59 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
         windows = info['total_windows']
         ng_windows = info['ng_windows']
         fc_windows = info['false_call_windows']
-        confirmed = max(0.0, ng_parts - fc_parts)
-        if ng_windows and not parts:
-            confirmed = ng_windows
-        yield_pct = (100.0 * (parts - confirmed) / parts) if parts else 0.0
+        window_confirmed = ng_windows if windows else None
+        part_confirmed = max(0.0, ng_parts - fc_parts) if parts else None
+        confirmed = window_confirmed if window_confirmed is not None else part_confirmed or 0.0
+
+        window_yield = (
+            100.0 * (windows - ng_windows) / windows
+            if windows
+            else None
+        )
+        part_yield = (
+            100.0 * (parts - (part_confirmed or 0.0)) / parts
+            if parts
+            else None
+        )
+        yield_pct = window_yield if window_yield is not None else part_yield or 0.0
+
         fc_per_board = _safe_ratio(fc_parts, boards)
-        ppm = _safe_ratio(fc_parts, parts) * 1_000_000 if parts else (
-            _safe_ratio(fc_windows, windows) * 1_000_000 if windows else 0.0
+        false_call_ppm = (
+            _safe_ratio(fc_parts, parts) * 1_000_000
+            if parts
+            else None
         )
-        dpm = _safe_ratio(ng_windows, windows) * 1_000_000 if windows else (
-            _safe_ratio(confirmed, parts) * 1_000_000 if parts else 0.0
+        false_call_dpm = (
+            _safe_ratio(fc_windows, windows) * 1_000_000
+            if windows
+            else None
         )
+        if false_call_dpm is None and info['fc_dpm_values']:
+            false_call_dpm = sum(info['fc_dpm_values']) / len(info['fc_dpm_values'])
+
+        defect_dpm = (
+            _safe_ratio(ng_windows, windows) * 1_000_000
+            if windows
+            else None
+        )
+        if defect_dpm is None and confirmed and parts:
+            defect_dpm = _safe_ratio(confirmed, parts) * 1_000_000
         date_count = len(info['dates']) or 1
         boards_per_day = boards / date_count if boards else 0.0
         return {
             'line': line,
             'totalParts': parts,
             'totalBoards': boards,
+            'totalWindows': windows,
             'falseCalls': fc_parts,
             'confirmedDefects': confirmed,
+            'windowYield': window_yield,
+            'partYield': part_yield,
             'yield': yield_pct,
             'falseCallsPerBoard': fc_per_board,
-            'ppm': ppm,
-            'dpm': dpm,
+            'falseCallPpm': false_call_ppm,
+            'falseCallDpm': false_call_dpm,
+            'defectDpm': defect_dpm,
             'boardsPerDay': boards_per_day,
             'datesActive': date_count,
         }
@@ -3480,35 +3513,69 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
         if info['total_parts'] or info['total_windows']
     ]
 
-    company_confirmed = max(
-        0.0, overall['ng_parts'] - overall['false_calls']
-    ) or overall['ng_windows']
-    company_yield = (
+    company_confirmed = (
+        overall['ng_windows']
+        if overall['total_windows']
+        else max(0.0, overall['ng_parts'] - overall['false_calls'])
+    )
+    company_window_yield = (
+        100.0 * (overall['total_windows'] - overall['ng_windows']) / overall['total_windows']
+        if overall['total_windows']
+        else None
+    )
+    company_part_yield = (
         100.0 * (overall['total_parts'] - company_confirmed) / overall['total_parts']
         if overall['total_parts']
-        else 0.0
+        else None
+    )
+    company_yield = (
+        company_window_yield
+        if company_window_yield is not None
+        else company_part_yield or 0.0
     )
     company_fc_rate = _safe_ratio(overall['false_calls'], overall['total_boards'])
-    company_ppm = (
+    company_false_call_ppm = (
         _safe_ratio(overall['false_calls'], overall['total_parts']) * 1_000_000
         if overall['total_parts']
-        else 0.0
+        else None
+    )
+    company_false_call_dpm = (
+        _safe_ratio(overall['false_call_windows'], overall['total_windows']) * 1_000_000
+        if overall['total_windows']
+        else None
     )
     company_dpm = (
         _safe_ratio(overall['ng_windows'], overall['total_windows']) * 1_000_000
         if overall['total_windows']
-        else 0.0
+        else None
     )
 
     line_vs_company = []
     for metrics in line_metrics:
+        line_window_yield = metrics.get('windowYield')
+        line_yield_fallback = metrics.get('partYield')
+        line_yield_value = (
+            line_window_yield
+            if line_window_yield is not None
+            else line_yield_fallback if line_yield_fallback is not None else 0.0
+        )
         line_vs_company.append(
             {
                 'line': metrics['line'],
-                'yieldDelta': metrics['yield'] - company_yield,
+                'windowYieldDelta': line_yield_value - company_yield,
                 'falseCallDelta': metrics['falseCallsPerBoard'] - company_fc_rate,
-                'ppmDelta': metrics['ppm'] - company_ppm,
-                'dpmDelta': metrics['dpm'] - company_dpm,
+                'falseCallPpmDelta': (
+                    (metrics['falseCallPpm'] or 0.0)
+                    - (company_false_call_ppm or 0.0)
+                ),
+                'falseCallDpmDelta': (
+                    (metrics['falseCallDpm'] or 0.0)
+                    - (company_false_call_dpm or 0.0)
+                ),
+                'defectDpmDelta': (
+                    (metrics['defectDpm'] or 0.0)
+                    - (company_dpm or 0.0)
+                ),
             }
         )
 
@@ -3522,28 +3589,44 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
             windows = values['windows']
             ng_windows = values['ng_windows']
             fc_windows = values['fc_windows']
-            confirmed = max(0.0, ng_parts - fc_parts)
-            if ng_windows and not parts:
-                confirmed = ng_windows
-            yield_pct = (100.0 * (parts - confirmed) / parts) if parts else None
+            window_confirmed = ng_windows if windows else None
+            part_confirmed = max(0.0, ng_parts - fc_parts) if parts else None
+            confirmed = window_confirmed if window_confirmed is not None else part_confirmed
+            window_yield = (
+                100.0 * (windows - ng_windows) / windows
+                if windows
+                else None
+            )
+            yield_pct = (
+                window_yield
+                if window_yield is not None
+                else (100.0 * (parts - (part_confirmed or 0.0)) / parts) if parts else None
+            )
             fc_rate = _safe_ratio(fc_parts, boards) if boards else None
-            ppm = (
+            false_call_ppm = (
                 _safe_ratio(fc_parts, parts) * 1_000_000
                 if parts
-                else _safe_ratio(fc_windows, windows) * 1_000_000 if windows else None
+                else None
             )
-            dpm = (
+            false_call_dpm = (
+                _safe_ratio(fc_windows, windows) * 1_000_000
+                if windows
+                else None
+            )
+            defect_dpm = (
                 _safe_ratio(ng_windows, windows) * 1_000_000
                 if windows
-                else _safe_ratio(confirmed, parts) * 1_000_000 if parts else None
+                else (_safe_ratio(confirmed, parts) * 1_000_000 if confirmed and parts else None)
             )
             entries.append(
                 {
                     'date': dt.isoformat(),
+                    'windowYield': window_yield,
                     'yield': yield_pct,
                     'falseCallsPerBoard': fc_rate,
-                    'ppm': ppm,
-                    'dpm': dpm,
+                    'falseCallPpm': false_call_ppm,
+                    'falseCallDpm': false_call_dpm,
+                    'defectDpm': defect_dpm,
                 }
             )
         return {'line': line, 'entries': entries}
@@ -3561,7 +3644,13 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
         return math.sqrt(sum((v - avg) ** 2 for v in values) / len(values))
 
     benchmarking = {
-        'bestYield': max(line_metrics, key=lambda m: m['yield'], default=None),
+        'bestYield': max(
+            line_metrics,
+            key=lambda m: m['windowYield']
+            if m['windowYield'] is not None
+            else (m['partYield'] if m['partYield'] is not None else -float('inf')),
+            default=None,
+        ),
         'lowestFalseCalls': min(
             line_metrics, key=lambda m: m['falseCallsPerBoard'], default=None
         ),
@@ -3571,7 +3660,13 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
 
     consistency_scores: list[tuple[str, float]] = []
     for trend in line_trends:
-        yields = [entry['yield'] for entry in trend['entries'] if entry['yield'] is not None]
+        yields = [
+            entry['windowYield']
+            if entry['windowYield'] is not None
+            else entry['yield']
+            for entry in trend['entries']
+            if entry['yield'] is not None or entry['windowYield'] is not None
+        ]
         if not yields:
             continue
         consistency_scores.append((trend['line'], _stddev(yields)))
@@ -3591,22 +3686,35 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
             ng_parts = info['ng_parts']
             windows = info['windows']
             ng_windows = info['ng_windows']
-            confirmed = max(0.0, ng_parts - fc_parts)
-            if ng_windows and not parts:
-                confirmed = ng_windows
-            yield_pct = (100.0 * (parts - confirmed) / parts) if parts else None
-            fc_rate = _safe_ratio(fc_parts, boards) if boards else None
-            ppm = (
-                _safe_ratio(fc_parts, parts) * 1_000_000
-                if parts
-                else _safe_ratio(info['fc_windows'], windows) * 1_000_000
+            fc_windows = info['fc_windows']
+            window_confirmed = ng_windows if windows else None
+            part_confirmed = max(0.0, ng_parts - fc_parts) if parts else None
+            confirmed = window_confirmed if window_confirmed is not None else part_confirmed
+            window_yield = (
+                100.0 * (windows - ng_windows) / windows
                 if windows
                 else None
             )
-            dpm = (
+            yield_pct = (
+                window_yield
+                if window_yield is not None
+                else (
+                    100.0 * (parts - (part_confirmed or 0.0)) / parts
+                )
+                if parts
+                else None
+            )
+            fc_rate = _safe_ratio(fc_parts, boards) if boards else None
+            false_call_ppm = (
+                _safe_ratio(fc_parts, parts) * 1_000_000 if parts else None
+            )
+            false_call_dpm = (
+                _safe_ratio(fc_windows, windows) * 1_000_000 if windows else None
+            )
+            defect_dpm = (
                 _safe_ratio(ng_windows, windows) * 1_000_000
                 if windows
-                else _safe_ratio(confirmed, parts) * 1_000_000 if parts else None
+                else (_safe_ratio(confirmed, parts) * 1_000_000 if confirmed and parts else None)
             )
             defects = info['defects']
             defect_total = sum(defects.values())
@@ -3616,10 +3724,17 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                 else {}
             )
             lines_info[line] = {
+                'windowYield': window_yield,
+                'partYield': (
+                    100.0 * (parts - (part_confirmed or 0.0)) / parts
+                    if parts
+                    else None
+                ),
                 'yield': yield_pct,
                 'falseCallsPerBoard': fc_rate,
-                'ppm': ppm,
-                'dpm': dpm,
+                'falseCallPpm': false_call_ppm,
+                'falseCallDpm': false_call_dpm,
+                'defectDpm': defect_dpm,
                 'defectMix': defect_mix,
             }
         assembly_comparisons.append({'assembly': assembly, 'lines': lines_info})
@@ -3627,7 +3742,11 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
     yield_variance = []
     false_call_variance = []
     for comp in assembly_comparisons:
-        yields = [v['yield'] for v in comp['lines'].values() if v['yield'] is not None]
+        yields = [
+            v['windowYield'] if v['windowYield'] is not None else v['yield']
+            for v in comp['lines'].values()
+            if v['windowYield'] is not None or v['yield'] is not None
+        ]
         if len(yields) > 1:
             yield_variance.append(
                 {
@@ -3686,7 +3805,13 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
 
     line_drift = []
     for trend in line_trends:
-        yields = [entry['yield'] for entry in trend['entries'] if entry['yield'] is not None]
+        yields = [
+            entry['windowYield']
+            if entry.get('windowYield') is not None
+            else entry.get('yield')
+            for entry in trend['entries']
+            if entry.get('windowYield') is not None or entry.get('yield') is not None
+        ]
         if len(yields) < 2:
             continue
         line_drift.append(
@@ -3707,10 +3832,14 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                 confirmed = max(0.0, info['ng_parts'] - info['false_calls'])
                 if info['ng_windows'] and not info['parts']:
                     confirmed = info['ng_windows']
-                if info['parts']:
-                    yield_pct = 100.0 * (info['parts'] - confirmed) / info['parts']
-                elif info['windows']:
-                    yield_pct = 100.0 * (info['windows'] - info['ng_windows']) / info['windows']
+                if info['windows']:
+                    yield_pct = (
+                        100.0 * (info['windows'] - info['ng_windows']) / info['windows']
+                    )
+                elif info['parts']:
+                    yield_pct = (
+                        100.0 * (info['parts'] - confirmed) / info['parts']
+                    )
                 else:
                     yield_pct = None
                 if yield_pct is not None:
@@ -3747,10 +3876,13 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
         'trendInsights': trend_insights,
         'benchmarking': benchmarking,
         'companyAverages': {
+            'windowYield': company_window_yield,
+            'partYield': company_part_yield,
             'yield': company_yield,
             'falseCallsPerBoard': company_fc_rate,
-            'ppm': company_ppm,
-            'dpm': company_dpm,
+            'falseCallPpm': company_false_call_ppm,
+            'falseCallDpm': company_false_call_dpm,
+            'defectDpm': company_dpm,
         },
     }
 
@@ -3770,10 +3902,15 @@ def _generate_line_report_charts(payload: dict) -> dict[str, str]:
     fig, ax = plt.subplots(figsize=(8, 4))
     if metrics:
         lines = [m['line'] for m in metrics]
-        yields = [m.get('yield', 0.0) for m in metrics]
+        yields = [
+            m.get('windowYield')
+            if m.get('windowYield') is not None
+            else m.get('partYield') or 0.0
+            for m in metrics
+        ]
         ax.bar(lines, yields, color='teal')
-        ax.set_ylabel('Yield %')
-        ax.set_title('Yield by Line')
+        ax.set_ylabel('Window Yield %')
+        ax.set_title('Window Yield by Line')
         ax.tick_params(axis='x', rotation=45)
     charts['lineYieldImg'] = _fig_to_data_uri(fig)
 
@@ -3790,16 +3927,28 @@ def _generate_line_report_charts(payload: dict) -> dict[str, str]:
     fig, ax = plt.subplots(figsize=(8, 4))
     if metrics:
         lines = [m['line'] for m in metrics]
-        ppm = [m.get('ppm', 0.0) for m in metrics]
-        dpm = [m.get('dpm', 0.0) for m in metrics]
+        false_call_ppm = [m.get('falseCallPpm') or 0.0 for m in metrics]
+        defect_dpm = [m.get('defectDpm') or 0.0 for m in metrics]
         x = list(range(len(lines)))
         width = 0.35
-        ax.bar([i - width / 2 for i in x], ppm, width, label='PPM', color='steelblue')
-        ax.bar([i + width / 2 for i in x], dpm, width, label='DPM', color='seagreen')
+        ax.bar(
+            [i - width / 2 for i in x],
+            false_call_ppm,
+            width,
+            label='False Call PPM (parts)',
+            color='steelblue',
+        )
+        ax.bar(
+            [i + width / 2 for i in x],
+            defect_dpm,
+            width,
+            label='Defect DPM (windows)',
+            color='seagreen',
+        )
         ax.set_xticks(x)
         ax.set_xticklabels(lines, rotation=45)
-        ax.set_ylabel('Parts per Million')
-        ax.set_title('PPM vs DPM by Line')
+        ax.set_ylabel('Events per Million')
+        ax.set_title('False Call PPM vs Defect DPM')
         ax.legend()
     charts['linePpmImg'] = _fig_to_data_uri(fig)
 
@@ -3808,15 +3957,25 @@ def _generate_line_report_charts(payload: dict) -> dict[str, str]:
     plotted = False
     for trend in trends:
         entries = trend.get('entries', [])
-        dates = [entry['date'] for entry in entries if entry.get('yield') is not None]
-        yields = [entry['yield'] for entry in entries if entry.get('yield') is not None]
+        dates = [
+            entry['date']
+            for entry in entries
+            if entry.get('windowYield') is not None or entry.get('yield') is not None
+        ]
+        yields = [
+            entry['windowYield']
+            if entry.get('windowYield') is not None
+            else entry.get('yield')
+            for entry in entries
+            if entry.get('windowYield') is not None or entry.get('yield') is not None
+        ]
         if len(dates) < 2:
             continue
         ax.plot(dates, yields, marker='o', label=trend.get('line', 'Line'))
         plotted = True
     if plotted:
-        ax.set_ylabel('Yield %')
-        ax.set_title('Yield Trend by Line')
+        ax.set_ylabel('Window Yield %')
+        ax.set_title('Window Yield Trend by Line')
         ax.tick_params(axis='x', rotation=45)
         ax.legend(loc='best')
     charts['lineTrendImg'] = _fig_to_data_uri(fig)
