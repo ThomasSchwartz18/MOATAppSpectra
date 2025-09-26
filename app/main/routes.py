@@ -2502,7 +2502,11 @@ def forecast_preview():
 def ppm_analysis():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
-    return render_template('ppm_analysis.html', username=session.get('username'))
+    return render_template(
+        'ppm_analysis.html',
+        username=session.get('username'),
+        user_role=(session.get('role') or '').upper(),
+    )
 
 
 @main_bp.route('/analysis/ppm/data', methods=['GET'])
@@ -5010,7 +5014,11 @@ def analysis_tracker_logs():
 def aoi_daily_reports():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
-    return render_template('aoi_daily_reports.html', username=session.get('username'))
+    return render_template(
+        'aoi_daily_reports.html',
+        username=session.get('username'),
+        user_role=(session.get('role') or '').upper(),
+    )
 
 
 def _daily_data(fetch_func):
@@ -5231,7 +5239,11 @@ def aoi_daily_data():
 def fi_daily_reports():
     if 'username' not in session:
         return redirect(url_for('auth.login'))
-    return render_template('fi_daily_reports.html', username=session.get('username'))
+    return render_template(
+        'fi_daily_reports.html',
+        username=session.get('username'),
+        user_role=(session.get('role') or '').upper(),
+    )
 
 
 @main_bp.route('/analysis/fi/data', methods=['GET'])

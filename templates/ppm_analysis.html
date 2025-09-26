@@ -8,7 +8,7 @@
     <div class="analysis-left section-card">
       <div class="tab-bar">
         <div class="tab active" data-target="builder-tab">Chart Builder</div>
-        {% if username == 'ADMIN' %}
+        {% if user_role == 'ADMIN' %}
         <div class="tab" data-target="upload-tab">Upload</div>
         {% endif %}
       </div>
@@ -160,7 +160,7 @@
         <button type="button" id="run-chart">Run</button>
       </div>
     </div> <!-- end builder-tab -->
-    {% if username == 'ADMIN' %}
+    {% if user_role == 'ADMIN' %}
     <div id="upload-tab" class="tab-content" style="display:none;">
       <form id="upload-form">
         <div class="field-row">
