@@ -198,6 +198,34 @@ def _parse_date(val):
     return parsed
 
 
+def _coerce_number(value, *, default=0.0):
+    """Convert Excel cell values to floats, stripping formatting."""
+
+    if value is None:
+        return default
+
+    if isinstance(value, (int, float)):
+        if isinstance(value, float) and (math.isnan(value) or math.isinf(value)):
+            return default
+        return float(value)
+
+    text = str(value).strip()
+    if not text:
+        return default
+
+    text = text.replace(',', '')
+    if text.endswith('%'):
+        text = text[:-1]
+    text = text.strip()
+    if not text:
+        return default
+
+    try:
+        return float(text)
+    except (TypeError, ValueError):
+        return default
+
+
 def _aoi_passed(row):
     ins = float(row.get('aoi_Quantity Inspected') or row.get('Quantity Inspected') or 0)
     rej = float(row.get('aoi_Quantity Rejected') or row.get('Quantity Rejected') or 0)
@@ -1975,13 +2003,13 @@ def upload_dpm_reports():
             break
         rows.append({
             'Model Name': model,
-            'Total Boards': cell(row_idx, 3) or 0,
-            'Windows per board': cell(row_idx, 4) or 0,
-            'Total Windows': cell(row_idx, 5) or 0,
-            'NG Windows': cell(row_idx, 6) or 0,
-            'DPM': cell(row_idx, 7) or 0,
-            'FalseCall Windows': cell(row_idx, 8) or 0,
-            'FC DPM': cell(row_idx, 9) or 0,
+            'Total Boards': _coerce_number(cell(row_idx, 3)),
+            'Windows per board': _coerce_number(cell(row_idx, 4)),
+            'Total Windows': _coerce_number(cell(row_idx, 5)),
+            'NG Windows': _coerce_number(cell(row_idx, 6)),
+            'DPM': _coerce_number(cell(row_idx, 7)),
+            'FalseCall Windows': _coerce_number(cell(row_idx, 8)),
+            'FC DPM': _coerce_number(cell(row_idx, 9)),
             'Report Date': report_date,
             'Line': line,
         })
