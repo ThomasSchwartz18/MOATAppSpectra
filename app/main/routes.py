@@ -1976,12 +1976,12 @@ def upload_dpm_reports():
         rows.append({
             'Model Name': model,
             'Total Boards': cell(row_idx, 3) or 0,
-            'Total Parts/Board': cell(row_idx, 4) or 0,
-            'Total Parts': cell(row_idx, 5) or 0,
-            'NG Parts': cell(row_idx, 6) or 0,
-            'NG PPM': cell(row_idx, 7) or 0,
-            'FalseCall Parts': cell(row_idx, 8) or 0,
-            'FalseCall PPM': cell(row_idx, 9) or 0,
+            'Windows per board': cell(row_idx, 4) or 0,
+            'Total Windows': cell(row_idx, 5) or 0,
+            'NG Windows': cell(row_idx, 6) or 0,
+            'DPM': cell(row_idx, 7) or 0,
+            'FalseCall Windows': cell(row_idx, 8) or 0,
+            'FC DPM': cell(row_idx, 9) or 0,
             'Report Date': report_date,
             'Line': line,
         })
@@ -2149,7 +2149,13 @@ def moat_preview():
     grouped = defaultdict(lambda: {"falsecall": 0, "boards": 0})
     date_values: list[date] = []
     for row in data:
-        fc = row.get('FalseCall Parts') or row.get('falsecall_parts') or 0
+        fc = (
+            row.get('FalseCall Windows')
+            or row.get('falsecall_windows')
+            or row.get('FalseCall Parts')
+            or row.get('falsecall_parts')
+            or 0
+        )
         boards = row.get('Total Boards') or row.get('total_boards') or 0
         model = row.get('Model Name') or row.get('model_name') or 'Unknown'
         report_date = _parse_date(row.get('Report Date') or row.get('report_date'))
@@ -2677,10 +2683,22 @@ def dpm_data():
             edt = parse_date(end)
             if edt and dt > edt:
                 continue
-        fc = row.get('FalseCall Parts') or row.get('falsecall_parts') or 0
+        fc = (
+            row.get('FalseCall Windows')
+            or row.get('falsecall_windows')
+            or row.get('FalseCall Parts')
+            or row.get('falsecall_parts')
+            or 0
+        )
         boards = row.get('Total Boards') or row.get('total_boards') or 0
-        grouped[dt]["falsecall"] += fc
-        grouped[dt]["boards"] += boards
+        try:
+            grouped[dt]["falsecall"] += float(fc)
+        except (TypeError, ValueError):
+            pass
+        try:
+            grouped[dt]["boards"] += float(boards)
+        except (TypeError, ValueError):
+            pass
 
     ordered_dates = sorted(list(grouped.keys()))
     labels = [d.isoformat() for d in ordered_dates]

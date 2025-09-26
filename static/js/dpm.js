@@ -60,18 +60,41 @@ function parseRelativeDate(token) {
 
 function computeDerived(row, expr) {
   // Safe limited evaluator for expressions like a/b
+  const fc = Number(
+    row['FalseCall Windows']
+    ?? row['falsecall_windows']
+    ?? row['FalseCall Parts']
+    ?? row['falsecall_parts']
+    ?? 0,
+  );
+  const boards = Number(row['Total Boards'] ?? row['total_boards'] ?? 0);
+  const totalWindows = Number(
+    row['Total Windows']
+    ?? row['total_windows']
+    ?? row['Total Parts']
+    ?? row['total_parts']
+    ?? 0,
+  );
   const ctx = {
-    falsecall_parts: Number(row['FalseCall Parts'] ?? row['falsecall_parts'] ?? 0),
-    total_boards: Number(row['Total Boards'] ?? row['total_boards'] ?? 0),
-    total_parts: Number(row['Total Parts'] ?? row['total_parts'] ?? 0),
+    falsecall_windows: fc,
+    falsecall_parts: fc,
+    total_boards: boards,
+    total_windows: totalWindows,
+    total_parts: totalWindows,
   };
   // Only allow identifiers, numbers, spaces, and operators + - * / ( ) .
   const safe = /^[\w\s+\-*/().]+$/.test(expr);
   if (!safe) return null;
   try {
+    const normalized = expr
+      .replaceAll('falsecall_windows', 'fc')
+      .replaceAll('falsecall_parts', 'fc')
+      .replaceAll('total_windows', 'tw')
+      .replaceAll('total_parts', 'tw')
+      .replaceAll('total_boards', 'tb');
     // eslint-disable-next-line no-new-func
-    const fn = new Function('fc', 'tb', 'tp', `return (${expr.replaceAll('falsecall_parts','fc').replaceAll('total_boards','tb').replaceAll('total_parts','tp')});`);
-    const v = fn(ctx.falsecall_parts, ctx.total_boards, ctx.total_parts);
+    const fn = new Function('fc', 'tb', 'tw', `return (${normalized});`);
+    const v = fn(ctx.falsecall_windows, ctx.total_boards, ctx.total_windows);
     if (!isFinite(v)) return null;
     return Number(v);
   } catch (_) {
@@ -432,7 +455,7 @@ function runChart() {
         const container = canvasEl.parentElement; const minPerLabel = 120; const width = Math.max(container.clientWidth, labels.length * minPerLabel); canvasEl.style.width = width + 'px';
       } else if (result.kind === 'scatter') {
         chartType = 'scatter'; labels = []; datasets = [{ label: 'Models', data: result.points, pointRadius: cfg.pointRadius, backgroundColor: cfg.color, borderColor: cfg.color }];
-        options = withMetaTooltip({ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true } }, scales: { x: { type: 'linear', title: { display: true, text: 'NG PPM' } }, y: { type: 'linear', title: { display: true, text: 'FalseCall PPM' } } } }, result.metaLookup, cfg.showTooltips);
+        options = withMetaTooltip({ responsive: true, maintainAspectRatio: false, plugins: { legend: { display: true } }, scales: { x: { type: 'linear', title: { display: true, text: 'DPM' } }, y: { type: 'linear', title: { display: true, text: 'FC DPM' } } } }, result.metaLookup, cfg.showTooltips);
         canvasEl.style.width = '100%';
       } else if (result.kind === 'ts_ng_by_line' || result.kind === 'ts_fc_vs_ng') {
         labels = result.labels; datasets = result.datasets; chartType = 'line';
@@ -476,11 +499,17 @@ async function runChartFlexible() {
   // Value per row
   const valueFn = (row) => {
     if (yAgg === 'count') return 1;
-    if (source === 'avg_false_calls_per_assembly') {
-      const fc = Number(row['FalseCall Parts'] ?? row['falsecall_parts'] ?? 0);
-      const tb = Number(row['Total Boards'] ?? row['total_boards'] ?? 0);
-      return tb ? fc / tb : 0;
-    }
+      if (source === 'avg_false_calls_per_assembly') {
+        const fc = Number(
+          row['FalseCall Windows']
+          ?? row['falsecall_windows']
+          ?? row['FalseCall Parts']
+          ?? row['falsecall_parts']
+          ?? 0,
+        );
+        const tb = Number(row['Total Boards'] ?? row['total_boards'] ?? 0);
+        return tb ? fc / tb : 0;
+      }
     // derived
     const v = computeDerived(row, expr);
     return v == null ? 0 : Number(v);
@@ -589,12 +618,12 @@ let activePreset = null; // { id, name, kind, yTitle?, calc? }
 function presetsList() {
   return [
     { id: 'avg_fc_per_board', name: 'Avg False Calls per Board (by Model)', kind: 'line-control', yTitle: 'Avg False Calls/Board', calc: (agg) => (agg.boardSum ? agg.fcSum / agg.boardSum : 0), groupByModel: false },
-    { id: 'fc_parts_per_total_parts', name: 'False Call % of Program (by Model)', kind: 'line-control', yTitle: 'False Call % of Program', calc: (agg) => (agg.partsSum ? (agg.fcSum / agg.partsSum) * 100 : 0) },
-    { id: 'fc_rate_per_part', name: 'False Call Rate per Part (by Model)', kind: 'line-control', yTitle: 'False Call Rate per Part', calc: (agg) => (agg.partsSum ? (agg.fcSum / agg.partsSum) : 0) },
-    { id: 'fc_avg_and_ppm', name: 'Avg FC/Board + FC PPM (by Model)', kind: 'fc_avg_and_ppm' },
-    { id: 'pareto_ng_by_model', name: 'Pareto of Defects (NG Parts by Model)', kind: 'pareto' },
+    { id: 'fc_parts_per_total_parts', name: 'False Call % of Windows (by Model)', kind: 'line-control', yTitle: 'False Call % of Windows', calc: (agg) => (agg.partsSum ? (agg.fcSum / agg.partsSum) * 100 : 0) },
+    { id: 'fc_rate_per_part', name: 'False Call Rate per Window (by Model)', kind: 'line-control', yTitle: 'False Call Rate per Window', calc: (agg) => (agg.partsSum ? (agg.fcSum / agg.partsSum) : 0) },
+    { id: 'fc_avg_and_ppm', name: 'Avg FC/Board + FC DPM (by Model)', kind: 'fc_avg_and_ppm' },
+    { id: 'pareto_ng_by_model', name: 'Pareto of Defects (NG Windows by Model)', kind: 'pareto' },
     { id: 'scatter_fc_vs_ng', name: 'False Call vs True Defect (Scatter)', kind: 'scatter' },
-    { id: 'ng_rate_over_time_by_line', name: 'Defect Rate Over Time (NG PPM by Line)', kind: 'ts_ng_by_line' },
+    { id: 'ng_rate_over_time_by_line', name: 'Defect Rate Over Time (DPM by Line)', kind: 'ts_ng_by_line' },
     { id: 'fc_vs_ng_rate_over_time', name: 'False Call vs NG Rate Over Time', kind: 'ts_fc_vs_ng' },
     { id: 'ratio_fc_to_ng', name: 'False Call / True NG Ratio (by Model)', kind: 'ratio_fc_ng' },
   ];
@@ -630,11 +659,11 @@ function resolveColumns(rows) {
     line: find(['Line','line','Line Name','line_name']),
     assembly: find(['Assembly','assembly','Program','program']),
     rev: find(['Rev','rev','Revision','revision']),
-    ngParts: find(['NG Parts','ng_parts','NG','ng','Defect Parts','defect_parts']),
-    ngPPM: find(['NG PPM','ng_ppm','NG_PPM']),
-    fcParts: find(['FalseCall Parts','falsecall_parts']),
+    ngParts: find(['NG Windows','ng_windows','NG Parts','ng_parts','NG','ng','Defect Parts','defect_parts']),
+    ngPPM: find(['DPM','dpm','NG PPM','ng_ppm','NG_PPM']),
+    fcParts: find(['FalseCall Windows','falsecall_windows','FalseCall Parts','falsecall_parts']),
     totalBoards: find(['Total Boards','total_boards']),
-    totalParts: find(['Total Parts','total_parts']),
+    totalParts: find(['Total Windows','total_windows','Total Parts','total_parts']),
   };
 }
 
@@ -815,14 +844,14 @@ async function runPresetChart() {
     if (cols.date && row[cols.date]) g.meta.dates.add(String(row[cols.date]).slice(0,10));
     if (cols.line && row[cols.line] !== undefined) g.meta.lines.add(String(row[cols.line]));
     if (cols.model && row[cols.model] !== undefined) g.meta.models.add(String(row[cols.model]));
-    // NG parts: prefer explicit NG Parts; fallback to NG PPM * Total Parts / 1e6
-    if (cols.ngParts) {
-      g.ngSum += Number(row[cols.ngParts] ?? 0);
-    } else if (cols.ngPPM && cols.totalParts) {
-      const parts = Number(row[cols.totalParts] ?? 0);
-      const ppm = Number(row[cols.ngPPM] ?? 0);
-      if (isFinite(parts) && isFinite(ppm)) g.ngSum += (parts * ppm) / 1e6;
-    }
+      // NG windows: prefer explicit NG Windows; fallback to DPM * Total Windows / 1e6
+      if (cols.ngParts) {
+        g.ngSum += Number(row[cols.ngParts] ?? 0);
+      } else if (cols.ngPPM && cols.totalParts) {
+        const windows = Number(row[cols.totalParts] ?? 0);
+        const dpm = Number(row[cols.ngPPM] ?? 0);
+        if (isFinite(windows) && isFinite(dpm)) g.ngSum += (windows * dpm) / 1e6;
+      }
     g.fcSum += Number(row[cols.fcParts] ?? 0);
     g.boardSum += Number(row[cols.totalBoards] ?? 0);
     g.partsSum += Number(row[cols.totalParts] ?? 0);
@@ -907,7 +936,7 @@ async function runPresetChart() {
     const bar = entries.map(e=>e.ng);
     const cum = entries.map(e=>{ running += e.ng; return (running/total*100); });
     const datasets = [
-      { type:'bar', label:'NG Parts', data: bar, backgroundColor:'#4F6BED' },
+      { type:'bar', label:'NG Windows', data: bar, backgroundColor:'#4F6BED' },
       { type:'line', label:'Cumulative %', data: cum, yAxisID:'y2', borderColor:'#F59E0B', backgroundColor:'#F59E0B', pointRadius:2, tension:0.1 }
     ];
     const metaLookup = {};
@@ -931,7 +960,7 @@ async function runPresetChart() {
     const ppm = labels.map(m=> ppmByModel.get(m));
     const datasets = [
       { type:'bar', label:'Avg FC/Board', data: avg, backgroundColor:'#4F6BED' },
-      { type:'line', label:'FC PPM', data: ppm, yAxisID:'y2', borderColor:'#F59E0B', backgroundColor:'#F59E0B', pointRadius:2, tension:0.1 }
+      { type:'line', label:'FC DPM', data: ppm, yAxisID:'y2', borderColor:'#F59E0B', backgroundColor:'#F59E0B', pointRadius:2, tension:0.1 }
     ];
     const metaLookup = {};
     labels.forEach((m) => {
@@ -968,9 +997,9 @@ async function runPresetChart() {
       if (cols.ngParts) {
         ag.ng += Number(row[cols.ngParts]||0);
       } else if (cols.ngPPM && cols.totalParts) {
-        const parts = Number(row[cols.totalParts]||0);
-        const ppm = Number(row[cols.ngPPM]||0);
-        if (isFinite(parts) && isFinite(ppm)) ag.ng += (parts*ppm)/1e6;
+        const windows = Number(row[cols.totalParts]||0);
+        const dpm = Number(row[cols.ngPPM]||0);
+        if (isFinite(windows) && isFinite(dpm)) ag.ng += (windows*dpm)/1e6;
       }
       ag.parts += Number(row[cols.totalParts]||0);
       if (cols.model && row[cols.model] !== undefined) ag.models.add(String(row[cols.model]));
@@ -981,7 +1010,7 @@ async function runPresetChart() {
     const metaLookup = {};
     const datasets = Array.from(lines).sort().map((line, i)=>{
       const hue=(i*53)%360; const color=`hsl(${hue} 75% 45%)`;
-      const data = dates.map(d=>{ const r=map.get(d).get(line); const ppm = r && r.parts ? (r.ng/r.parts)*1e6 : null; const m = r ? { date:[d], line:[line], model:Array.from(r.models) } : { date:[d], line:[line], model:[] }; metaLookup[`${line}||${d}`] = m; return ppm; });
+      const data = dates.map(d=>{ const r=map.get(d).get(line); const dpm = r && r.parts ? (r.ng/r.parts)*1e6 : null; const m = r ? { date:[d], line:[line], model:Array.from(r.models) } : { date:[d], line:[line], model:[] }; metaLookup[`${line}||${d}`] = m; return dpm; });
       return { label: line, data, borderColor: color, backgroundColor: color, fill:false, tension:0.1, pointRadius:2 };
     });
     return { kind, labels, datasets, metaLookup };
@@ -995,9 +1024,9 @@ async function runPresetChart() {
       if (cols.ngParts) {
         ag.ng += Number(row[cols.ngParts]||0);
       } else if (cols.ngPPM && cols.totalParts) {
-        const parts = Number(row[cols.totalParts]||0);
-        const ppm = Number(row[cols.ngPPM]||0);
-        if (isFinite(parts) && isFinite(ppm)) ag.ng += (parts*ppm)/1e6;
+        const windows = Number(row[cols.totalParts]||0);
+        const dpm = Number(row[cols.ngPPM]||0);
+        if (isFinite(windows) && isFinite(dpm)) ag.ng += (windows*dpm)/1e6;
       }
       ag.fc += Number(row[cols.fcParts]||0);
       ag.parts += Number(row[cols.totalParts]||0);
@@ -1007,11 +1036,11 @@ async function runPresetChart() {
     });
     const labels = Array.from(byDate.keys()).sort();
     const metaLookup = {};
-    const ng = labels.map(d=>{ const a=byDate.get(d); metaLookup[`NG PPM||${d}`]={ date:[d], line:Array.from(a.lines), model:Array.from(a.models) }; return a.parts? (a.ng/a.parts)*1e6 : 0; });
-    const fc = labels.map(d=>{ const a=byDate.get(d); metaLookup[`FalseCall PPM||${d}`]={ date:[d], line:Array.from(a.lines), model:Array.from(a.models) }; return a.parts? (a.fc/a.parts)*1e6 : 0; });
+    const ng = labels.map(d=>{ const a=byDate.get(d); metaLookup[`DPM||${d}`]={ date:[d], line:Array.from(a.lines), model:Array.from(a.models) }; return a.parts? (a.ng/a.parts)*1e6 : 0; });
+    const fc = labels.map(d=>{ const a=byDate.get(d); metaLookup[`FC DPM||${d}`]={ date:[d], line:Array.from(a.lines), model:Array.from(a.models) }; return a.parts? (a.fc/a.parts)*1e6 : 0; });
     const datasets = [
-      { label:'NG PPM', data: ng, borderColor:'#EF4444', backgroundColor:'#EF4444', fill:false, tension:0.1, pointRadius:2 },
-      { label:'FalseCall PPM', data: fc, borderColor:'#3B82F6', backgroundColor:'#3B82F6', fill:false, tension:0.1, pointRadius:2 }
+      { label:'DPM', data: ng, borderColor:'#EF4444', backgroundColor:'#EF4444', fill:false, tension:0.1, pointRadius:2 },
+      { label:'FC DPM', data: fc, borderColor:'#3B82F6', backgroundColor:'#3B82F6', fill:false, tension:0.1, pointRadius:2 }
     ];
     return { kind, labels, datasets, metaLookup };
   }

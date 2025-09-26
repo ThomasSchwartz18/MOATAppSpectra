@@ -72,7 +72,7 @@ def _current_day():
 
 def _moat_preview_patch():
     today = _current_day()
-    rows = [
+    ppm_rows = [
         {
             "Model Name": "Asm1 SMT",
             "Total Boards": 120,
@@ -86,10 +86,27 @@ def _moat_preview_patch():
             "Report Date": (today - timedelta(days=1)).isoformat(),
         },
     ]
-    fetcher = _make_fetch(rows)
+    dpm_rows = [
+        {
+            "Model Name": "Asm1 SMT",
+            "Total Boards": 120,
+            "FalseCall Windows": 6,
+            "Windows per board": 1,
+            "Total Windows": 120,
+            "Report Date": today.isoformat(),
+        },
+        {
+            "Model Name": "Asm2 SMT",
+            "Total Boards": 80,
+            "FalseCall Windows": 4,
+            "Windows per board": 1,
+            "Total Windows": 80,
+            "Report Date": (today - timedelta(days=1)).isoformat(),
+        },
+    ]
     return {
-        "fetch_recent_moat": fetcher,
-        "fetch_recent_moat_dpm": fetcher,
+        "fetch_recent_moat": _make_fetch(ppm_rows),
+        "fetch_recent_moat_dpm": _make_fetch(dpm_rows),
     }
 
 

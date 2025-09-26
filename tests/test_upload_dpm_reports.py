@@ -57,6 +57,12 @@ def test_upload_dpm_single_date(app_instance, monkeypatch):
     assert resp.get_json()["inserted"] == 1
     assert captured["rows"][0]["Line"] == "L1"
     assert captured["rows"][0]["Report Date"] == "2024-07-01"
+    assert captured["rows"][0]["Windows per board"] == 1
+    assert captured["rows"][0]["Total Windows"] == 1
+    assert captured["rows"][0]["NG Windows"] == 1
+    assert captured["rows"][0]["DPM"] == 1
+    assert captured["rows"][0]["FalseCall Windows"] == 1
+    assert captured["rows"][0]["FC DPM"] == 1
 
 
 def test_upload_dpm_date_range(app_instance, monkeypatch):
