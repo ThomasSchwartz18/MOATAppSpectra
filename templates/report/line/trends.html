@@ -1,0 +1,29 @@
+<section class="report-section">
+  <h2>Trend Insights</h2>
+  <figure class="report-figure">
+    <img src="{{ lineTrendImg }}" alt="Yield Trend by Line" />
+    <figcaption>Yield performance by line across the selected period.</figcaption>
+  </figure>
+  <div class="two-column">
+    <div>
+      <h3>Line Drift</h3>
+      <ul>
+        {% for item in trendInsights.lineDrift[:6] %}
+        <li>{{ item.line }}: {{ item.start|round(2) }}% → {{ item.end|round(2) }}% (Δ {{ item.change|round(2) }})</li>
+        {% else %}
+        <li>No significant drift detected.</li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div>
+      <h3>Assembly Learning Curves</h3>
+      <ul>
+        {% for item in trendInsights.assemblyLearning[:6] %}
+        <li>{{ item.assembly }} on {{ item.line }}: {{ item.start[1]|round(2) }}% → {{ item.end[1]|round(2) }}% (Δ {{ item.change|round(2) }})</li>
+        {% else %}
+        <li>No repeated assembly runs detected.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</section>

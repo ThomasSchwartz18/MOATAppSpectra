@@ -1,0 +1,41 @@
+<section class="report-section">
+  <h2>Executive Summary</h2>
+  <div class="summary-grid">
+    <article>
+      <h3>Top Lines</h3>
+      <ul>
+        {% if benchmarking.bestYield %}
+        <li><strong>Best Yield:</strong> {{ benchmarking.bestYield.line }} ({{ benchmarking.bestYield.yield|round(2) }}%)</li>
+        {% endif %}
+        {% if benchmarking.lowestFalseCalls %}
+        <li><strong>Lowest False Calls:</strong> {{ benchmarking.lowestFalseCalls.line }} ({{ benchmarking.lowestFalseCalls.falseCallsPerBoard|round(2) }})</li>
+        {% endif %}
+        {% if benchmarking.mostConsistent %}
+        <li><strong>Most Consistent:</strong> {{ benchmarking.mostConsistent.line }} (σ {{ benchmarking.mostConsistent.stddev|round(2) }})</li>
+        {% endif %}
+      </ul>
+    </article>
+    <article>
+      <h3>Company Averages</h3>
+      <ul>
+        <li>Yield: {{ companyAverages.yield|round(2) }}%</li>
+        <li>False Calls / Board: {{ companyAverages.falseCallsPerBoard|round(2) }}</li>
+        <li>PPM: {{ companyAverages.ppm|round(2) }}</li>
+        <li>DPM: {{ companyAverages.dpm|round(2) }}</li>
+      </ul>
+    </article>
+    <article>
+      <h3>Key Insights</h3>
+      <ul>
+        {% set drift = (trendInsights.lineDrift or [])[:3] %}
+        {% if drift %}
+          {% for item in drift %}
+          <li>{{ item.line }} yield drifted {{ item.change|round(2) }} pts ({{ item.start|round(2) }}% → {{ item.end|round(2) }}%).</li>
+          {% endfor %}
+        {% else %}
+          <li>No significant yield drift detected across lines.</li>
+        {% endif %}
+      </ul>
+    </article>
+  </div>
+</section>

@@ -1,0 +1,39 @@
+<section class="report-section">
+  <h2>Cross-Line Synchronization</h2>
+  <div class="two-column">
+    <div>
+      <h3>Yield Variance</h3>
+      <ul>
+        {% for entry in crossLine.yieldVariance[:5] %}
+        <li>{{ entry.assembly }} — σ {{ entry.stddev|round(2) }}</li>
+        {% else %}
+        <li>No multi-line assemblies available.</li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div>
+      <h3>False Call Variance</h3>
+      <ul>
+        {% for entry in crossLine.falseCallVariance[:5] %}
+        <li>{{ entry.assembly }} — σ {{ entry.stddev|round(2) }}</li>
+        {% else %}
+        <li>No multi-line assemblies available.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% if crossLine.defectSimilarity %}
+  <div class="report-grid">
+    {% for entry in crossLine.defectSimilarity[:4] %}
+    <article>
+      <h3>{{ entry.assembly }}</h3>
+      <ul>
+        {% for pair in entry.pairs[:3] %}
+        <li>{{ pair.lines[0] }} vs {{ pair.lines[1] }} — {{ (pair.similarity * 100)|round(2) }}% similarity</li>
+        {% endfor %}
+      </ul>
+    </article>
+    {% endfor %}
+  </div>
+  {% endif %}
+</section>

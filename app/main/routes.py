@@ -83,6 +83,7 @@ from fi_utils import parse_fi_rejections
 
 # Helpers for AOI Grades analytics
 from collections import defaultdict, Counter
+from itertools import combinations
 from statistics import mean
 
 
@@ -504,6 +505,13 @@ FEATURE_REGISTRY = [
         "category": "reports",
         "description": "Operator-level KPIs and drill-down performance dashboards.",
         "default_message": "The Operator Report is temporarily unavailable while we resolve a bug.",
+    },
+    {
+        "slug": "reports_line",
+        "label": "Line Report",
+        "category": "reports",
+        "description": "Line-level AOI performance, benchmarking, and synchronization insights.",
+        "default_message": "The Line Report is temporarily unavailable while we finish calibrations.",
     },
     {
         "slug": "reports_aoi_daily",
@@ -3179,6 +3187,615 @@ def _generate_report_charts(payload):
     return charts
 
 
+def _normalize_line_name(raw: str | None) -> str:
+    text = (raw or '').strip()
+    if not text:
+        return 'UNKNOWN'
+    return text.upper()
+
+
+def _normalize_assembly_name(row: dict) -> str:
+    for key in (
+        'Assembly',
+        'assembly',
+        'Model Name',
+        'model_name',
+        'Model',
+        'model',
+    ):
+        value = row.get(key)
+        if value not in (None, ''):
+            return str(value)
+    return 'Unknown'
+
+
+def _coerce_date_key(row: dict, *keys: str) -> date | None:
+    for key in keys:
+        dt = _parse_date(row.get(key))
+        if dt:
+            return dt
+    return None
+
+
+def _line_bucket() -> dict[str, object]:
+    return {
+        'total_parts': 0.0,
+        'total_boards': 0.0,
+        'false_call_parts': 0.0,
+        'ng_parts': 0.0,
+        'total_windows': 0.0,
+        'ng_windows': 0.0,
+        'false_call_windows': 0.0,
+        'ppm_values': [],
+        'dpm_values': [],
+        'dates': set(),
+        'defects': defaultdict(float),
+    }
+
+
+def _daily_bucket() -> dict[str, float]:
+    return {
+        'parts': 0.0,
+        'boards': 0.0,
+        'false_calls': 0.0,
+        'ng_parts': 0.0,
+        'windows': 0.0,
+        'ng_windows': 0.0,
+        'fc_windows': 0.0,
+    }
+
+
+def _assembly_bucket() -> dict[str, object]:
+    return {
+        'total_parts': 0.0,
+        'false_calls': 0.0,
+        'ng_parts': 0.0,
+        'boards': 0.0,
+        'windows': 0.0,
+        'ng_windows': 0.0,
+        'fc_windows': 0.0,
+        'defects': defaultdict(float),
+        'dates': set(),
+    }
+
+
+def _assembly_daily_bucket() -> dict[str, float]:
+    return {
+        'parts': 0.0,
+        'false_calls': 0.0,
+        'ng_parts': 0.0,
+        'boards': 0.0,
+        'windows': 0.0,
+        'ng_windows': 0.0,
+        'fc_windows': 0.0,
+    }
+
+
+def _safe_ratio(num: float, den: float) -> float:
+    if den == 0:
+        return 0.0
+    return num / den
+
+
+def build_line_report_payload(start: date | None = None, end: date | None = None) -> dict:
+    ppm_rows, error = fetch_moat()
+    if error:
+        abort(500, description=error)
+    dpm_rows, error = fetch_moat_dpm()
+    if error:
+        abort(500, description=error)
+
+    line_totals: dict[str, dict[str, object]] = defaultdict(_line_bucket)
+    line_daily: dict[str, dict[date, dict[str, float]]] = defaultdict(
+        lambda: defaultdict(_daily_bucket)
+    )
+    assembly_line: dict[str, dict[str, dict[str, object]]] = defaultdict(
+        lambda: defaultdict(_assembly_bucket)
+    )
+    assembly_daily: dict[str, dict[str, dict[date, dict[str, float]]]] = defaultdict(
+        lambda: defaultdict(lambda: defaultdict(_assembly_daily_bucket))
+    )
+
+    overall = {
+        'total_parts': 0.0,
+        'false_calls': 0.0,
+        'ng_parts': 0.0,
+        'total_boards': 0.0,
+        'total_windows': 0.0,
+        'ng_windows': 0.0,
+    }
+
+    def _within_range(dt: date | None) -> bool:
+        if not dt:
+            return False
+        if start and dt < start:
+            return False
+        if end and dt > end:
+            return False
+        return True
+
+    for row in ppm_rows or []:
+        dt = _coerce_date_key(row, 'Report Date', 'report_date')
+        if start or end:
+            if not _within_range(dt):
+                continue
+        line = _normalize_line_name(row.get('Line') or row.get('line'))
+        assembly = _normalize_assembly_name(row)
+        parts = _coerce_number(row.get('Total Parts') or row.get('total_parts'))
+        boards = _coerce_number(row.get('Total Boards') or row.get('total_boards'))
+        fc_parts = _coerce_number(
+            row.get('FalseCall Parts') or row.get('falsecall_parts')
+        )
+        ng_parts = _coerce_number(row.get('NG Parts') or row.get('ng_parts'))
+        ppm_value = _coerce_number(row.get('FalseCall PPM') or row.get('falsecall_ppm'))
+
+        bucket = line_totals[line]
+        bucket['total_parts'] += parts
+        bucket['total_boards'] += boards
+        bucket['false_call_parts'] += fc_parts
+        bucket['ng_parts'] += ng_parts
+        if ppm_value:
+            bucket['ppm_values'].append(ppm_value)
+        if dt:
+            bucket['dates'].add(dt)
+            day_bucket = line_daily[line][dt]
+            day_bucket['parts'] += parts
+            day_bucket['boards'] += boards
+            day_bucket['false_calls'] += fc_parts
+            day_bucket['ng_parts'] += ng_parts
+
+        asm_bucket = assembly_line[assembly][line]
+        asm_bucket['total_parts'] += parts
+        asm_bucket['false_calls'] += fc_parts
+        asm_bucket['ng_parts'] += ng_parts
+        asm_bucket['boards'] += boards
+        if dt:
+            asm_bucket['dates'].add(dt)
+            asm_day = assembly_daily[assembly][line][dt]
+            asm_day['parts'] += parts
+            asm_day['false_calls'] += fc_parts
+            asm_day['ng_parts'] += ng_parts
+            asm_day['boards'] += boards
+
+        overall['total_parts'] += parts
+        overall['false_calls'] += fc_parts
+        overall['ng_parts'] += ng_parts
+        overall['total_boards'] += boards
+
+    for row in dpm_rows or []:
+        dt = _coerce_date_key(row, 'Report Date', 'report_date')
+        if start or end:
+            if not _within_range(dt):
+                continue
+        line = _normalize_line_name(row.get('Line') or row.get('line'))
+        assembly = _normalize_assembly_name(row)
+        windows = _coerce_number(row.get('Total Windows') or row.get('total_windows'))
+        ng_windows = _coerce_number(row.get('NG Windows') or row.get('ng_windows'))
+        fc_windows = _coerce_number(
+            row.get('FalseCall Windows') or row.get('falsecall_windows')
+        )
+        dpm_value = _coerce_number(row.get('DPM') or row.get('dpm'))
+        fc_dpm = _coerce_number(row.get('FC DPM') or row.get('fc_dpm'))
+        defect_name = row.get('Defect Name') or row.get('Defect') or row.get('defect_name')
+
+        bucket = line_totals[line]
+        bucket['total_windows'] += windows
+        bucket['ng_windows'] += ng_windows
+        bucket['false_call_windows'] += fc_windows
+        if dpm_value:
+            bucket['dpm_values'].append(dpm_value)
+        if fc_dpm:
+            bucket['ppm_values'].append(fc_dpm)
+        if dt:
+            bucket['dates'].add(dt)
+            day_bucket = line_daily[line][dt]
+            day_bucket['windows'] += windows
+            day_bucket['ng_windows'] += ng_windows
+            day_bucket['fc_windows'] += fc_windows
+
+        asm_bucket = assembly_line[assembly][line]
+        asm_bucket['windows'] += windows
+        asm_bucket['ng_windows'] += ng_windows
+        asm_bucket['fc_windows'] += fc_windows
+        if defect_name:
+            defect = str(defect_name).strip() or 'Unknown'
+            asm_bucket['defects'][defect] += ng_windows or 0.0
+            bucket['defects'][defect] += ng_windows or 0.0
+        if dt:
+            asm_bucket['dates'].add(dt)
+            asm_day = assembly_daily[assembly][line][dt]
+            asm_day['windows'] += windows
+            asm_day['ng_windows'] += ng_windows
+            asm_day['fc_windows'] += fc_windows
+
+        overall['total_windows'] += windows
+        overall['ng_windows'] += ng_windows
+
+    def _line_metrics(line: str, info: dict[str, object]) -> dict[str, object]:
+        parts = info['total_parts']
+        boards = info['total_boards']
+        fc_parts = info['false_call_parts']
+        ng_parts = info['ng_parts']
+        windows = info['total_windows']
+        ng_windows = info['ng_windows']
+        fc_windows = info['false_call_windows']
+        confirmed = max(0.0, ng_parts - fc_parts)
+        if ng_windows and not parts:
+            confirmed = ng_windows
+        yield_pct = (100.0 * (parts - confirmed) / parts) if parts else 0.0
+        fc_per_board = _safe_ratio(fc_parts, boards)
+        ppm = _safe_ratio(fc_parts, parts) * 1_000_000 if parts else (
+            _safe_ratio(fc_windows, windows) * 1_000_000 if windows else 0.0
+        )
+        dpm = _safe_ratio(ng_windows, windows) * 1_000_000 if windows else (
+            _safe_ratio(confirmed, parts) * 1_000_000 if parts else 0.0
+        )
+        date_count = len(info['dates']) or 1
+        boards_per_day = boards / date_count if boards else 0.0
+        return {
+            'line': line,
+            'totalParts': parts,
+            'totalBoards': boards,
+            'falseCalls': fc_parts,
+            'confirmedDefects': confirmed,
+            'yield': yield_pct,
+            'falseCallsPerBoard': fc_per_board,
+            'ppm': ppm,
+            'dpm': dpm,
+            'boardsPerDay': boards_per_day,
+            'datesActive': date_count,
+        }
+
+    line_metrics = [
+        _line_metrics(line, info)
+        for line, info in sorted(line_totals.items())
+        if info['total_parts'] or info['total_windows']
+    ]
+
+    company_confirmed = max(
+        0.0, overall['ng_parts'] - overall['false_calls']
+    ) or overall['ng_windows']
+    company_yield = (
+        100.0 * (overall['total_parts'] - company_confirmed) / overall['total_parts']
+        if overall['total_parts']
+        else 0.0
+    )
+    company_fc_rate = _safe_ratio(overall['false_calls'], overall['total_boards'])
+    company_ppm = (
+        _safe_ratio(overall['false_calls'], overall['total_parts']) * 1_000_000
+        if overall['total_parts']
+        else 0.0
+    )
+    company_dpm = (
+        _safe_ratio(overall['ng_windows'], overall['total_windows']) * 1_000_000
+        if overall['total_windows']
+        else 0.0
+    )
+
+    line_vs_company = []
+    for metrics in line_metrics:
+        line_vs_company.append(
+            {
+                'line': metrics['line'],
+                'yieldDelta': metrics['yield'] - company_yield,
+                'falseCallDelta': metrics['falseCallsPerBoard'] - company_fc_rate,
+                'ppmDelta': metrics['ppm'] - company_ppm,
+                'dpmDelta': metrics['dpm'] - company_dpm,
+            }
+        )
+
+    def _summarize_line_trend(line: str, daily: dict[date, dict[str, float]]):
+        entries = []
+        for dt, values in sorted(daily.items()):
+            parts = values['parts']
+            boards = values['boards']
+            fc_parts = values['false_calls']
+            ng_parts = values['ng_parts']
+            windows = values['windows']
+            ng_windows = values['ng_windows']
+            fc_windows = values['fc_windows']
+            confirmed = max(0.0, ng_parts - fc_parts)
+            if ng_windows and not parts:
+                confirmed = ng_windows
+            yield_pct = (100.0 * (parts - confirmed) / parts) if parts else None
+            fc_rate = _safe_ratio(fc_parts, boards) if boards else None
+            ppm = (
+                _safe_ratio(fc_parts, parts) * 1_000_000
+                if parts
+                else _safe_ratio(fc_windows, windows) * 1_000_000 if windows else None
+            )
+            dpm = (
+                _safe_ratio(ng_windows, windows) * 1_000_000
+                if windows
+                else _safe_ratio(confirmed, parts) * 1_000_000 if parts else None
+            )
+            entries.append(
+                {
+                    'date': dt.isoformat(),
+                    'yield': yield_pct,
+                    'falseCallsPerBoard': fc_rate,
+                    'ppm': ppm,
+                    'dpm': dpm,
+                }
+            )
+        return {'line': line, 'entries': entries}
+
+    line_trends = [
+        _summarize_line_trend(line, daily)
+        for line, daily in line_daily.items()
+        if daily
+    ]
+
+    def _stddev(values: list[float]) -> float:
+        if len(values) < 2:
+            return 0.0
+        avg = sum(values) / len(values)
+        return math.sqrt(sum((v - avg) ** 2 for v in values) / len(values))
+
+    benchmarking = {
+        'bestYield': max(line_metrics, key=lambda m: m['yield'], default=None),
+        'lowestFalseCalls': min(
+            line_metrics, key=lambda m: m['falseCallsPerBoard'], default=None
+        ),
+        'mostConsistent': None,
+        'lineVsCompany': line_vs_company,
+    }
+
+    consistency_scores: list[tuple[str, float]] = []
+    for trend in line_trends:
+        yields = [entry['yield'] for entry in trend['entries'] if entry['yield'] is not None]
+        if not yields:
+            continue
+        consistency_scores.append((trend['line'], _stddev(yields)))
+    if consistency_scores:
+        line, score = min(consistency_scores, key=lambda item: item[1])
+        match = next((m for m in line_metrics if m['line'] == line), None)
+        if match:
+            benchmarking['mostConsistent'] = {**match, 'stddev': score}
+
+    assembly_comparisons = []
+    for assembly, line_map in sorted(assembly_line.items()):
+        lines_info: dict[str, dict[str, object]] = {}
+        for line, info in line_map.items():
+            parts = info['total_parts']
+            boards = info['boards']
+            fc_parts = info['false_calls']
+            ng_parts = info['ng_parts']
+            windows = info['windows']
+            ng_windows = info['ng_windows']
+            confirmed = max(0.0, ng_parts - fc_parts)
+            if ng_windows and not parts:
+                confirmed = ng_windows
+            yield_pct = (100.0 * (parts - confirmed) / parts) if parts else None
+            fc_rate = _safe_ratio(fc_parts, boards) if boards else None
+            ppm = (
+                _safe_ratio(fc_parts, parts) * 1_000_000
+                if parts
+                else _safe_ratio(info['fc_windows'], windows) * 1_000_000
+                if windows
+                else None
+            )
+            dpm = (
+                _safe_ratio(ng_windows, windows) * 1_000_000
+                if windows
+                else _safe_ratio(confirmed, parts) * 1_000_000 if parts else None
+            )
+            defects = info['defects']
+            defect_total = sum(defects.values())
+            defect_mix = (
+                {name: _safe_ratio(value, defect_total) for name, value in defects.items()}
+                if defect_total
+                else {}
+            )
+            lines_info[line] = {
+                'yield': yield_pct,
+                'falseCallsPerBoard': fc_rate,
+                'ppm': ppm,
+                'dpm': dpm,
+                'defectMix': defect_mix,
+            }
+        assembly_comparisons.append({'assembly': assembly, 'lines': lines_info})
+
+    yield_variance = []
+    false_call_variance = []
+    for comp in assembly_comparisons:
+        yields = [v['yield'] for v in comp['lines'].values() if v['yield'] is not None]
+        if len(yields) > 1:
+            yield_variance.append(
+                {
+                    'assembly': comp['assembly'],
+                    'stddev': _stddev(yields),
+                }
+            )
+        fc_rates = [
+            v['falseCallsPerBoard']
+            for v in comp['lines'].values()
+            if v['falseCallsPerBoard'] is not None
+        ]
+        if len(fc_rates) > 1:
+            false_call_variance.append(
+                {
+                    'assembly': comp['assembly'],
+                    'stddev': _stddev(fc_rates),
+                }
+            )
+
+    defect_similarity = []
+    for comp in assembly_comparisons:
+        lines = list(comp['lines'].items())
+        mixes = [
+            (line, info['defectMix'])
+            for line, info in lines
+            if info['defectMix']
+        ]
+        if len(mixes) < 2:
+            continue
+        categories: set[str] = set()
+        for _, mix in mixes:
+            categories.update(mix.keys())
+        categories = sorted(categories)
+        pairwise = []
+        for (line_a, mix_a), (line_b, mix_b) in combinations(mixes, 2):
+            vec_a = [mix_a.get(cat, 0.0) for cat in categories]
+            vec_b = [mix_b.get(cat, 0.0) for cat in categories]
+            norm_a = math.sqrt(sum(v * v for v in vec_a))
+            norm_b = math.sqrt(sum(v * v for v in vec_b))
+            if not norm_a or not norm_b:
+                similarity = 0.0
+            else:
+                similarity = sum(a * b for a, b in zip(vec_a, vec_b)) / (norm_a * norm_b)
+            pairwise.append({
+                'lines': [line_a, line_b],
+                'similarity': similarity,
+            })
+        if pairwise:
+            defect_similarity.append(
+                {
+                    'assembly': comp['assembly'],
+                    'pairs': pairwise,
+                }
+            )
+
+    line_drift = []
+    for trend in line_trends:
+        yields = [entry['yield'] for entry in trend['entries'] if entry['yield'] is not None]
+        if len(yields) < 2:
+            continue
+        line_drift.append(
+            {
+                'line': trend['line'],
+                'start': yields[0],
+                'end': yields[-1],
+                'change': yields[-1] - yields[0],
+            }
+        )
+
+    assembly_learning = []
+    for assembly, line_map in assembly_daily.items():
+        for line, entries in line_map.items():
+            ordered = sorted(entries.items())
+            yields = []
+            for dt, info in ordered:
+                confirmed = max(0.0, info['ng_parts'] - info['false_calls'])
+                if info['ng_windows'] and not info['parts']:
+                    confirmed = info['ng_windows']
+                if info['parts']:
+                    yield_pct = 100.0 * (info['parts'] - confirmed) / info['parts']
+                elif info['windows']:
+                    yield_pct = 100.0 * (info['windows'] - info['ng_windows']) / info['windows']
+                else:
+                    yield_pct = None
+                if yield_pct is not None:
+                    yields.append((dt.isoformat(), yield_pct))
+            if len(yields) >= 2:
+                assembly_learning.append(
+                    {
+                        'assembly': assembly,
+                        'line': line,
+                        'start': yields[0],
+                        'end': yields[-1],
+                        'change': yields[-1][1] - yields[0][1],
+                    }
+                )
+
+    cross_line = {
+        'yieldVariance': sorted(yield_variance, key=lambda x: x['stddev'], reverse=True),
+        'falseCallVariance': sorted(
+            false_call_variance, key=lambda x: x['stddev'], reverse=True
+        ),
+        'defectSimilarity': defect_similarity,
+    }
+
+    trend_insights = {
+        'lineDrift': line_drift,
+        'assemblyLearning': assembly_learning,
+    }
+
+    return {
+        'lineMetrics': line_metrics,
+        'assemblyComparisons': assembly_comparisons,
+        'crossLine': cross_line,
+        'lineTrends': line_trends,
+        'trendInsights': trend_insights,
+        'benchmarking': benchmarking,
+        'companyAverages': {
+            'yield': company_yield,
+            'falseCallsPerBoard': company_fc_rate,
+            'ppm': company_ppm,
+            'dpm': company_dpm,
+        },
+    }
+
+
+def _generate_line_report_charts(payload: dict) -> dict[str, str]:
+    if plt is None:
+        return {
+            'lineYieldImg': '',
+            'lineFalseCallImg': '',
+            'linePpmImg': '',
+            'lineTrendImg': '',
+        }
+
+    charts: dict[str, str] = {}
+
+    metrics = payload.get('lineMetrics', [])
+    fig, ax = plt.subplots(figsize=(8, 4))
+    if metrics:
+        lines = [m['line'] for m in metrics]
+        yields = [m.get('yield', 0.0) for m in metrics]
+        ax.bar(lines, yields, color='teal')
+        ax.set_ylabel('Yield %')
+        ax.set_title('Yield by Line')
+        ax.tick_params(axis='x', rotation=45)
+    charts['lineYieldImg'] = _fig_to_data_uri(fig)
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    if metrics:
+        lines = [m['line'] for m in metrics]
+        fc_rates = [m.get('falseCallsPerBoard', 0.0) for m in metrics]
+        ax.bar(lines, fc_rates, color='orange')
+        ax.set_ylabel('False Calls / Board')
+        ax.set_title('False Calls per Board by Line')
+        ax.tick_params(axis='x', rotation=45)
+    charts['lineFalseCallImg'] = _fig_to_data_uri(fig)
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    if metrics:
+        lines = [m['line'] for m in metrics]
+        ppm = [m.get('ppm', 0.0) for m in metrics]
+        dpm = [m.get('dpm', 0.0) for m in metrics]
+        x = list(range(len(lines)))
+        width = 0.35
+        ax.bar([i - width / 2 for i in x], ppm, width, label='PPM', color='steelblue')
+        ax.bar([i + width / 2 for i in x], dpm, width, label='DPM', color='seagreen')
+        ax.set_xticks(x)
+        ax.set_xticklabels(lines, rotation=45)
+        ax.set_ylabel('Parts per Million')
+        ax.set_title('PPM vs DPM by Line')
+        ax.legend()
+    charts['linePpmImg'] = _fig_to_data_uri(fig)
+
+    fig, ax = plt.subplots(figsize=(8, 4))
+    trends = payload.get('lineTrends', [])
+    plotted = False
+    for trend in trends:
+        entries = trend.get('entries', [])
+        dates = [entry['date'] for entry in entries if entry.get('yield') is not None]
+        yields = [entry['yield'] for entry in entries if entry.get('yield') is not None]
+        if len(dates) < 2:
+            continue
+        ax.plot(dates, yields, marker='o', label=trend.get('line', 'Line'))
+        plotted = True
+    if plotted:
+        ax.set_ylabel('Yield %')
+        ax.set_title('Yield Trend by Line')
+        ax.tick_params(axis='x', rotation=45)
+        ax.legend(loc='best')
+    charts['lineTrendImg'] = _fig_to_data_uri(fig)
+
+    return charts
+
+
 def _generate_operator_report_charts(payload):
     """Generate charts for the operator report.
 
@@ -3661,6 +4278,123 @@ def build_report_payload(start=None, end=None):
         'avgBoards': avg_boards,
         'appendix': appendix,
     }
+
+
+@main_bp.route('/api/reports/line', methods=['GET'])
+@feature_required('reports_line')
+def api_line_report():
+    """Return aggregated line-level AOI metrics."""
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+
+    start = _parse_date(request.args.get('start_date'))
+    end = _parse_date(request.args.get('end_date'))
+
+    payload = build_line_report_payload(start, end)
+    payload['start'] = start.isoformat() if start else ''
+    payload['end'] = end.isoformat() if end else ''
+    return jsonify(payload)
+
+
+@main_bp.route('/reports/line', methods=['GET'])
+@feature_required('reports_line')
+def line_report():
+    """Render the Line Report page."""
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+    return render_template('line_report.html', username=session.get('username'))
+
+
+@main_bp.route('/reports/line/export')
+@feature_required('reports_line')
+def export_line_report():
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+
+    start = _parse_date(request.args.get('start_date'))
+    end = _parse_date(request.args.get('end_date'))
+    start_str = start.strftime('%y%m%d') if start else ''
+    end_str = end.strftime('%y%m%d') if end else ''
+
+    payload = build_line_report_payload(start, end)
+    payload['start'] = start.isoformat() if start else ''
+    payload['end'] = end.isoformat() if end else ''
+    charts = _generate_line_report_charts(payload)
+
+    body = request.get_json(silent=True) or {}
+
+    def _get(name, default=''):
+        return request.args.get(name, body.get(name, default))
+
+    def _get_bool(name, default=True):
+        value = request.args.get(name)
+        if value is None:
+            value = body.get(name)
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        return str(value).lower() not in {'0', 'false', 'no'}
+
+    show_cover = _get_bool('show_cover', False)
+    show_summary = _get_bool('show_summary')
+    title = _get('title') or 'Line Report'
+    subtitle = _get('subtitle')
+    report_date = _get('report_date')
+    period = _get('period')
+    author = _get('author')
+    logo_url = _get('logo_url') or url_for(
+        'static', filename='images/company-logo.png', _external=True
+    )
+    footer_left = _get('footer_left')
+    report_id = _get('report_id')
+    contact = _get('contact', 'tschwartz@4spectra.com')
+    confidentiality = _get('confidentiality', 'Spectra-Tech • Confidential')
+    generated_at = datetime.now(ZoneInfo('EST')).strftime('%Y-%m-%d %H:%M:%S %Z')
+
+    report_css = _load_report_css()
+
+    html = render_template(
+        'report/line/index.html',
+        show_cover=show_cover,
+        show_summary=show_summary,
+        title=title,
+        subtitle=subtitle,
+        report_date=report_date,
+        period=period,
+        author=author,
+        logo_url=logo_url,
+        footer_left=footer_left,
+        report_id=report_id,
+        contact=contact,
+        confidentiality=confidentiality,
+        generated_at=generated_at,
+        report_css=report_css,
+        **payload,
+        **charts,
+    )
+
+    fmt = request.args.get('format')
+    if fmt == 'pdf':
+        try:
+            pdf = render_html_to_pdf(html, base_url=request.url_root)
+        except PdfGenerationError as exc:
+            return jsonify({'message': str(exc)}), 503
+        filename = f"{start_str}_{end_str}_line_report.pdf"
+        return send_file(
+            io.BytesIO(pdf),
+            mimetype='application/pdf',
+            download_name=filename,
+            as_attachment=True,
+        )
+    if fmt == 'html':
+        return send_file(
+            io.BytesIO(html.encode('utf-8')),
+            mimetype='text/html',
+            download_name='report.html',
+            as_attachment=True,
+        )
+    return html
 
 
 @main_bp.route('/api/reports/integrated', methods=['GET'])

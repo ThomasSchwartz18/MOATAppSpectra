@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>{{ title or 'Line Report' }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/report.css') }}">
+  <style>{{ report_css|safe }}</style>
+</head>
+<body>
+  <main class="report-page">
+    {% if show_cover %}
+      {% include 'report/line/cover.html' %}
+    {% endif %}
+    {% if show_summary %}
+      {% include 'report/line/summary.html' %}
+    {% endif %}
+    {% include 'report/line/metrics.html' %}
+    {% include 'report/line/assemblies.html' %}
+    {% include 'report/line/cross_line.html' %}
+    {% include 'report/line/trends.html' %}
+    {% include 'report/line/kpis.html' %}
+  </main>
+</body>
+</html>

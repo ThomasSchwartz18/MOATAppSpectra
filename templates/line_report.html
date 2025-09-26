@@ -1,0 +1,124 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Line Report</h2>
+
+<div class="section-card">
+  <div class="field-row">
+    <div class="field">
+      <label for="start-date">Start Date</label>
+      <input type="date" id="start-date" />
+    </div>
+    <div class="field">
+      <label for="end-date">End Date</label>
+      <input type="date" id="end-date" />
+    </div>
+    <button type="button" id="run-line-report">Run</button>
+  </div>
+</div>
+
+<section class="section-card" id="line-metrics-section" hidden>
+  <header>
+    <h3>Line-Level Performance Metrics</h3>
+    <p class="section-subtitle">
+      Aggregate yield, false calls, and throughput across all assemblies inspected on each line.
+    </p>
+  </header>
+  <div class="table-wrapper">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th>Line</th>
+          <th>Yield %</th>
+          <th>Confirmed Defects</th>
+          <th>False Calls / Board</th>
+          <th>PPM</th>
+          <th>DPM</th>
+          <th>Boards / Day</th>
+          <th>Total Parts</th>
+        </tr>
+      </thead>
+      <tbody id="line-metrics-body"></tbody>
+    </table>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-block">
+      <canvas id="lineYieldChart"></canvas>
+    </div>
+    <div class="chart-block">
+      <canvas id="lineFalseCallChart"></canvas>
+    </div>
+    <div class="chart-block">
+      <canvas id="linePpmChart"></canvas>
+    </div>
+  </div>
+</section>
+
+<section class="section-card" id="assembly-comparison-section" hidden>
+  <header>
+    <h3>Assembly vs Line Comparisons</h3>
+    <p class="section-subtitle">
+      Compare how each line performs on the same assembly to pinpoint tuning or process opportunities.
+    </p>
+  </header>
+  <div id="assembly-comparisons"></div>
+</section>
+
+<section class="section-card" id="cross-line-section" hidden>
+  <header>
+    <h3>Cross-Line Synchronization</h3>
+    <p class="section-subtitle">
+      Measure consistency across lines and highlight where defect signatures diverge.</p>
+  </header>
+  <div id="cross-line-content"></div>
+</section>
+
+<section class="section-card" id="trend-section" hidden>
+  <header>
+    <h3>Trend Insights</h3>
+    <p class="section-subtitle">
+      Track yield drift, learning curves, and longitudinal performance by line.</p>
+  </header>
+  <div class="chart-block">
+    <canvas id="lineTrendChart"></canvas>
+  </div>
+  <div id="trend-insights"></div>
+</section>
+
+<section class="section-card" id="benchmarking-section" hidden>
+  <header>
+    <h3>Benchmarking KPIs</h3>
+    <p class="section-subtitle">
+      Quickly identify top-performing and at-risk lines relative to company targets.</p>
+  </header>
+  <div id="benchmarking-content"></div>
+</section>
+
+<div class="field-row" id="download-controls">
+  <div class="field">
+    <label for="file-format">Format</label>
+    <select id="file-format">
+      <option value="pdf">pdf</option>
+      <option value="xlsx">xlsx</option>
+      <option value="html">html</option>
+    </select>
+  </div>
+  <div class="field">
+    <label for="include-cover">Cover Page</label>
+    <input type="checkbox" id="include-cover" checked />
+  </div>
+  <div class="field">
+    <label for="include-summary">Executive Summary</label>
+    <input type="checkbox" id="include-summary" checked />
+  </div>
+  <button id="download-report">Download</button>
+  <span class="spinner" id="download-spinner" hidden></span>
+  <button id="email-report">Email Report</button>
+  <p class="pdf-host-warning">PDF generation requires a Linux or Windows host. macOS is not supported.</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script type="module" src="{{ url_for('static', filename='js/line_report.js') }}"></script>
+{% endblock %}

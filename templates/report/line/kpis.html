@@ -1,0 +1,25 @@
+<section class="report-section">
+  <h2>Benchmarking KPIs</h2>
+  <table class="report-table">
+    <thead>
+      <tr>
+        <th>Line</th>
+        <th>Yield Δ vs Avg</th>
+        <th>False Call Δ</th>
+        <th>PPM Δ</th>
+        <th>DPM Δ</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in benchmarking.lineVsCompany %}
+      <tr>
+        <td>{{ entry.line }}</td>
+        <td>{{ entry.yieldDelta|round(2) }}</td>
+        <td>{{ entry.falseCallDelta|round(2) }}</td>
+        <td>{{ entry.ppmDelta|round(2) }}</td>
+        <td>{{ entry.dpmDelta|round(2) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
