@@ -9,7 +9,7 @@
       "y": "window_yield_pct",
       "series": "line"
     },
-    "sql": "SELECT\n  \"Report Date\"::date AS d,\n  \"Line\" AS line,\n  SUM(COALESCE(\"Total Windows\", \"Windows per board\" * \"Total Boards\")) AS windows,\n  SUM(\"NG Windows\") AS ng_windows,\n  (SUM(COALESCE(\"Total Windows\", \"Windows per board\" * \"Total Boards\")) - SUM(\"NG Windows\"))\n    / NULLIF(SUM(COALESCE(\"Total Windows\", \"Windows per board\" * \"Total Boards\")),0) * 100.0 AS window_yield_pct\nFROM moat_dpm\nGROUP BY 1,2\nORDER BY 1,2;"
+    "sql": "WITH base AS (\n  SELECT\n    \"Report Date\"::date AS d,\n    \"Line\" AS line,\n    COALESCE(\"Total Windows\", \"Windows per board\" * \"Total Boards\") AS windows,\n    \"NG Windows\" AS ng_windows\n  FROM moat_dpm\n)\nSELECT\n  d,\n  line,\n  SUM(windows) AS windows,\n  SUM(ng_windows) AS ng_windows,\n  (SUM(windows) - SUM(ng_windows)) / NULLIF(SUM(windows), 0) * 100.0 AS window_yield_pct\nFROM base\nGROUP BY 1,2\nORDER BY 1,2;"
   },
   {
     "id": "weekly_dpm_trend_by_assembly",
@@ -21,7 +21,7 @@
       "y": "dpm",
       "series": "model_name"
     },
-    "sql": "WITH w AS (\n  SELECT\n    date_trunc('week', \"Report Date\")::date AS wk,\n    \"Model Name\" AS model_name,\n    SUM(COALESCE(\"Total Windows\", \"Windows per board\" * \"Total Boards\")) AS windows,\n    SUM(\"NG Windows\") AS ng_windows\n  FROM moat_dpm\n  GROUP BY 1,2\n)\nSELECT\n  wk,\n  model_name,\n  ng_windows / NULLIF(windows,0) * 1e6 AS dpm\nFROM w\nORDER BY wk, model_name;"
+    "sql": "WITH base AS (\n  SELECT\n    date_trunc('week', \"Report Date\")::date AS wk,\n    \"Model Name\" AS model_name,\n    COALESCE(\"Total Windows\", \"Windows per board\" * \"Total Boards\") AS windows,\n    \"NG Windows\" AS ng_windows\n  FROM moat_dpm\n)\nSELECT\n  wk,\n  model_name,\n  SUM(ng_windows) / NULLIF(SUM(windows), 0) * 1e6 AS dpm\nFROM base\nGROUP BY 1,2\nORDER BY wk, model_name;"
   },
   {
     "id": "top10_assemblies_by_dpm",
@@ -32,7 +32,7 @@
       "x": "dpm",
       "y": "model_name"
     },
-    "sql": "WITH f AS (\n  SELECT\n    \"Model Name\" AS model_name,\n    SUM(COALESCE(\"Total Windows\", \"Windows per board\" * \"Total Boards\")) AS windows,\n    SUM(\"NG Windows\") AS ng_windows\n  FROM moat_dpm\n  WHERE \"Report Date\" >= :from AND \"Report Date\" < :to\n  GROUP BY 1\n)\nSELECT\n  model_name,\n  ng_windows / NULLIF(windows,0) * 1e6 AS dpm\nFROM f\nORDER BY dpm DESC NULLS LAST\nLIMIT 10;"
+    "sql": "WITH base AS (\n  SELECT\n    \"Model Name\" AS model_name,\n    COALESCE(\"Total Windows\", \"Windows per board\" * \"Total Boards\") AS windows,\n    \"NG Windows\" AS ng_windows,\n    \"Report Date\"::date AS report_date\n  FROM moat_dpm\n)\nSELECT\n  model_name,\n  SUM(ng_windows) / NULLIF(SUM(windows), 0) * 1e6 AS dpm\nFROM base\nWHERE report_date >= :from AND report_date < :to\nGROUP BY model_name\nORDER BY dpm DESC NULLS LAST\nLIMIT 10;"
   },
   {
     "id": "line_yield_comparison_for_assembly",
@@ -43,7 +43,7 @@
       "x": "line",
       "y": "window_yield_pct"
     },
-    "sql": "SELECT\n  \"Line\" AS line,\n  SUM(COALESCE(\"Total Windows\", \"Windows per board\" * \"Total Boards\")) AS windows,\n  SUM(\"NG Windows\") AS ng_windows,\n  (SUM(COALESCE(\"Total Windows\", \"Windows per board\" * \"Total Boards\")) - SUM(\"NG Windows\"))\n    / NULLIF(SUM(COALESCE(\"Total Windows\", \"Windows per board\" * \"Total Boards\")),0) * 100.0 AS window_yield_pct\nFROM moat_dpm\nWHERE \"Model Name\" = :model\n  AND \"Report Date\" >= :from AND \"Report Date\" < :to\nGROUP BY line\nORDER BY line;"
+    "sql": "WITH base AS (\n  SELECT\n    \"Line\" AS line,\n    \"Model Name\" AS model_name,\n    COALESCE(\"Total Windows\", \"Windows per board\" * \"Total Boards\") AS windows,\n    \"NG Windows\" AS ng_windows,\n    \"Report Date\"::date AS report_date\n  FROM moat_dpm\n)\nSELECT\n  line,\n  SUM(windows) AS windows,\n  SUM(ng_windows) AS ng_windows,\n  (SUM(windows) - SUM(ng_windows)) / NULLIF(SUM(windows), 0) * 100.0 AS window_yield_pct\nFROM base\nWHERE model_name = :model\n  AND report_date >= :from AND report_date < :to\nGROUP BY line\nORDER BY line;"
   },
   {
     "id": "defects_per_board_by_line_daily",
@@ -55,7 +55,7 @@
       "y": "defects_per_board",
       "series": "line"
     },
-    "sql": "SELECT\n  \"Report Date\"::date AS d,\n  \"Line\" AS line,\n  SUM(\"Total Boards\") AS boards,\n  SUM(\"NG Windows\") AS ngw,\n  SUM(\"NG Windows\") / NULLIF(SUM(\"Total Boards\"),0) AS defects_per_board\nFROM moat_dpm\nGROUP BY 1,2\nORDER BY 1,2;"
+    "sql": "WITH base AS (\n  SELECT\n    \"Report Date\"::date AS d,\n    \"Line\" AS line,\n    \"Total Boards\" AS boards,\n    \"NG Windows\" AS ng_windows\n  FROM moat_dpm\n)\nSELECT\n  d,\n  line,\n  SUM(boards) AS boards,\n  SUM(ng_windows) AS ngw,\n  SUM(ng_windows) / NULLIF(SUM(boards), 0) AS defects_per_board\nFROM base\nGROUP BY 1,2\nORDER BY 1,2;"
   },
   {
     "id": "windows_per_board_vs_dpm_scatter",
@@ -68,7 +68,7 @@
       "series": "line",
       "label": "model_name"
     },
-    "sql": "WITH g AS (\n  SELECT\n    \"Model Name\" AS model_name,\n    \"Line\" AS line,\n    SUM(\"Total Boards\") AS boards,\n    SUM(COALESCE(\"Total Windows\", \"Windows per board\" * \"Total Boards\")) AS windows,\n    SUM(\"NG Windows\") AS ngw\n  FROM moat_dpm\n  WHERE \"Report Date\" >= :from AND \"Report Date\" < :to\n  GROUP BY 1,2\n)\nSELECT\n  model_name,\n  line,\n  windows / NULLIF(boards,0) AS windows_per_board,\n  ngw / NULLIF(windows,0) * 1e6 AS dpm\nFROM g\nWHERE boards > 0 AND windows > 0;"
+    "sql": "WITH base AS (\n  SELECT\n    \"Model Name\" AS model_name,\n    \"Line\" AS line,\n    \"Total Boards\" AS boards,\n    COALESCE(\"Total Windows\", \"Windows per board\" * \"Total Boards\") AS windows,\n    \"NG Windows\" AS ng_windows,\n    \"Report Date\"::date AS report_date\n  FROM moat_dpm\n)\nSELECT\n  model_name,\n  line,\n  SUM(windows) / NULLIF(SUM(boards), 0) AS windows_per_board,\n  SUM(ng_windows) / NULLIF(SUM(windows), 0) * 1e6 AS dpm\nFROM base\nWHERE report_date >= :from AND report_date < :to\nGROUP BY model_name, line\nHAVING SUM(boards) > 0 AND SUM(windows) > 0;"
   },
   {
     "id": "yield_heatmap_line_by_assembly",
@@ -80,7 +80,7 @@
       "col": "line",
       "value": "window_yield_pct"
     },
-    "sql": "WITH base AS (\n  SELECT\n    \"Line\" AS line,\n    \"Model Name\" AS model_name,\n    SUM(COALESCE(\"Total Windows\", \"Windows per board\" * \"Total Boards\")) AS windows,\n    SUM(\"NG Windows\") AS ngw\n  FROM moat_dpm\n  WHERE \"Report Date\" >= :from AND \"Report Date\" < :to\n  GROUP BY 1,2\n)\nSELECT\n  line,\n  model_name,\n  (windows - ngw) / NULLIF(windows,0) * 100.0 AS window_yield_pct\nFROM base;"
+    "sql": "WITH base AS (\n  SELECT\n    \"Line\" AS line,\n    \"Model Name\" AS model_name,\n    COALESCE(\"Total Windows\", \"Windows per board\" * \"Total Boards\") AS windows,\n    \"NG Windows\" AS ng_windows,\n    \"Report Date\"::date AS report_date\n  FROM moat_dpm\n)\nSELECT\n  line,\n  model_name,\n  (SUM(windows) - SUM(ng_windows)) / NULLIF(SUM(windows), 0) * 100.0 AS window_yield_pct\nFROM base\nWHERE report_date >= :from AND report_date < :to\nGROUP BY line, model_name;"
   },
   {
     "id": "rolling7_window_yield_by_line",
@@ -92,7 +92,7 @@
       "y": "window_yield_pct_roll7",
       "series": "line"
     },
-    "sql": "WITH d AS (\n  SELECT\n    \"Report Date\"::date AS d,\n    \"Line\" AS line,\n    SUM(COALESCE(\"Total Windows\", \"Windows per board\" * \"Total Boards\")) AS windows,\n    SUM(\"NG Windows\") AS ngw\n  FROM moat_dpm\n  GROUP BY 1,2\n),\nx AS (\n  SELECT\n    d,\n    line,\n    (windows - ngw) / NULLIF(windows,0) * 100.0 AS window_yield_pct\n  FROM d\n)\nSELECT\n  d,\n  line,\n  AVG(window_yield_pct) OVER (\n    PARTITION BY line\n    ORDER BY d\n    ROWS BETWEEN 6 PRECEDING AND CURRENT ROW\n  ) AS window_yield_pct_roll7\nFROM x\nORDER BY d, line;"
+    "sql": "WITH base AS (\n  SELECT\n    \"Report Date\"::date AS d,\n    \"Line\" AS line,\n    COALESCE(\"Total Windows\", \"Windows per board\" * \"Total Boards\") AS windows,\n    \"NG Windows\" AS ng_windows\n  FROM moat_dpm\n),\nagg AS (\n  SELECT\n    d,\n    line,\n    SUM(windows) AS windows,\n    SUM(ng_windows) AS ng_windows\n  FROM base\n  GROUP BY d, line\n),\nyield AS (\n  SELECT\n    d,\n    line,\n    (windows - ng_windows) / NULLIF(windows, 0) * 100.0 AS window_yield_pct\n  FROM agg\n)\nSELECT\n  d,\n  line,\n  AVG(window_yield_pct) OVER (\n    PARTITION BY line\n    ORDER BY d\n    ROWS BETWEEN 6 PRECEDING AND CURRENT ROW\n  ) AS window_yield_pct_roll7\nFROM yield\nORDER BY d, line;"
   },
   {
     "id": "throughput_vs_quality_by_line",
@@ -104,7 +104,7 @@
       "y": "window_yield_pct",
       "label": "line"
     },
-    "sql": "WITH s AS (\n  SELECT\n    \"Line\" AS line,\n    SUM(\"Total Boards\") AS boards,\n    SUM(COALESCE(\"Total Windows\", \"Windows per board\" * \"Total Boards\")) AS windows,\n    SUM(\"NG Windows\") AS ngw\n  FROM moat_dpm\n  WHERE \"Report Date\" >= :from AND \"Report Date\" < :to\n  GROUP BY 1\n)\nSELECT\n  line,\n  boards,\n  (windows - ngw) / NULLIF(windows,0) * 100.0 AS window_yield_pct\nFROM s;"
+    "sql": "WITH base AS (\n  SELECT\n    \"Line\" AS line,\n    \"Total Boards\" AS boards,\n    COALESCE(\"Total Windows\", \"Windows per board\" * \"Total Boards\") AS windows,\n    \"NG Windows\" AS ng_windows,\n    \"Report Date\"::date AS report_date\n  FROM moat_dpm\n)\nSELECT\n  line,\n  SUM(boards) AS boards,\n  (SUM(windows) - SUM(ng_windows)) / NULLIF(SUM(windows), 0) * 100.0 AS window_yield_pct\nFROM base\nWHERE report_date >= :from AND report_date < :to\nGROUP BY line;"
   },
   {
     "id": "spc_u_chart_defects_per_board",
@@ -116,7 +116,7 @@
       "y": "u_value",
       "series": "line"
     },
-    "sql": "SELECT\n  \"Report Date\"::date AS d,\n  \"Line\" AS line,\n  SUM(\"Total Boards\") AS boards,\n  SUM(\"NG Windows\") AS ngw,\n  SUM(\"NG Windows\") / NULLIF(SUM(\"Total Boards\"),0) AS u_value -- defects/board\nFROM moat_dpm\nGROUP BY 1,2\nORDER BY 1,2;",
+    "sql": "WITH base AS (\n  SELECT\n    \"Report Date\"::date AS d,\n    \"Line\" AS line,\n    \"Total Boards\" AS boards,\n    \"NG Windows\" AS ng_windows\n  FROM moat_dpm\n)\nSELECT\n  d,\n  line,\n  SUM(boards) AS boards,\n  SUM(ng_windows) AS ngw,\n  SUM(ng_windows) / NULLIF(SUM(boards), 0) AS u_value -- defects/board\nFROM base\nGROUP BY 1,2\nORDER BY 1,2;",
     "notes": "Compute mean and UCL/LCL per line after fetching results: UCL = ū + 3 * sqrt(ū / n_i), LCL = max(0, ū - 3 * sqrt(ū / n_i)), where n_i is the boards inspected on that day."
   }
 ]
