@@ -4561,7 +4561,7 @@ def export_line_report():
         **charts,
     )
 
-    fmt = request.args.get('format')
+    fmt = request.args.get('format') or 'html'
     if fmt == 'pdf':
         try:
             pdf = render_html_to_pdf(html, base_url=request.url_root)
@@ -4581,7 +4581,7 @@ def export_line_report():
             download_name='report.html',
             as_attachment=True,
         )
-    return html
+    return jsonify({'message': 'Unsupported format. Choose pdf or html.'}), 400
 
 
 @main_bp.route('/api/reports/integrated', methods=['GET'])
