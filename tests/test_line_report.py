@@ -156,3 +156,18 @@ def test_line_report_export_handles_pdf_error(app_instance, monkeypatch):
 
     assert resp.status_code == 503
     assert resp.get_json() == {"message": "Install Pango"}
+
+
+def test_line_report_export_rejects_unknown_format(app_instance, monkeypatch):
+    monkeypatch.setattr(routes, "build_line_report_payload", lambda start, end: {})
+    monkeypatch.setattr(routes, "_generate_line_report_charts", lambda payload: {})
+    monkeypatch.setattr(routes, "render_template", lambda template, **context: "<html></html>")
+
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        with client.session_transaction() as sess:
+            sess["username"] = "tester"
+        resp = client.get("/reports/line/export?format=xlsx")
+
+    assert resp.status_code == 400
+    assert resp.get_json() == {"message": "Unsupported format. Choose pdf or html."}

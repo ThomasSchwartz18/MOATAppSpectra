@@ -433,7 +433,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   downloadBtn?.addEventListener('click', async () => {
-    const fmt = document.getElementById('file-format').value;
+    const fmtSelect = document.getElementById('file-format');
+    const selectedFormat = fmtSelect?.value;
+    const fmt = ['pdf', 'html'].includes(selectedFormat) ? selectedFormat : 'pdf';
     const start = document.getElementById('start-date').value;
     const end = document.getElementById('end-date').value;
     const params = new URLSearchParams({ format: fmt });
