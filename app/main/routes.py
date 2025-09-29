@@ -3539,7 +3539,25 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                 continue
         line = _normalize_line_name(row.get('Line') or row.get('line'))
         assembly = _normalize_assembly_name(row)
-        windows = _coerce_number(row.get('Total Windows') or row.get('total_windows'))
+        windows_value = row.get('Total Windows')
+        if windows_value is None:
+            windows_value = row.get('total_windows')
+        windows = _coerce_number(windows_value, default=None)
+
+        if windows in (None, 0.0):
+            wpb_value = row.get('Windows per board')
+            if wpb_value is None:
+                wpb_value = row.get('windows_per_board')
+            boards_value = row.get('Total Boards')
+            if boards_value is None:
+                boards_value = row.get('total_boards')
+            windows_per_board = _coerce_number(wpb_value, default=None)
+            total_boards = _coerce_number(boards_value, default=None)
+            if windows_per_board is not None and total_boards is not None:
+                windows = windows_per_board * total_boards
+
+        if windows is None:
+            windows = 0.0
         ng_windows = _coerce_number(row.get('NG Windows') or row.get('ng_windows'))
         fc_windows = _coerce_number(
             row.get('FalseCall Windows') or row.get('falsecall_windows')
