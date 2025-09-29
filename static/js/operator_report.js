@@ -46,15 +46,10 @@ function getDropdownValues(className) {
     .filter((v) => v);
 }
 
-import { downloadFile } from './utils.js';
+import { setupReportRunner } from './report_runner.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-  const runBtn = document.getElementById('run-report');
-  const downloadControls = document.getElementById('download-controls');
-  const downloadBtn = document.getElementById('download-report');
   let dailyChart = null;
-
-  if (downloadControls) downloadControls.style.display = 'none';
 
   fetch('/aoi_reports')
     .then((r) => r.json())
@@ -64,37 +59,40 @@ document.addEventListener('DOMContentLoaded', () => {
       populateDynamicSelect('operator-wrapper', 'filter-operator', operatorOptions);
     });
 
-  runBtn?.addEventListener('click', () => {
-    const start = document.getElementById('start-date').value;
-    const end = document.getElementById('end-date').value;
+  const collectParams = () => {
+    const start = document.getElementById('start-date')?.value || '';
+    const end = document.getElementById('end-date')?.value || '';
     const operator = getDropdownValues('filter-operator').join(',');
-    if (!start || !end) {
-      alert('Please select a date range.');
-      return;
-    }
-    const params = new URLSearchParams({ start_date: start, end_date: end });
-    if (operator) params.append('operator', operator);
-    fetch(`/api/reports/operator?${params.toString()}`)
-      .then((res) => res.json())
-      .then((data) => {
-        renderReport(data);
-        if (downloadControls) downloadControls.style.display = 'flex';
-      })
-      .catch(() => alert('Failed to run report.'));
-  });
+    const format = document.getElementById('file-format')?.value || 'pdf';
+    return { start, end, operator, format };
+  };
 
-  downloadBtn?.addEventListener('click', async () => {
-    const fmt = document.getElementById('file-format').value;
-    const start = document.getElementById('start-date').value;
-    const end = document.getElementById('end-date').value;
-    const operator = getDropdownValues('filter-operator').join(',');
-    const params = new URLSearchParams({ format: fmt });
-    if (start) params.append('start_date', start);
-    if (end) params.append('end_date', end);
-    if (operator) params.append('operator', operator);
-    await downloadFile(`/reports/operator/export?${params.toString()}`, {
-      buttonId: 'download-report',
-    });
+  const validateParams = ({ start, end }) => {
+    if (!start || !end) {
+      return 'Please select a date range.';
+    }
+    return true;
+  };
+
+  setupReportRunner({
+    collectParams,
+    validateParams,
+    buildPreviewUrl: ({ start, end, operator }) => {
+      const params = new URLSearchParams({ start_date: start, end_date: end });
+      if (operator) params.append('operator', operator);
+      return `/api/reports/operator?${params.toString()}`;
+    },
+    onPreviewSuccess: (data) => {
+      renderReport(data);
+    },
+    onPreviewError: () => alert('Failed to run report.'),
+    buildDownloadUrl: ({ start, end, operator, format }) => {
+      const params = new URLSearchParams({ format: format || 'pdf' });
+      if (start) params.append('start_date', start);
+      if (end) params.append('end_date', end);
+      if (operator) params.append('operator', operator);
+      return `/reports/operator/export?${params.toString()}`;
+    },
   });
 
   function setDesc(id, lines) {

@@ -1,43 +1,47 @@
-import { downloadFile } from './utils.js';
+import { setupReportRunner } from './report_runner.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-  const runBtn = document.getElementById('run-report');
-  const downloadControls = document.getElementById('download-controls');
-  const downloadBtn = document.getElementById('download-report');
   let reportData = null;
   let yieldChart, operatorChart, modelChart, fcVsNgChart, fcNgRatioChart;
 
-  if (downloadControls) downloadControls.style.display = 'none';
+  const collectParams = () => {
+    const startInput = document.getElementById('start-date');
+    const endInput = document.getElementById('end-date');
+    const formatSelect = document.getElementById('file-format');
+    return {
+      start: startInput?.value || '',
+      end: endInput?.value || '',
+      format: formatSelect?.value || 'pdf',
+    };
+  };
 
-  runBtn?.addEventListener('click', () => {
-    const start = document.getElementById('start-date').value;
-    const end = document.getElementById('end-date').value;
+  const validateParams = ({ start, end }) => {
     if (!start || !end) {
-      alert('Please select a date range.');
-      return;
+      return 'Please select a date range.';
     }
+    return true;
+  };
 
-    fetch(`/api/reports/integrated?start_date=${start}&end_date=${end}`)
-      .then((res) => res.json())
-      .then((data) => {
-        reportData = { ...data, start, end };
-        computeSummary(reportData);
-        renderCharts(reportData);
-        downloadControls.style.display = 'flex';
-      })
-      .catch(() => alert('Failed to run report.'));
-  });
-
-  downloadBtn?.addEventListener('click', async () => {
-    const fmt = document.getElementById('file-format').value;
-    const start = document.getElementById('start-date').value;
-    const end = document.getElementById('end-date').value;
-    const params = new URLSearchParams({ format: fmt });
-    if (start) params.append('start_date', start);
-    if (end) params.append('end_date', end);
-    await downloadFile(`/reports/integrated/export?${params.toString()}`, {
-      buttonId: 'download-report',
-    });
+  setupReportRunner({
+    collectParams,
+    validateParams,
+    buildPreviewUrl: ({ start, end }) => {
+      const params = new URLSearchParams({ start_date: start, end_date: end });
+      return `/api/reports/integrated?${params.toString()}`;
+    },
+    onPreviewSuccess: async (data, params) => {
+      const { start, end } = params;
+      reportData = { ...data, start, end };
+      computeSummary(reportData);
+      renderCharts(reportData);
+    },
+    onPreviewError: () => alert('Failed to run report.'),
+    buildDownloadUrl: ({ start, end, format }) => {
+      const params = new URLSearchParams({ format: format || 'pdf' });
+      if (start) params.append('start_date', start);
+      if (end) params.append('end_date', end);
+      return `/reports/integrated/export?${params.toString()}`;
+    },
   });
 
   function setDesc(id, lines) {
