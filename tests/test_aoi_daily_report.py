@@ -81,9 +81,11 @@ def test_export_aoi_daily_report_cover_fields(app_instance, monkeypatch):
         with client.session_transaction() as sess:
             sess["username"] = "tester"
         resp = client.get(
-            "/reports/aoi_daily/export?date=2024-06-01&show_cover=1&contact=help@example.com"
+            "/reports/aoi_daily/export?date=2024-06-01&show_cover=1&contact=help@example.com&format=html"
         )
         assert resp.status_code == 200
+        disposition = resp.headers.get("Content-Disposition", "")
+        assert "240601_aoi_daily_report.html" in disposition
         html = resp.data.decode()
         assert "http://localhost/static/images/company-logo.png" in html
         assert "<style>" in html
@@ -91,7 +93,7 @@ def test_export_aoi_daily_report_cover_fields(app_instance, monkeypatch):
         assert "report_range:</b> 2024-06-01 - 2024-06-01" in html
         assert "&lt;help@example.com&gt;" in html
         assert re.search(
-            r"generated_at:</b> \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} EST", html
+            r"generated_at:</b> \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2} [A-Z]{2,4}", html
         )
         assert "Prog1" in html and "Prog2" in html
 

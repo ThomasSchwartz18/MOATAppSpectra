@@ -147,6 +147,12 @@ def test_export_integrated_report_filename_in_header(app_instance, monkeypatch):
         })
         with client.session_transaction() as sess:
             sess["username"] = "tester"
+        resp_html = client.get(
+            "/reports/integrated/export?start_date=2024-07-01&end_date=2024-07-31&format=html"
+        )
+        assert resp_html.status_code == 200
+        header_html = resp_html.headers.get("Content-Disposition", "")
+        assert "240701_240731_aoiIR.html" in header_html
         resp_pdf = client.get(
             "/reports/integrated/export?start_date=2024-07-01&end_date=2024-07-31&format=pdf"
         )

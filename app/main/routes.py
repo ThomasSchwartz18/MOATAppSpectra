@@ -4704,23 +4704,23 @@ def export_line_report():
     html = render_template('report/line/index.html', **context)
 
     fmt = request.args.get('format') or 'html'
+    filename_stem = f"{start_str}_{end_str}_line_report"
     if fmt == 'pdf':
         try:
             pdf = render_html_to_pdf(html, base_url=request.url_root)
         except PdfGenerationError as exc:
             return jsonify({'message': str(exc)}), 503
-        filename = f"{start_str}_{end_str}_line_report.pdf"
         return send_file(
             io.BytesIO(pdf),
             mimetype='application/pdf',
-            download_name=filename,
+            download_name=f"{filename_stem}.pdf",
             as_attachment=True,
         )
     if fmt == 'html':
         return send_file(
             io.BytesIO(html.encode('utf-8')),
             mimetype='text/html',
-            download_name='report.html',
+            download_name=f"{filename_stem}.html",
             as_attachment=True,
         )
     return jsonify({'message': 'Unsupported format. Choose pdf or html.'}), 400
@@ -4827,23 +4827,23 @@ def export_integrated_report():
         **charts,
     )
     fmt = request.args.get('format')
+    filename_stem = f"{start_str}_{end_str}_aoiIR"
     if fmt == 'pdf':
         try:
             pdf = render_html_to_pdf(html, base_url=request.url_root)
         except PdfGenerationError as exc:
             return jsonify({'message': str(exc)}), 503
-        filename = f"{start_str}_{end_str}_aoiIR.pdf"
         return send_file(
             io.BytesIO(pdf),
             mimetype='application/pdf',
-            download_name=filename,
+            download_name=f"{filename_stem}.pdf",
             as_attachment=True,
         )
     if fmt == 'html':
         return send_file(
             io.BytesIO(html.encode('utf-8')),
             mimetype='text/html',
-            download_name='report.html',
+            download_name=f"{filename_stem}.html",
             as_attachment=True,
         )
     return html
@@ -4902,23 +4902,23 @@ def export_aoi_daily_report():
     )
 
     fmt = request.args.get('format')
+    filename_stem = f"{day.strftime('%y%m%d')}_aoi_daily_report"
     if fmt == 'pdf':
         try:
             pdf = render_html_to_pdf(html, base_url=request.url_root)
         except PdfGenerationError as exc:
             return jsonify({'message': str(exc)}), 503
-        filename = f"{day.strftime('%y%m%d')}_aoi_daily_report.pdf"
         return send_file(
             io.BytesIO(pdf),
             mimetype='application/pdf',
-            download_name=filename,
+            download_name=f"{filename_stem}.pdf",
             as_attachment=True,
         )
     if fmt == 'html':
         return send_file(
             io.BytesIO(html.encode('utf-8')),
             mimetype='text/html',
-            download_name='report.html',
+            download_name=f"{filename_stem}.html",
             as_attachment=True,
         )
     return html
@@ -5379,23 +5379,23 @@ def export_operator_report():
     )
 
     fmt = request.args.get('format')
+    filename_stem = f"{start_str}_{end_str}_operator_report"
     if fmt == 'pdf':
         try:
             pdf = render_html_to_pdf(html, base_url=request.url_root)
         except PdfGenerationError as exc:
             return jsonify({'message': str(exc)}), 503
-        filename = f"{start_str}_{end_str}_operator_report.pdf"
         return send_file(
             io.BytesIO(pdf),
             mimetype='application/pdf',
-            download_name=filename,
+            download_name=f"{filename_stem}.pdf",
             as_attachment=True,
         )
     if fmt == 'html':
         return send_file(
             io.BytesIO(html.encode('utf-8')),
             mimetype='text/html',
-            download_name='report.html',
+            download_name=f"{filename_stem}.html",
             as_attachment=True,
         )
     return html
