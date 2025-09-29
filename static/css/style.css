@@ -1183,6 +1183,11 @@ button {
   align-items: center;
 }
 
+.json-preview.preview-message {
+  white-space: pre-wrap;
+  color: var(--danger);
+}
+
 .spinner {
   width: 16px;
   height: 16px;
