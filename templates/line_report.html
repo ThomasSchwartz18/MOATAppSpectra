@@ -18,87 +18,9 @@
 </div>
 
 <details id="line-preview" class="section-card">
-  <summary>Preview Charts</summary>
+  <summary>Preview Data</summary>
   <div class="preview-content">
-    <section class="section-card" id="line-metrics-section" hidden>
-      <header>
-        <h3>Line-Level Performance Metrics</h3>
-        <p class="section-subtitle">
-          Aggregate window yield, defect rates, and throughput across all assemblies inspected on each line.
-        </p>
-      </header>
-      <div class="table-wrapper">
-        <table class="data-table">
-          <thead>
-            <tr>
-              <th>Line</th>
-              <th>Window Yield %</th>
-              <th>Part Yield %</th>
-              <th>Confirmed Defects</th>
-              <th>Defects / Board</th>
-              <th>False Calls / Board</th>
-              <th>False Call DPM</th>
-              <th>Defect DPM</th>
-              <th>Boards / Day</th>
-              <th>Total Windows</th>
-              <th>Total Parts</th>
-            </tr>
-          </thead>
-          <tbody id="line-metrics-body"></tbody>
-        </table>
-      </div>
-      <div class="chart-grid">
-        <div class="chart-block">
-          <canvas id="lineYieldChart"></canvas>
-        </div>
-        <div class="chart-block">
-          <canvas id="lineFalseCallChart"></canvas>
-        </div>
-        <div class="chart-block">
-          <canvas id="lineQualityChart"></canvas>
-        </div>
-      </div>
-    </section>
-
-    <section class="section-card" id="assembly-comparison-section" hidden>
-      <header>
-        <h3>Assembly vs Line Comparisons</h3>
-        <p class="section-subtitle">
-          Compare how each line performs on the same assembly to pinpoint tuning or process opportunities.
-        </p>
-      </header>
-      <div id="assembly-comparisons"></div>
-    </section>
-
-    <section class="section-card" id="cross-line-section" hidden>
-      <header>
-        <h3>Cross-Line Synchronization</h3>
-        <p class="section-subtitle">
-          Measure consistency across lines and highlight where defect signatures diverge.</p>
-      </header>
-      <div id="cross-line-content"></div>
-    </section>
-
-    <section class="section-card" id="trend-section" hidden>
-      <header>
-        <h3>Trend Insights</h3>
-        <p class="section-subtitle">
-          Track yield drift, learning curves, and longitudinal performance by line.</p>
-      </header>
-      <div class="chart-block">
-        <canvas id="lineTrendChart"></canvas>
-      </div>
-      <div id="trend-insights"></div>
-    </section>
-
-    <section class="section-card" id="benchmarking-section" hidden>
-      <header>
-        <h3>Benchmarking KPIs</h3>
-        <p class="section-subtitle">
-          Quickly identify top-performing and at-risk lines relative to company targets.</p>
-      </header>
-      <div id="benchmarking-content"></div>
-    </section>
+    <pre id="line-preview-data" class="json-preview"></pre>
   </div>
 </details>
 
@@ -116,6 +38,5 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script type="module" src="{{ url_for('static', filename='js/line_report.js') }}"></script>
 {% endblock %}
