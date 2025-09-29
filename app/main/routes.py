@@ -3447,10 +3447,10 @@ def _safe_ratio(num: float, den: float) -> float:
 
 
 def build_line_report_payload(start: date | None = None, end: date | None = None) -> dict:
-    ppm_rows, error = fetch_moat()
+    ppm_rows, error = fetch_moat(start_date=start, end_date=end)
     if error:
         abort(500, description=error)
-    dpm_rows, error = fetch_moat_dpm()
+    dpm_rows, error = fetch_moat_dpm(start_date=start, end_date=end)
     if error:
         abort(500, description=error)
 

@@ -2,6 +2,8 @@ import base64
 import copy
 import os
 import sys
+from datetime import date
+
 import pytest
 
 os.environ.setdefault("USER_PASSWORD", "pw")
@@ -160,6 +162,8 @@ def _mock_line_report(monkeypatch):
     payload_template = _sample_line_payload()
 
     def _build_payload(start, end):
+        assert start is None
+        assert end is None
         return copy.deepcopy(payload_template)
 
     chart_data = base64.b64encode(b"chart").decode()
@@ -280,8 +284,19 @@ def test_line_report_api_returns_expected_metrics(app_instance, monkeypatch):
         },
     ]
 
-    monkeypatch.setattr(routes, "fetch_moat", lambda: (ppm_rows, None))
-    monkeypatch.setattr(routes, "fetch_moat_dpm", lambda: (dpm_rows, None))
+    ppm_calls: list[tuple[date | None, date | None]] = []
+    dpm_calls: list[tuple[date | None, date | None]] = []
+
+    def _fetch_moat(start_date=None, end_date=None):
+        ppm_calls.append((start_date, end_date))
+        return ppm_rows, None
+
+    def _fetch_moat_dpm(start_date=None, end_date=None):
+        dpm_calls.append((start_date, end_date))
+        return dpm_rows, None
+
+    monkeypatch.setattr(routes, "fetch_moat", _fetch_moat)
+    monkeypatch.setattr(routes, "fetch_moat_dpm", _fetch_moat_dpm)
 
     client = app_instance.test_client()
     with app_instance.app_context():
@@ -293,6 +308,8 @@ def test_line_report_api_returns_expected_metrics(app_instance, monkeypatch):
 
     assert response.status_code == 200
     payload = response.get_json()
+    assert ppm_calls == [(date(2024, 7, 1), date(2024, 7, 5))]
+    assert dpm_calls == [(date(2024, 7, 1), date(2024, 7, 5))]
     assert payload["lineMetrics"]
     metrics = {item["line"]: item for item in payload["lineMetrics"]}
     assert pytest.approx(metrics["L1"]["windowYield"], rel=1e-3) == 95.0
@@ -344,6 +361,127 @@ def test_line_report_api_returns_expected_metrics(app_instance, monkeypatch):
     assert day1["ngWindows"] == pytest.approx(10.0)
     assert day1["windowsPerBoard"] == pytest.approx(20.0)
     assert day1["defectsPerBoard"] == pytest.approx(1.0)
+
+
+def test_build_line_report_payload_handles_multi_month_range(monkeypatch):
+    start = date(2024, 1, 1)
+    end = date(2024, 3, 31)
+
+    ppm_rows = [
+        {
+            "Report Date": "2024-01-15",
+            "Line": "L1",
+            "Model Name": "AsmA",
+            "Total Parts": 100,
+            "Total Boards": 10,
+            "FalseCall Parts": 5,
+            "NG Parts": 10,
+            "FalseCall PPM": 1500,
+        },
+        {
+            "Report Date": "2024-02-15",
+            "Line": "L1",
+            "Model Name": "AsmA",
+            "Total Parts": 90,
+            "Total Boards": 9,
+            "FalseCall Parts": 4,
+            "NG Parts": 9,
+            "FalseCall PPM": 1400,
+        },
+        {
+            "Report Date": "2024-03-15",
+            "Line": "L1",
+            "Model Name": "AsmA",
+            "Total Parts": 110,
+            "Total Boards": 11,
+            "FalseCall Parts": 6,
+            "NG Parts": 11,
+            "FalseCall PPM": 1600,
+        },
+        {
+            "Report Date": "2024-04-01",
+            "Line": "L1",
+            "Model Name": "AsmA",
+            "Total Parts": 120,
+            "Total Boards": 12,
+            "FalseCall Parts": 7,
+            "NG Parts": 12,
+            "FalseCall PPM": 1700,
+        },
+    ]
+
+    dpm_rows = [
+        {
+            "Report Date": "2024-01-15",
+            "Line": "L1",
+            "Model Name": "AsmA",
+            "Total Windows": 200,
+            "NG Windows": 10,
+            "FalseCall Windows": 4,
+            "DPM": 50000,
+            "FC DPM": 20000,
+        },
+        {
+            "Report Date": "2024-02-15",
+            "Line": "L1",
+            "Model Name": "AsmA",
+            "Total Windows": 180,
+            "NG Windows": 9,
+            "FalseCall Windows": 3,
+            "DPM": 45000,
+            "FC DPM": 18000,
+        },
+        {
+            "Report Date": "2024-03-15",
+            "Line": "L1",
+            "Model Name": "AsmA",
+            "Total Windows": 220,
+            "NG Windows": 11,
+            "FalseCall Windows": 5,
+            "DPM": 55000,
+            "FC DPM": 22000,
+        },
+        {
+            "Report Date": "2024-04-01",
+            "Line": "L1",
+            "Model Name": "AsmA",
+            "Total Windows": 240,
+            "NG Windows": 12,
+            "FalseCall Windows": 6,
+            "DPM": 60000,
+            "FC DPM": 24000,
+        },
+    ]
+
+    ppm_calls: list[tuple[date | None, date | None]] = []
+    dpm_calls: list[tuple[date | None, date | None]] = []
+
+    def _fetch_moat(start_date=None, end_date=None):
+        ppm_calls.append((start_date, end_date))
+        return ppm_rows, None
+
+    def _fetch_moat_dpm(start_date=None, end_date=None):
+        dpm_calls.append((start_date, end_date))
+        return dpm_rows, None
+
+    monkeypatch.setattr(routes, "fetch_moat", _fetch_moat)
+    monkeypatch.setattr(routes, "fetch_moat_dpm", _fetch_moat_dpm)
+
+    payload = routes.build_line_report_payload(start, end)
+
+    assert ppm_calls == [(start, end)]
+    assert dpm_calls == [(start, end)]
+
+    metrics = {item["line"]: item for item in payload["lineMetrics"]}
+    l1_metrics = metrics["L1"]
+    assert l1_metrics["totalParts"] == pytest.approx(300.0)
+    assert l1_metrics["totalBoards"] == pytest.approx(30.0)
+    assert l1_metrics["ngParts"] == pytest.approx(30.0)
+
+    trends = next(item for item in payload["lineTrends"] if item["line"] == "L1")
+    trend_dates = {entry["date"] for entry in trends["entries"]}
+    assert trend_dates == {"2024-01-15", "2024-02-15", "2024-03-15"}
+    assert "2024-04-01" not in trend_dates
 
 
 def test_line_report_export_html_includes_charts(app_instance, monkeypatch):
