@@ -47,9 +47,15 @@ function getDropdownValues(className) {
 }
 
 import { setupReportRunner } from './report_runner.js';
+import {
+  configureReportFormatSelector,
+  getPreferredReportFormat,
+} from './utils.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   let dailyChart = null;
+
+  configureReportFormatSelector({ noteId: 'file-format-note' });
 
   fetch('/aoi_reports')
     .then((r) => r.json())
@@ -63,7 +69,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const start = document.getElementById('start-date')?.value || '';
     const end = document.getElementById('end-date')?.value || '';
     const operator = getDropdownValues('filter-operator').join(',');
-    const format = document.getElementById('file-format')?.value || 'pdf';
+    const format =
+      document.getElementById('file-format')?.value || getPreferredReportFormat();
     return { start, end, operator, format };
   };
 
@@ -87,7 +94,9 @@ document.addEventListener('DOMContentLoaded', () => {
     },
     onPreviewError: () => alert('Failed to run report.'),
     buildDownloadUrl: ({ start, end, operator, format }) => {
-      const params = new URLSearchParams({ format: format || 'pdf' });
+      const params = new URLSearchParams({
+        format: format || getPreferredReportFormat(),
+      });
       if (start) params.append('start_date', start);
       if (end) params.append('end_date', end);
       if (operator) params.append('operator', operator);

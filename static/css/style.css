@@ -1171,6 +1171,11 @@ button {
 .field { display: flex; flex-direction: column; }
 .field label { font-size: 12px; }
 .field input, .field select { padding: 6px; }
+.field-note {
+  margin-top: 4px;
+  font-size: 0.8rem;
+  color: var(--ink-subtle);
+}
 
 #download-controls {
   display: none;
