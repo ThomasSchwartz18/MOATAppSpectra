@@ -3856,7 +3856,8 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                 'defectDpm': defect_dpm,
                 'defectMix': defect_mix,
             }
-        assembly_comparisons.append({'assembly': assembly, 'lines': lines_info})
+        if len(lines_info) >= 2:
+            assembly_comparisons.append({'assembly': assembly, 'lines': lines_info})
 
     yield_variance = []
     false_call_variance = []
