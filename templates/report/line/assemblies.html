@@ -1,9 +1,9 @@
 <section class="report-section">
   <h2>Assembly vs Line Comparisons</h2>
   {% for assembly in assemblyComparisons %}
-  <article class="report-card">
+  <article class="section-card">
     <h3>{{ assembly.assembly }}</h3>
-    <table class="report-table">
+    <table class="data-table">
       <thead>
         <tr>
           <th>Line</th>
@@ -52,9 +52,9 @@
       {% endif %}
     {% endfor %}
     {% if mixes %}
-    <div class="defect-mix-grid">
+    <div class="kpi-grid">
       {% for item in mixes %}
-      <div>
+      <div class="section-card">
         <h4>{{ item[0] }} Defect Mix</h4>
         <ul>
           {% for defect, share in (item[1].items()|sort(attribute=1, reverse=True))[:5] %}
