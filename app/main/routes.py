@@ -4661,25 +4661,26 @@ def export_line_report():
 
     report_css = _load_report_css()
 
-    html = render_template(
-        'report/line/index.html',
-        show_cover=show_cover,
-        show_summary=show_summary,
-        title=title,
-        subtitle=subtitle,
-        report_date=report_date,
-        period=period,
-        author=author,
-        logo_url=logo_url,
-        footer_left=footer_left,
-        report_id=report_id,
-        contact=contact,
-        confidentiality=confidentiality,
-        generated_at=generated_at,
-        report_css=report_css,
+    context = {
+        'show_cover': show_cover,
+        'show_summary': show_summary,
+        'title': title,
+        'subtitle': subtitle,
+        'report_date': report_date,
+        'period': period,
+        'author': author,
+        'logo_url': logo_url,
+        'footer_left': footer_left,
+        'report_id': report_id,
+        'contact': contact,
+        'confidentiality': confidentiality,
+        'generated_at': generated_at,
+        'report_css': report_css,
         **payload,
-        **charts,
-    )
+        **(charts or {}),
+    }
+
+    html = render_template('report/line/index.html', **context)
 
     fmt = request.args.get('format') or 'html'
     if fmt == 'pdf':

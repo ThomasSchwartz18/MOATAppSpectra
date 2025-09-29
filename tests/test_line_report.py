@@ -1,3 +1,5 @@
+import base64
+import copy
 import os
 import sys
 import pytest
@@ -10,6 +12,123 @@ sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 import app as app_module
 from app import create_app
 from app.main import routes
+
+
+def _sample_line_payload():
+    return {
+        "lineMetrics": [
+            {
+                "line": "L1",
+                "windowYield": 98.5,
+                "partYield": 97.2,
+                "confirmedDefects": 5,
+                "falseCallsPerBoard": 0.32,
+                "falseCallPpm": 1200.5,
+                "falseCallDpm": 800.1,
+                "defectDpm": 500.2,
+                "boardsPerDay": 18.4,
+                "totalWindows": 1500,
+                "totalParts": 1200,
+            }
+        ],
+        "assemblyComparisons": [
+            {
+                "assembly": "AsmA",
+                "lines": {
+                    "L1": {
+                        "windowYield": 98.5,
+                        "falseCallsPerBoard": 0.32,
+                        "falseCallPpm": 1200.5,
+                        "falseCallDpm": 800.1,
+                        "defectDpm": 500.2,
+                        "defectMix": {"Bridge": 0.6, "Insufficient": 0.4},
+                    }
+                },
+            }
+        ],
+        "crossLine": {
+            "yieldVariance": [{"assembly": "AsmA", "stddev": 0.5}],
+            "falseCallVariance": [{"assembly": "AsmA", "stddev": 0.2}],
+            "defectSimilarity": [
+                {
+                    "assembly": "AsmA",
+                    "pairs": [
+                        {"lines": ["L1", "L2"], "similarity": 0.82},
+                    ],
+                }
+            ],
+        },
+        "lineTrends": [
+            {
+                "line": "L1",
+                "entries": [
+                    {"date": "2024-01-01", "yield": 97.0},
+                    {"date": "2024-01-02", "yield": 97.5},
+                ],
+            }
+        ],
+        "trendInsights": {
+            "lineDrift": [
+                {"line": "L1", "change": 1.5, "start": 96.0, "end": 97.5},
+            ],
+            "assemblyLearning": [
+                {
+                    "assembly": "AsmA",
+                    "line": "L1",
+                    "start": ["2024-01-01", 95.0],
+                    "end": ["2024-01-05", 97.5],
+                    "change": 2.5,
+                }
+            ],
+        },
+        "benchmarking": {
+            "lineVsCompany": [
+                {
+                    "line": "L1",
+                    "windowYieldDelta": 1.0,
+                    "falseCallDelta": -0.1,
+                    "falseCallPpmDelta": -50.0,
+                    "falseCallDpmDelta": -35.0,
+                    "defectDpmDelta": -12.0,
+                }
+            ],
+            "bestYield": {"line": "L1", "windowYield": 98.5},
+            "lowestFalseCalls": {"line": "L1", "falseCallsPerBoard": 0.32},
+            "mostConsistent": {"line": "L1", "stddev": 0.18},
+        },
+        "companyAverages": {
+            "windowYield": 97.3,
+            "falseCallsPerBoard": 0.4,
+            "falseCallPpm": 1400.0,
+            "falseCallDpm": 900.0,
+            "defectDpm": 600.0,
+        },
+        "trendInsightsSummary": {},
+    }
+
+
+def _mock_line_report(monkeypatch):
+    payload_template = _sample_line_payload()
+
+    def _build_payload(start, end):
+        return copy.deepcopy(payload_template)
+
+    chart_data = base64.b64encode(b"chart").decode()
+    charts = {
+        "lineYieldImg": f"data:image/png;base64,{chart_data}",
+        "lineFalseCallImg": f"data:image/png;base64,{chart_data}",
+        "linePpmImg": f"data:image/png;base64,{chart_data}",
+        "lineTrendImg": f"data:image/png;base64,{chart_data}",
+    }
+
+    monkeypatch.setattr(routes, "build_line_report_payload", _build_payload)
+    monkeypatch.setattr(routes, "_generate_line_report_charts", lambda payload: charts.copy())
+    monkeypatch.setattr(routes, "_load_report_css", lambda: "")
+    monkeypatch.setattr(
+        routes,
+        "render_html_to_pdf",
+        lambda html, base_url=None: b"%PDF-1.4 line report\n",
+    )
 
 
 @pytest.fixture
@@ -118,6 +237,36 @@ def test_line_report_api_returns_expected_metrics(app_instance, monkeypatch):
     averages = payload["companyAverages"]
     assert averages["windowYield"] == pytest.approx(94.75)
     assert averages["defectDpm"] == pytest.approx(52500.0)
+
+
+def test_line_report_export_html_includes_charts(app_instance, monkeypatch):
+    _mock_line_report(monkeypatch)
+
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        with client.session_transaction() as sess:
+            sess["username"] = "tester"
+        resp = client.get("/reports/line/export?format=html")
+
+    assert resp.status_code == 200
+    html = resp.data.decode()
+    assert "data:image/png;base64" in html
+    assert "Benchmarking KPIs" in html
+    assert "L1" in html
+
+
+def test_line_report_export_pdf_succeeds(app_instance, monkeypatch):
+    _mock_line_report(monkeypatch)
+
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        with client.session_transaction() as sess:
+            sess["username"] = "tester"
+        resp = client.get("/reports/line/export?format=pdf")
+
+    assert resp.status_code == 200
+    assert resp.mimetype == "application/pdf"
+    assert resp.data.startswith(b"%PDF-1.4")
 
 
 def test_line_report_export_handles_pdf_error(app_instance, monkeypatch):

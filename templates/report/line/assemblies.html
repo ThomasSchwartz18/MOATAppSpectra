@@ -57,7 +57,7 @@
       <div>
         <h4>{{ item[0] }} Defect Mix</h4>
         <ul>
-          {% for defect, share in item[1].items()|sort(attribute=1, reverse=True)[:5] %}
+          {% for defect, share in (item[1].items()|sort(attribute=1, reverse=True))[:5] %}
           <li>{{ defect }} — {{ (share * 100)|round(2) }}%</li>
           {% endfor %}
         </ul>
