@@ -363,6 +363,81 @@ def test_line_report_api_returns_expected_metrics(app_instance, monkeypatch):
     assert day1["defectsPerBoard"] == pytest.approx(1.0)
 
 
+def test_build_line_report_payload_uses_windows_per_board_fallback(monkeypatch):
+    ppm_rows = [
+        {
+            "Report Date": "2024-08-01",
+            "Line": "L1",
+            "Model Name": "AsmX",
+            "Total Parts": 100,
+            "Total Boards": 5,
+            "FalseCall Parts": 3,
+            "NG Parts": 7,
+        },
+        {
+            "Report Date": "2024-08-01",
+            "Line": "L2",
+            "Model Name": "AsmX",
+            "Total Parts": 80,
+            "Total Boards": 4,
+            "FalseCall Parts": 1,
+            "NG Parts": 3,
+        },
+    ]
+
+    dpm_rows = [
+        {
+            "Report Date": "2024-08-01",
+            "Line": "L1",
+            "Model Name": "AsmX",
+            "Windows per board": 40,
+            "Total Boards": 5,
+            "NG Windows": 4,
+            "FalseCall Windows": 1,
+            "DPM": 20000,
+            "FC DPM": 5000,
+        },
+        {
+            "Report Date": "2024-08-01",
+            "Line": "L2",
+            "Model Name": "AsmX",
+            "Total Windows": 160,
+            "NG Windows": 6,
+            "FalseCall Windows": 2,
+            "DPM": 37500,
+            "FC DPM": 12500,
+        },
+    ]
+
+    monkeypatch.setattr(routes, "fetch_moat", lambda *args, **kwargs: (ppm_rows, None))
+    monkeypatch.setattr(
+        routes, "fetch_moat_dpm", lambda *args, **kwargs: (dpm_rows, None)
+    )
+
+    payload = routes.build_line_report_payload()
+
+    metrics = {item["line"]: item for item in payload["lineMetrics"]}
+    l1 = metrics["L1"]
+    assert l1["totalWindows"] == pytest.approx(200.0)
+    assert l1["windowYield"] == pytest.approx(98.0)
+    assert l1["defectsPerBoard"] == pytest.approx(0.8)
+    assert l1["defectDpm"] == pytest.approx(20000.0)
+    assert l1["windowsPerBoard"] == pytest.approx(40.0)
+
+    trend = next(item for item in payload["lineTrends"] if item["line"] == "L1")
+    day = next(entry for entry in trend["entries"] if entry["date"] == "2024-08-01")
+    assert day["windows"] == pytest.approx(200.0)
+    assert day["windowsPerBoard"] == pytest.approx(40.0)
+    assert day["defectsPerBoard"] == pytest.approx(0.8)
+
+    asm = next(
+        item for item in payload["assemblyComparisons"] if item["assembly"] == "AsmX"
+    )
+    l1_assembly = asm["lines"]["L1"]
+    assert l1_assembly["windows"] == pytest.approx(200.0)
+    assert l1_assembly["defectsPerBoard"] == pytest.approx(0.8)
+
+
 def test_build_line_report_payload_handles_multi_month_range(monkeypatch):
     start = date(2024, 1, 1)
     end = date(2024, 3, 31)
