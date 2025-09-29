@@ -805,7 +805,7 @@ p {
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  padding: 12px 20px;
+  padding: 4px 9px;
   border-radius: 0;
   border: var(--border-thin) solid var(--border-muted);
   background: linear-gradient(180deg, var(--surface), var(--muted-light));
