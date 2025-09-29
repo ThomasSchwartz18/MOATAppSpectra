@@ -4664,7 +4664,7 @@ def export_line_report():
             return value
         return str(value).lower() not in {'0', 'false', 'no'}
 
-    show_cover = _get_bool('show_cover', False)
+    show_cover = _get_bool('show_cover')
     show_summary = _get_bool('show_summary')
     title = _get('title') or 'Line Report'
     subtitle = _get('subtitle')
@@ -4777,7 +4777,7 @@ def export_integrated_report():
             return value
         return str(value).lower() not in {'0', 'false', 'no'}
 
-    show_cover = _get_bool('show_cover', False)
+    show_cover = _get_bool('show_cover')
     show_summary = _get_bool('show_summary')
     title = _get('title')
     subtitle = _get('subtitle')
@@ -4879,7 +4879,9 @@ def export_aoi_daily_report():
     charts = _generate_aoi_daily_report_charts(payload)
     payload.update(charts)
 
-    show_cover = str(request.args.get('show_cover', 'false')).lower() not in {'0', 'false', 'no'}
+    show_cover = (
+        str(request.args.get('show_cover', 'true')).lower() not in {'0', 'false', 'no'}
+    )
     report_css = _load_report_css()
 
     logo_url = request.args.get('logo_url') or url_for(
@@ -5326,7 +5328,7 @@ def export_operator_report():
             return value
         return str(value).lower() not in {'0', 'false', 'no'}
 
-    show_cover = _get_bool('show_cover', False)
+    show_cover = _get_bool('show_cover')
     show_summary = _get_bool('show_summary')
     title = _get('title') or (operator or 'Operator Report')
     subtitle = _get('subtitle')
