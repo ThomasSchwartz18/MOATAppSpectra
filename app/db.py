@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any, Tuple
 
 from flask import current_app
@@ -414,16 +414,83 @@ def fetch_combined_reports():
         return None, f"Failed to fetch combined reports: {exc}"
 
 
-def fetch_moat():
+def _normalize_date_for_query(value: date | datetime | str | None) -> str | None:
+    """Return an ISO formatted date string for Supabase filters."""
+
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value.date().isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    return str(value)
+
+
+def _fetch_paginated_rows(
+    table: str,
+    *,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    order_column: str | None = None,
+    page_size: int = 1000,
+) -> list[dict]:
+    """Fetch all rows from ``table`` applying optional range filters.
+
+    Supabase caps responses to 1,000 rows by default.  This helper fetches data
+    in ``page_size`` chunks while reapplying the requested range filters so that
+    large exports do not truncate results.
+    """
+
+    if page_size <= 0:
+        raise ValueError("page_size must be greater than zero")
+
+    supabase = _get_client()
+    rows: list[dict] = []
+    offset = 0
+
+    while True:
+        query = supabase.table(table).select("*")
+        if order_column:
+            query = query.order(order_column)
+        if start_date:
+            query = query.gte("Report Date", start_date)
+        if end_date:
+            query = query.lte("Report Date", end_date)
+        query = query.range(offset, offset + page_size - 1)
+
+        response = query.execute()
+        batch = response.data or []
+        rows.extend(batch)
+
+        if len(batch) < page_size:
+            break
+        offset += page_size
+
+    return rows
+
+
+def fetch_moat(
+    start_date: date | datetime | str | None = None,
+    end_date: date | datetime | str | None = None,
+):
     """Retrieve MOAT data from the database.
 
-    ``Report Date`` values are offset by -1 day to represent the original run
-    date.
+    Optional ``start_date`` and ``end_date`` filters apply range constraints on
+    ``Report Date``.  ``Report Date`` values are offset by -1 day to represent
+    the original run date.
     """
-    supabase = _get_client()
+
+    start_value = _normalize_date_for_query(start_date)
+    end_value = _normalize_date_for_query(end_date)
+
     try:
-        response = supabase.table("moat").select("*").execute()
-        data = _apply_report_date_offset(response.data)
+        rows = _fetch_paginated_rows(
+            "moat",
+            start_date=start_value,
+            end_date=end_value,
+            order_column="Report Date",
+        )
+        data = _apply_report_date_offset(rows)
         return data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to fetch MOAT data: {exc}"
@@ -435,28 +502,27 @@ def fetch_recent_moat(days: int = 7):
     ``Report Date`` values are offset by -1 day to represent the original run
     date.
     """
-    supabase = _get_client()
-    start_date = (datetime.utcnow() - timedelta(days=days)).date().isoformat()
-    try:
-        response = (
-            supabase.table("moat")
-            .select("*")
-            .gte("Report Date", start_date)
-            .execute()
-        )
-        data = _apply_report_date_offset(response.data)
-        return data, None
-    except Exception as exc:  # pragma: no cover - network errors
-        return None, f"Failed to fetch recent MOAT data: {exc}"
+    start_date = (datetime.utcnow() - timedelta(days=days)).date()
+    return fetch_moat(start_date=start_date)
 
 
-def fetch_moat_dpm():
+def fetch_moat_dpm(
+    start_date: date | datetime | str | None = None,
+    end_date: date | datetime | str | None = None,
+):
     """Retrieve MOAT DPM data from the database."""
 
-    supabase = _get_client()
+    start_value = _normalize_date_for_query(start_date)
+    end_value = _normalize_date_for_query(end_date)
+
     try:
-        response = supabase.table("moat_dpm").select("*").execute()
-        data = _apply_report_date_offset(response.data)
+        rows = _fetch_paginated_rows(
+            "moat_dpm",
+            start_date=start_value,
+            end_date=end_value,
+            order_column="Report Date",
+        )
+        data = _apply_report_date_offset(rows)
         return data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to fetch MOAT DPM data: {exc}"
@@ -465,19 +531,8 @@ def fetch_moat_dpm():
 def fetch_recent_moat_dpm(days: int = 7):
     """Retrieve recent MOAT DPM data for the past ``days`` days."""
 
-    supabase = _get_client()
-    start_date = (datetime.utcnow() - timedelta(days=days)).date().isoformat()
-    try:
-        response = (
-            supabase.table("moat_dpm")
-            .select("*")
-            .gte("Report Date", start_date)
-            .execute()
-        )
-        data = _apply_report_date_offset(response.data)
-        return data, None
-    except Exception as exc:  # pragma: no cover - network errors
-        return None, f"Failed to fetch recent MOAT DPM data: {exc}"
+    start_date = (datetime.utcnow() - timedelta(days=days)).date()
+    return fetch_moat_dpm(start_date=start_date)
 
 
 def fetch_defect_catalog() -> tuple[list[dict[str, str]] | None, str | None]:
