@@ -39,6 +39,10 @@
         <li>False Call PPM: {{ (companyAverages.falseCallPpm if companyAverages.falseCallPpm is not none else 0)|round(2) }}</li>
         <li>False Call DPM: {{ (companyAverages.falseCallDpm if companyAverages.falseCallDpm is not none else 0)|round(2) }}</li>
         <li>Defect DPM: {{ (companyAverages.defectDpm if companyAverages.defectDpm is not none else 0)|round(2) }}</li>
+        <li>NG Parts: {{ companyAverages.ngParts|round(0) }}</li>
+        <li>NG Windows: {{ companyAverages.ngWindows|round(0) }}</li>
+        <li>Windows / Board: {{ (companyAverages.windowsPerBoard if companyAverages.windowsPerBoard is not none else 0)|round(2) }}</li>
+        <li>Defects / Board: {{ (companyAverages.defectsPerBoard if companyAverages.defectsPerBoard is not none else 0)|round(2) }}</li>
       </ul>
     </article>
     <article class="section-card">

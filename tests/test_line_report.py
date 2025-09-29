@@ -31,6 +31,11 @@ def _sample_line_payload():
                 "boardsPerDay": 18.4,
                 "totalWindows": 1500,
                 "totalParts": 1200,
+                "totalBoards": 80,
+                "ngParts": 25,
+                "ngWindows": 18,
+                "windowsPerBoard": 18.75,
+                "defectsPerBoard": 0.225,
             }
         ],
         "assemblyComparisons": [
@@ -46,6 +51,14 @@ def _sample_line_payload():
                         "falseCallDpm": 800.1,
                         "defectDpm": 500.2,
                         "defectMix": {"Bridge": 0.6, "Insufficient": 0.4},
+                        "parts": 1200,
+                        "boards": 80,
+                        "windows": 1500,
+                        "ngParts": 25,
+                        "ngWindows": 18,
+                        "falseCalls": 8,
+                        "windowsPerBoard": 18.75,
+                        "defectsPerBoard": 0.225,
                     }
                 },
             }
@@ -71,12 +84,28 @@ def _sample_line_payload():
                         "windowYield": 97.0,
                         "truePartYield": 96.5,
                         "rawPartYield": 95.0,
+                        "boards": 40,
+                        "parts": 600,
+                        "ngParts": 12,
+                        "falseCalls": 3,
+                        "windows": 900,
+                        "ngWindows": 6,
+                        "windowsPerBoard": 22.5,
+                        "defectsPerBoard": 0.15,
                     },
                     {
                         "date": "2024-01-02",
                         "windowYield": 97.5,
                         "truePartYield": 96.9,
                         "rawPartYield": 95.4,
+                        "boards": 40,
+                        "parts": 600,
+                        "ngParts": 13,
+                        "falseCalls": 2,
+                        "windows": 900,
+                        "ngWindows": 7,
+                        "windowsPerBoard": 22.5,
+                        "defectsPerBoard": 0.175,
                     },
                 ],
             }
@@ -118,6 +147,10 @@ def _sample_line_payload():
             "falseCallPpm": 1400.0,
             "falseCallDpm": 900.0,
             "defectDpm": 600.0,
+            "ngParts": 120.0,
+            "ngWindows": 80.0,
+            "windowsPerBoard": 15.0,
+            "defectsPerBoard": 0.3,
         },
         "trendInsightsSummary": {},
     }
@@ -141,10 +174,18 @@ def _mock_line_report(monkeypatch):
         for metric in payload.get("lineMetrics", []):
             assert "rawPartYield" in metric
             assert "truePartYield" in metric
+            assert "windowsPerBoard" in metric
+            assert "defectsPerBoard" in metric
+            assert "ngParts" in metric
+            assert "ngWindows" in metric
         for trend in payload.get("lineTrends", []):
             for entry in trend.get("entries", []):
                 assert "rawPartYield" in entry
                 assert "truePartYield" in entry
+                assert "windowsPerBoard" in entry
+                assert "defectsPerBoard" in entry
+                assert "boards" in entry
+                assert "parts" in entry
         return charts.copy()
 
     monkeypatch.setattr(routes, "build_line_report_payload", _build_payload)
@@ -265,10 +306,18 @@ def test_line_report_api_returns_expected_metrics(app_instance, monkeypatch):
     assert metrics["L1"]["windowConfirmedDefects"] == pytest.approx(16.0)
     assert pytest.approx(metrics["L1"]["boardsPerDay"], rel=1e-3) == 11.0
     assert metrics["L1"]["totalWindows"] == pytest.approx(320.0)
+    assert metrics["L1"]["ngParts"] == pytest.approx(23.0)
+    assert metrics["L1"]["ngWindows"] == pytest.approx(16.0)
+    assert pytest.approx(metrics["L1"]["windowsPerBoard"], rel=1e-4) == 14.5455
+    assert pytest.approx(metrics["L1"]["defectsPerBoard"], rel=1e-4) == 0.7273
 
     assert metrics["L3"]["confirmedDefects"] == pytest.approx(3.0)
     assert metrics["L3"]["windowConfirmedDefects"] is None
     assert pytest.approx(metrics["L3"]["defectDpm"], rel=1e-4) == 60000.0
+    assert metrics["L3"]["ngParts"] == pytest.approx(4.0)
+    assert metrics["L3"]["ngWindows"] == pytest.approx(0.0)
+    assert pytest.approx(metrics["L3"]["windowsPerBoard"], rel=1e-4) == 0.0
+    assert pytest.approx(metrics["L3"]["defectsPerBoard"], rel=1e-4) == 0.0
 
     assert payload["assemblyComparisons"]
     asmA = next(item for item in payload["assemblyComparisons"] if item["assembly"] == "AsmA")
@@ -280,6 +329,21 @@ def test_line_report_api_returns_expected_metrics(app_instance, monkeypatch):
     assert averages["truePartYield"] == pytest.approx(93.714286)
     assert averages["rawPartYield"] == pytest.approx(90.571429)
     assert averages["defectDpm"] == pytest.approx(52500.0)
+    assert averages["ngParts"] == pytest.approx(33.0)
+    assert averages["ngWindows"] == pytest.approx(21.0)
+    assert averages["windowsPerBoard"] == pytest.approx(11.428571)
+    assert averages["defectsPerBoard"] == pytest.approx(0.6)
+
+    l1_trend = next(item for item in payload["lineTrends"] if item["line"] == "L1")
+    day1 = next(entry for entry in l1_trend["entries"] if entry["date"] == "2024-07-01")
+    assert day1["boards"] == pytest.approx(10.0)
+    assert day1["parts"] == pytest.approx(100.0)
+    assert day1["ngParts"] == pytest.approx(15.0)
+    assert day1["falseCalls"] == pytest.approx(5.0)
+    assert day1["windows"] == pytest.approx(200.0)
+    assert day1["ngWindows"] == pytest.approx(10.0)
+    assert day1["windowsPerBoard"] == pytest.approx(20.0)
+    assert day1["defectsPerBoard"] == pytest.approx(1.0)
 
 
 def test_line_report_export_html_includes_charts(app_instance, monkeypatch):

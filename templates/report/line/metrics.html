@@ -31,7 +31,11 @@
         <th>True Part Yield %</th>
         <th>Raw Part Yield %</th>
         <th>Confirmed Defects</th>
+        <th>NG Parts</th>
+        <th>NG Windows</th>
         <th>False Calls / Board</th>
+        <th>Windows / Board</th>
+        <th>Defects / Board</th>
         <th>False Call PPM</th>
         <th>False Call DPM</th>
         <th>Defect DPM</th>
@@ -66,7 +70,23 @@
           {% endif %}
         </td>
         <td>{{ metric.confirmedDefects|round(0) }}</td>
+        <td>{{ metric.ngParts|round(0) }}</td>
+        <td>{{ metric.ngWindows|round(0) }}</td>
         <td>{{ metric.falseCallsPerBoard|round(2) }}</td>
+        <td>
+          {% if metric.windowsPerBoard is not none %}
+            {{ metric.windowsPerBoard|round(2) }}
+          {% else %}
+            --
+          {% endif %}
+        </td>
+        <td>
+          {% if metric.defectsPerBoard is not none %}
+            {{ metric.defectsPerBoard|round(2) }}
+          {% else %}
+            --
+          {% endif %}
+        </td>
         <td>
           {% if metric.falseCallPpm is not none %}
             {{ metric.falseCallPpm|round(2) }}
