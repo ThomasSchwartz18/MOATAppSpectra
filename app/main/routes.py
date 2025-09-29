@@ -887,6 +887,9 @@ TRACKED_SUPABASE_TABLES = {
     "bug_reports": "In-app feedback collected to triage feature issues and bugs.",
     "defects": "Defect catalog entries referenced when analysing bug submissions.",
     "app_versions": "Release ledger aligning desktop and web deployments.",
+    "moat_dpm": "MOAT defect-per-million submissions that drive the DPM dashboards.",
+    "app_feature_states": "Feature flag states used to lock or reopen capabilities from bug triage.",
+    "part_result_table": "Part-level AOI results providing deeper context for line quality checks.",
 }
 
 
