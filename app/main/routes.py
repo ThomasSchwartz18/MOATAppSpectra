@@ -3610,6 +3610,8 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
         )
 
         fc_per_board = _safe_ratio(fc_parts, boards)
+        windows_per_board = _safe_ratio(windows, boards) if boards else None
+        defects_per_board = _safe_ratio(ng_windows, boards) if boards else None
         false_call_ppm = (
             _safe_ratio(fc_parts, parts) * 1_000_000
             if parts
@@ -3637,6 +3639,8 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
             'totalParts': parts,
             'totalBoards': boards,
             'totalWindows': windows,
+            'ngParts': ng_parts,
+            'ngWindows': ng_windows,
             'falseCalls': fc_parts,
             'confirmedDefects': confirmed_parts,
             'windowConfirmedDefects': window_confirmed,
@@ -3644,6 +3648,8 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
             'rawPartYield': raw_part_yield,
             'truePartYield': true_part_yield,
             'falseCallsPerBoard': fc_per_board,
+            'windowsPerBoard': windows_per_board,
+            'defectsPerBoard': defects_per_board,
             'falseCallPpm': false_call_ppm,
             'falseCallDpm': false_call_dpm,
             'defectDpm': defect_dpm,
@@ -3782,6 +3788,8 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                     else None
                 )
             )
+            windows_per_board = _safe_ratio(windows, boards) if boards else None
+            defects_per_board = _safe_ratio(ng_windows, boards) if boards else None
             entries.append(
                 {
                     'date': dt.isoformat(),
@@ -3794,6 +3802,14 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                     'defectDpm': defect_dpm,
                     'confirmedDefects': confirmed_parts,
                     'windowConfirmedDefects': window_confirmed,
+                    'boards': boards,
+                    'parts': parts,
+                    'ngParts': ng_parts,
+                    'falseCalls': fc_parts,
+                    'windows': windows,
+                    'ngWindows': ng_windows,
+                    'windowsPerBoard': windows_per_board,
+                    'defectsPerBoard': defects_per_board,
                 }
             )
         return {'line': line, 'entries': entries}
@@ -3916,6 +3932,14 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                 'defectMix': defect_mix,
                 'confirmedDefects': confirmed_parts,
                 'windowConfirmedDefects': window_confirmed,
+                'parts': parts,
+                'boards': boards,
+                'windows': windows,
+                'ngParts': ng_parts,
+                'ngWindows': ng_windows,
+                'falseCalls': fc_parts,
+                'windowsPerBoard': _safe_ratio(windows, boards) if boards else None,
+                'defectsPerBoard': _safe_ratio(ng_windows, boards) if boards else None,
             }
         if len(lines_info) >= 2:
             assembly_comparisons.append({'assembly': assembly, 'lines': lines_info})
@@ -4078,6 +4102,18 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
             'falseCallPpm': company_false_call_ppm,
             'falseCallDpm': company_false_call_dpm,
             'defectDpm': company_dpm,
+            'ngParts': overall['ng_parts'],
+            'ngWindows': overall['ng_windows'],
+            'windowsPerBoard': (
+                _safe_ratio(overall['total_windows'], overall['total_boards'])
+                if overall['total_boards']
+                else None
+            ),
+            'defectsPerBoard': (
+                _safe_ratio(overall['ng_windows'], overall['total_boards'])
+                if overall['total_boards']
+                else None
+            ),
         },
     }
 
