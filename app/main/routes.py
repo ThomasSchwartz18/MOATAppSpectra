@@ -3781,10 +3781,49 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
             'datesActive': date_count,
         }
 
+    def _line_period_summary(line: str, info: dict[str, object]) -> dict[str, object]:
+        parts = info['total_parts']
+        boards = info['total_boards']
+        false_calls = info['false_call_parts']
+        ng_parts = info['ng_parts']
+        windows = info['total_windows']
+        ng_windows = info['ng_windows']
+        confirmed_parts = max(0.0, ng_parts - false_calls)
+
+        raw_part_yield = (
+            100.0 * (parts - ng_parts) / parts if parts else None
+        )
+        true_part_yield = (
+            100.0 * (parts - confirmed_parts) / parts if parts else None
+        )
+        window_yield = (
+            100.0 * (windows - ng_windows) / windows if windows else None
+        )
+
+        return {
+            'line': line,
+            'true_part_yield_pct': true_part_yield,
+            'window_yield_pct': window_yield,
+            'raw_part_yield_pct': raw_part_yield,
+            'fc_per_board': _safe_ratio(false_calls, boards) if boards else 0.0,
+            'defects_per_board': _safe_ratio(ng_windows, boards) if boards else 0.0,
+            'total_boards': boards,
+            'total_parts': parts,
+            'total_windows': windows,
+            'false_calls': false_calls,
+            'ng_windows': ng_windows,
+        }
+
     line_metrics = [
         _line_metrics(line, info)
         for line, info in sorted(line_totals.items())
         if info['total_parts'] or info['total_windows']
+    ]
+
+    line_period_summaries = [
+        _line_period_summary(line, info)
+        for line, info in sorted(line_totals.items())
+        if info['total_parts'] or info['total_windows'] or info['total_boards']
     ]
 
     company_confirmed = max(0.0, overall['ng_parts'] - overall['false_calls'])
@@ -4211,6 +4250,64 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
         'assemblyLearning': assembly_learning,
     }
 
+    def _summary_yield_value(summary: dict[str, object]) -> float | None:
+        for key in ('true_part_yield_pct', 'window_yield_pct', 'raw_part_yield_pct'):
+            value = summary.get(key)
+            if value is not None:
+                return value
+        return None
+
+    focus_summary = max(
+        (s for s in line_period_summaries if s.get('total_boards', 0.0) > 0.0),
+        key=lambda item: item['total_boards'],
+        default=None,
+    )
+    if focus_summary is None and line_period_summaries:
+        focus_summary = line_period_summaries[0]
+
+    ranked_summaries = [
+        (summary, _summary_yield_value(summary))
+        for summary in line_period_summaries
+    ]
+    ranked_summaries = [
+        (summary, value)
+        for summary, value in ranked_summaries
+        if value is not None
+    ]
+
+    best_summary = max(ranked_summaries, key=lambda item: item[1], default=None)
+    worst_summary = min(ranked_summaries, key=lambda item: item[1], default=None)
+
+    overall_defects_per_board = (
+        _safe_ratio(overall['ng_windows'], overall['total_boards'])
+        if overall['total_boards']
+        else None
+    )
+
+    line_period_summary = {
+        'lines': line_period_summaries,
+        'focus': focus_summary,
+        'best': best_summary[0] if best_summary else None,
+        'worst': worst_summary[0] if worst_summary else None,
+        'overall': {
+            'line': 'All Lines',
+            'true_part_yield_pct': company_true_part_yield,
+            'window_yield_pct': company_window_yield,
+            'raw_part_yield_pct': company_raw_part_yield,
+            'fc_per_board': company_fc_rate,
+            'defects_per_board': overall_defects_per_board,
+            'total_boards': overall['total_boards'],
+            'total_parts': overall['total_parts'],
+            'total_windows': overall['total_windows'],
+            'false_calls': overall['false_calls'],
+            'ng_windows': overall['ng_windows'],
+        },
+        'dateRange': {
+            'start': start.isoformat() if start else None,
+            'end': end.isoformat() if end else None,
+        },
+    }
+
     return {
         'lineMetrics': line_metrics,
         'assemblyComparisons': assembly_comparisons,
@@ -4218,6 +4315,7 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
         'lineTrends': line_trends,
         'trendInsights': trend_insights,
         'benchmarking': benchmarking,
+        'linePeriodSummary': line_period_summary,
         'companyAverages': {
             'windowYield': company_window_yield,
             'rawPartYield': company_raw_part_yield,

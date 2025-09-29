@@ -1,5 +1,39 @@
+{% macro format_pct(value) -%}{{ '%.2f'|format(value) ~ '%' if value is not none else '--' }}{%- endmacro %}
+
+{% macro format_ratio(value) -%}{{ '%.2f'|format(value) if value is not none else '--' }}{%- endmacro %}
+
 <section class="report-section">
   <h2>Executive Summary</h2>
+  {% set summary = linePeriodSummary or {} %}
+  {% set focus = summary.get('focus') %}
+  {% set overall = summary.get('overall') %}
+  {% set best = summary.get('best') %}
+  {% set worst = summary.get('worst') %}
+  <div class="summary-lede">
+    {% if focus %}
+      {% set has_range = start or end %}
+      {% set start_label = start or 'the start of the selected period' %}
+      {% set end_label = end or 'the end of the selected period' %}
+      {% set boards = focus.total_boards|round(0)|int %}
+      {% set true_yield = focus.true_part_yield_pct %}
+      {% set window_yield = focus.window_yield_pct %}
+      <p>{% if has_range %}Between {{ start_label }} and {{ end_label }},{% else %}Across the selected period,{% endif %} {{ focus.line }} inspected {{ boards }} boards with a true part yield of {{ format_pct(true_yield) }}{% if window_yield is not none %} and a window yield of {{ format_pct(window_yield) }}{% endif %}.</p>
+    {% else %}
+      <p>No line data is available for the selected period.</p>
+    {% endif %}
+    {% if overall %}
+      <p>Average false calls per board: {{ format_ratio(overall.fc_per_board) }}; defects per board: {{ format_ratio(overall.defects_per_board) }}.</p>
+    {% endif %}
+    {% if best or worst %}
+      {% if best %}
+        {% set best_yield = best.true_part_yield_pct if best.true_part_yield_pct is not none else (best.window_yield_pct if best.window_yield_pct is not none else best.raw_part_yield_pct) %}
+      {% endif %}
+      {% if worst %}
+        {% set worst_yield = worst.true_part_yield_pct if worst.true_part_yield_pct is not none else (worst.window_yield_pct if worst.window_yield_pct is not none else worst.raw_part_yield_pct) %}
+      {% endif %}
+      <p>{% if best %}<strong>Best yield:</strong> {{ best.line }} at {{ format_pct(best_yield) }}{% if worst %} {% else %}.{% endif %}{% endif %}{% if worst %}<strong>Needs attention:</strong> {{ worst.line }} at {{ format_pct(worst_yield) }}.{% endif %}</p>
+    {% endif %}
+  </div>
   <div class="kpi-grid">
     <article class="section-card">
       <h3>Top Lines</h3>

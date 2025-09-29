@@ -56,24 +56,159 @@ def _mock_report(monkeypatch):
 
 def _mock_line_report(monkeypatch):
     sample_payload = {
-        "lines": [{"label": "LineA", "value": 5}],
+        "lineMetrics": [
+            {
+                "line": "Line A",
+                "windowYield": 98.2,
+                "truePartYield": 97.5,
+                "rawPartYield": 96.0,
+                "confirmedDefects": 10,
+                "ngParts": 15,
+                "ngWindows": 20,
+                "falseCallsPerBoard": 0.3,
+                "windowsPerBoard": 12.0,
+                "defectsPerBoard": 0.1,
+                "falseCallPpm": 120.0,
+                "falseCallDpm": 85.0,
+                "defectDpm": 65.0,
+                "boardsPerDay": 100.0,
+                "totalWindows": 1500.0,
+                "totalParts": 8000.0,
+                "totalBoards": 400.0,
+            },
+            {
+                "line": "Line B",
+                "windowYield": 94.0,
+                "truePartYield": 92.1,
+                "rawPartYield": 91.5,
+                "confirmedDefects": 30,
+                "ngParts": 45,
+                "ngWindows": 55,
+                "falseCallsPerBoard": 0.4,
+                "windowsPerBoard": 10.0,
+                "defectsPerBoard": 0.2,
+                "falseCallPpm": 150.0,
+                "falseCallDpm": 110.0,
+                "defectDpm": 90.0,
+                "boardsPerDay": 80.0,
+                "totalWindows": 1000.0,
+                "totalParts": 6000.0,
+                "totalBoards": 300.0,
+            },
+        ],
+        "benchmarking": {
+            "bestYield": {
+                "line": "Line A",
+                "windowYield": 98.2,
+                "truePartYield": 97.5,
+                "rawPartYield": 96.0,
+                "falseCallsPerBoard": 0.3,
+            },
+            "lowestFalseCalls": {
+                "line": "Line B",
+                "falseCallsPerBoard": 0.2,
+            },
+            "mostConsistent": None,
+            "lineVsCompany": [],
+        },
+        "companyAverages": {
+            "windowYield": 96.0,
+            "truePartYield": 95.0,
+            "rawPartYield": 94.5,
+            "falseCallsPerBoard": 0.35,
+            "falseCallPpm": 140.0,
+            "falseCallDpm": 100.0,
+            "defectDpm": 80.0,
+            "ngParts": 60.0,
+            "ngWindows": 75.0,
+            "windowsPerBoard": 11.0,
+            "defectsPerBoard": 0.15,
+        },
+        "trendInsights": {"lineDrift": [], "assemblyLearning": []},
+        "lineYieldImg": "",
+        "lineFalseCallImg": "",
+        "linePpmImg": "",
+        "lineTrendImg": "",
+        "lineTrends": [],
+        "assemblyComparisons": [],
+        "crossLine": {
+            "yieldVariance": [],
+            "falseCallVariance": [],
+            "defectSimilarity": [],
+        },
+        "linePeriodSummary": {
+            "lines": [
+                {
+                    "line": "Line A",
+                    "true_part_yield_pct": 97.5,
+                    "window_yield_pct": 98.2,
+                    "raw_part_yield_pct": 96.0,
+                    "fc_per_board": 0.3,
+                    "defects_per_board": 0.1,
+                    "total_boards": 400.0,
+                    "total_parts": 8000.0,
+                    "total_windows": 1500.0,
+                    "false_calls": 120.0,
+                    "ng_windows": 40.0,
+                },
+                {
+                    "line": "Line B",
+                    "true_part_yield_pct": 92.1,
+                    "window_yield_pct": 94.0,
+                    "raw_part_yield_pct": 91.5,
+                    "fc_per_board": 0.4,
+                    "defects_per_board": 0.2,
+                    "total_boards": 300.0,
+                    "total_parts": 6000.0,
+                    "total_windows": 1000.0,
+                    "false_calls": 120.0,
+                    "ng_windows": 60.0,
+                },
+            ],
+            "focus": {
+                "line": "Line A",
+                "true_part_yield_pct": 97.5,
+                "window_yield_pct": 98.2,
+                "raw_part_yield_pct": 96.0,
+                "fc_per_board": 0.3,
+                "defects_per_board": 0.1,
+                "total_boards": 400.0,
+                "total_parts": 8000.0,
+                "total_windows": 1500.0,
+                "false_calls": 120.0,
+                "ng_windows": 40.0,
+            },
+            "best": {
+                "line": "Line A",
+                "true_part_yield_pct": 97.5,
+                "window_yield_pct": 98.2,
+                "raw_part_yield_pct": 96.0,
+            },
+            "worst": {
+                "line": "Line B",
+                "true_part_yield_pct": 92.1,
+                "window_yield_pct": 94.0,
+                "raw_part_yield_pct": 91.5,
+            },
+            "overall": {
+                "line": "All Lines",
+                "true_part_yield_pct": 95.0,
+                "window_yield_pct": 96.0,
+                "raw_part_yield_pct": 94.5,
+                "fc_per_board": 0.3,
+                "defects_per_board": 0.1,
+                "total_boards": 700.0,
+                "total_parts": 14000.0,
+                "total_windows": 2500.0,
+                "false_calls": 210.0,
+                "ng_windows": 100.0,
+            },
+        },
     }
     monkeypatch.setattr(
         routes, "build_line_report_payload", lambda start, end: sample_payload
     )
     monkeypatch.setattr(routes, "_generate_line_report_charts", lambda payload: {})
-
-    def fake_render(template, **context):
-        assert template == "report/line/index.html"
-        tpl = (
-            "{% if show_cover %}"
-            "<section class='report-section cover-page'>cover</section>"
-            "{% endif %}"
-            "<div class='content'>Line Report</div>"
-        )
-        return render_template_string(tpl, **context)
-
-    monkeypatch.setattr(routes, "render_template", fake_render)
 
 
 def _mock_operator_report(monkeypatch):
@@ -165,10 +300,19 @@ def test_line_export_defaults_include_cover(app_instance, monkeypatch):
     with app_instance.app_context():
         with client.session_transaction() as sess:
             sess["username"] = "tester"
-        resp = client.get("/reports/line/export?format=html")
+        resp = client.get(
+            "/reports/line/export?format=html&start_date=2024-01-01&end_date=2024-01-31"
+        )
         assert resp.status_code == 200
         html = resp.data.decode()
         assert "cover-page" in html
+        assert (
+            "Between 2024-01-01 and 2024-01-31, Line A inspected 400 boards with a true part"
+            " yield of 97.50% and a window yield of 98.20%."
+        ) in html
+        assert "Average false calls per board: 0.30; defects per board: 0.10." in html
+        assert "<strong>Best yield:</strong> Line A at 97.50%" in html
+        assert "<strong>Needs attention:</strong> Line B at 92.10%" in html
 
 
 def test_operator_export_defaults_include_cover(app_instance, monkeypatch):
