@@ -1,11 +1,14 @@
 <section class="report-section">
   <h2>Trend Insights</h2>
-  <figure class="report-figure">
+  <div class="chart-block">
+    <h3>Yield Trend by Line</h3>
     <img src="{{ lineTrendImg }}" alt="Yield Trend by Line" />
-    <figcaption>Yield performance by line across the selected period.</figcaption>
-  </figure>
-  <div class="two-column">
-    <div>
+    <div class="chart-summary">
+      <p>Yield performance by line across the selected period.</p>
+    </div>
+  </div>
+  <div class="kpi-grid">
+    <div class="section-card">
       <h3>Line Drift</h3>
       <ul>
         {% for item in trendInsights.lineDrift[:6] %}
@@ -15,7 +18,7 @@
         {% endfor %}
       </ul>
     </div>
-    <div>
+    <div class="section-card">
       <h3>Assembly Learning Curves</h3>
       <ul>
         {% for item in trendInsights.assemblyLearning[:6] %}

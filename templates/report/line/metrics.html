@@ -1,18 +1,29 @@
 <section class="report-section">
   <h2>Line-Level Performance</h2>
-  <figure class="report-figure">
-    <img src="{{ lineYieldImg }}" alt="Yield by Line" />
-    <figcaption>Yield performance across AOI lines.</figcaption>
-  </figure>
-  <figure class="report-figure">
-    <img src="{{ lineFalseCallImg }}" alt="False Calls by Line" />
-    <figcaption>False-call rate per board.</figcaption>
-  </figure>
-  <figure class="report-figure">
-    <img src="{{ linePpmImg }}" alt="PPM vs DPM" />
-    <figcaption>Comparison of false-call PPM and confirmed-defect DPM.</figcaption>
-  </figure>
-  <table class="report-table">
+  <div class="chart-grid">
+    <div class="chart-block">
+      <h3>Yield by Line</h3>
+      <img src="{{ lineYieldImg }}" alt="Yield by Line" />
+      <div class="chart-summary">
+        <p>Yield performance across AOI lines.</p>
+      </div>
+    </div>
+    <div class="chart-block">
+      <h3>False Calls by Line</h3>
+      <img src="{{ lineFalseCallImg }}" alt="False Calls by Line" />
+      <div class="chart-summary">
+        <p>False-call rate per board.</p>
+      </div>
+    </div>
+    <div class="chart-block">
+      <h3>PPM vs DPM</h3>
+      <img src="{{ linePpmImg }}" alt="PPM vs DPM" />
+      <div class="chart-summary">
+        <p>Comparison of false-call PPM and confirmed-defect DPM.</p>
+      </div>
+    </div>
+  </div>
+  <table class="data-table">
     <thead>
       <tr>
         <th>Line</th>

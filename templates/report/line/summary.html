@@ -1,7 +1,7 @@
 <section class="report-section">
   <h2>Executive Summary</h2>
-  <div class="summary-grid">
-    <article>
+  <div class="kpi-grid">
+    <article class="section-card">
       <h3>Top Lines</h3>
       <ul>
         {% if benchmarking.bestYield %}
@@ -16,7 +16,7 @@
         {% endif %}
       </ul>
     </article>
-    <article>
+    <article class="section-card">
       <h3>Company Averages</h3>
       <ul>
         <li>Window Yield: {{ (companyAverages.windowYield if companyAverages.windowYield is not none else companyAverages.yield)|round(2) }}%</li>
@@ -26,7 +26,7 @@
         <li>Defect DPM: {{ (companyAverages.defectDpm if companyAverages.defectDpm is not none else 0)|round(2) }}</li>
       </ul>
     </article>
-    <article>
+    <article class="section-card">
       <h3>Key Insights</h3>
       <ul>
         {% set drift = (trendInsights.lineDrift or [])[:3] %}

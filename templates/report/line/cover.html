@@ -1,49 +1,53 @@
-<section class="report-cover">
-  <div class="cover-header">
-    <img src="{{ logo_url }}" alt="Logo" class="cover-logo" />
-    <div class="cover-meta">
-      <h1>{{ title or 'Line Report' }}</h1>
-      {% if subtitle %}<p class="cover-subtitle">{{ subtitle }}</p>{% endif %}
-    </div>
+<section class="report-section cover-page" id="cover">
+  <br />
+  <header>
+    <h1>
+      {% if logo_url %}
+      <img src="{{ logo_url }}" alt="Company logo" class="company-logo-pdf" />
+      {% endif %}
+      {{ title or 'Line Report' }}
+    </h1>
+  </header>
+  {% if subtitle %}
+  <p class="section-desc">{{ subtitle }}</p>
+  {% endif %}
+  <div class="report-details">
+    <p><strong>Report Date:</strong>&nbsp;{{ report_date or generated_at }}</p>
   </div>
-  <dl class="cover-details">
-    <div>
-      <dt>Report Date</dt>
-      <dd>{{ report_date or generated_at }}</dd>
-    </div>
-    <div>
-      <dt>Period</dt>
-      <dd>
-        {% if period %}
-          {{ period }}
-        {% elif start or end %}
-          {{ start or '—' }} to {{ end or '—' }}
-        {% else %}
-          Custom Range
-        {% endif %}
-      </dd>
-    </div>
-    {% if author %}
-    <div>
-      <dt>Prepared By</dt>
-      <dd>{{ author }}</dd>
-    </div>
-    {% endif %}
-    {% if contact %}
-    <div>
-      <dt>Contact</dt>
-      <dd>{{ contact }}</dd>
-    </div>
-    {% endif %}
-    {% if report_id %}
-    <div>
-      <dt>Report ID</dt>
-      <dd>{{ report_id }}</dd>
-    </div>
-    {% endif %}
-  </dl>
-  <footer class="cover-footer">
-    <span>{{ confidentiality }}</span>
-    {% if footer_left %}<span>{{ footer_left }}</span>{% endif %}
-  </footer>
+  <div class="report-details">
+    <p>
+      <strong>Period:</strong>&nbsp;
+      {% if period %}
+        {{ period }}
+      {% elif start or end %}
+        {{ start or '—' }} to {{ end or '—' }}
+      {% else %}
+        Custom Range
+      {% endif %}
+    </p>
+  </div>
+  {% if author %}
+  <div class="report-details">
+    <p><strong>Prepared By:</strong>&nbsp;{{ author }}</p>
+  </div>
+  {% endif %}
+  {% if contact %}
+  <div class="report-details">
+    <p><strong>Contact:</strong>&nbsp;{{ contact }}</p>
+  </div>
+  {% endif %}
+  {% if report_id %}
+  <div class="report-details">
+    <p><strong>Report ID:</strong>&nbsp;{{ report_id }}</p>
+  </div>
+  {% endif %}
+  {% if confidentiality or footer_left %}
+  <div class="report-details">
+    <p>
+      {% if confidentiality %}{{ confidentiality }}{% endif %}
+      {% if confidentiality and footer_left %}&nbsp;•&nbsp;{% endif %}
+      {% if footer_left %}{{ footer_left }}{% endif %}
+    </p>
+  </div>
+  {% endif %}
 </section>
