@@ -26,9 +26,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function showSection(section) {
     if (section) section.hidden = false;
-    if (previewDetails && !previewDetails.open) {
-      previewDetails.open = true;
-    }
   }
 
   function hideSections() {
