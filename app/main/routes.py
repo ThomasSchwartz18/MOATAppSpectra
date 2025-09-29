@@ -3590,9 +3590,8 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
         windows = info['total_windows']
         ng_windows = info['ng_windows']
         fc_windows = info['false_call_windows']
+        confirmed_parts = max(0.0, ng_parts - fc_parts)
         window_confirmed = ng_windows if windows else None
-        part_confirmed = max(0.0, ng_parts - fc_parts) if parts else None
-        confirmed = window_confirmed if window_confirmed is not None else part_confirmed or 0.0
 
         window_yield = (
             100.0 * (windows - ng_windows) / windows
@@ -3600,7 +3599,7 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
             else None
         )
         part_yield = (
-            100.0 * (parts - (part_confirmed or 0.0)) / parts
+            100.0 * (parts - confirmed_parts) / parts
             if parts
             else None
         )
@@ -3625,8 +3624,8 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
             if windows
             else None
         )
-        if defect_dpm is None and confirmed and parts:
-            defect_dpm = _safe_ratio(confirmed, parts) * 1_000_000
+        if defect_dpm is None and parts:
+            defect_dpm = _safe_ratio(confirmed_parts, parts) * 1_000_000
         date_count = len(info['dates']) or 1
         boards_per_day = boards / date_count if boards else 0.0
         return {
@@ -3635,7 +3634,8 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
             'totalBoards': boards,
             'totalWindows': windows,
             'falseCalls': fc_parts,
-            'confirmedDefects': confirmed,
+            'confirmedDefects': confirmed_parts,
+            'windowConfirmedDefects': window_confirmed,
             'windowYield': window_yield,
             'partYield': part_yield,
             'yield': yield_pct,
@@ -3653,18 +3653,16 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
         if info['total_parts'] or info['total_windows']
     ]
 
-    company_confirmed = (
-        overall['ng_windows']
-        if overall['total_windows']
-        else max(0.0, overall['ng_parts'] - overall['false_calls'])
-    )
+    company_confirmed = max(0.0, overall['ng_parts'] - overall['false_calls'])
     company_window_yield = (
         100.0 * (overall['total_windows'] - overall['ng_windows']) / overall['total_windows']
         if overall['total_windows']
         else None
     )
     company_part_yield = (
-        100.0 * (overall['total_parts'] - company_confirmed) / overall['total_parts']
+        100.0
+        * (overall['total_parts'] - company_confirmed)
+        / overall['total_parts']
         if overall['total_parts']
         else None
     )
@@ -3687,7 +3685,11 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
     company_dpm = (
         _safe_ratio(overall['ng_windows'], overall['total_windows']) * 1_000_000
         if overall['total_windows']
-        else None
+        else (
+            _safe_ratio(company_confirmed, overall['total_parts']) * 1_000_000
+            if overall['total_parts']
+            else None
+        )
     )
 
     line_vs_company = []
@@ -3729,19 +3731,19 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
             windows = values['windows']
             ng_windows = values['ng_windows']
             fc_windows = values['fc_windows']
+            confirmed_parts = max(0.0, ng_parts - fc_parts)
             window_confirmed = ng_windows if windows else None
-            part_confirmed = max(0.0, ng_parts - fc_parts) if parts else None
-            confirmed = window_confirmed if window_confirmed is not None else part_confirmed
             window_yield = (
                 100.0 * (windows - ng_windows) / windows
                 if windows
                 else None
             )
-            yield_pct = (
-                window_yield
-                if window_yield is not None
-                else (100.0 * (parts - (part_confirmed or 0.0)) / parts) if parts else None
+            part_yield = (
+                100.0 * (parts - confirmed_parts) / parts
+                if parts
+                else None
             )
+            yield_pct = window_yield if window_yield is not None else part_yield
             fc_rate = _safe_ratio(fc_parts, boards) if boards else None
             false_call_ppm = (
                 _safe_ratio(fc_parts, parts) * 1_000_000
@@ -3756,17 +3758,24 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
             defect_dpm = (
                 _safe_ratio(ng_windows, windows) * 1_000_000
                 if windows
-                else (_safe_ratio(confirmed, parts) * 1_000_000 if confirmed and parts else None)
+                else (
+                    _safe_ratio(confirmed_parts, parts) * 1_000_000
+                    if parts
+                    else None
+                )
             )
             entries.append(
                 {
                     'date': dt.isoformat(),
                     'windowYield': window_yield,
+                    'partYield': part_yield,
                     'yield': yield_pct,
                     'falseCallsPerBoard': fc_rate,
                     'falseCallPpm': false_call_ppm,
                     'falseCallDpm': false_call_dpm,
                     'defectDpm': defect_dpm,
+                    'confirmedDefects': confirmed_parts,
+                    'windowConfirmedDefects': window_confirmed,
                 }
             )
         return {'line': line, 'entries': entries}
@@ -3827,9 +3836,8 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
             windows = info['windows']
             ng_windows = info['ng_windows']
             fc_windows = info['fc_windows']
+            confirmed_parts = max(0.0, ng_parts - fc_parts)
             window_confirmed = ng_windows if windows else None
-            part_confirmed = max(0.0, ng_parts - fc_parts) if parts else None
-            confirmed = window_confirmed if window_confirmed is not None else part_confirmed
             window_yield = (
                 100.0 * (windows - ng_windows) / windows
                 if windows
@@ -3839,7 +3847,7 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                 window_yield
                 if window_yield is not None
                 else (
-                    100.0 * (parts - (part_confirmed or 0.0)) / parts
+                    100.0 * (parts - confirmed_parts) / parts
                 )
                 if parts
                 else None
@@ -3854,7 +3862,11 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
             defect_dpm = (
                 _safe_ratio(ng_windows, windows) * 1_000_000
                 if windows
-                else (_safe_ratio(confirmed, parts) * 1_000_000 if confirmed and parts else None)
+                else (
+                    _safe_ratio(confirmed_parts, parts) * 1_000_000
+                    if parts
+                    else None
+                )
             )
             defects = info['defects']
             defect_total = sum(defects.values())
@@ -3866,7 +3878,7 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
             lines_info[line] = {
                 'windowYield': window_yield,
                 'partYield': (
-                    100.0 * (parts - (part_confirmed or 0.0)) / parts
+                    100.0 * (parts - confirmed_parts) / parts
                     if parts
                     else None
                 ),
@@ -3876,6 +3888,8 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                 'falseCallDpm': false_call_dpm,
                 'defectDpm': defect_dpm,
                 'defectMix': defect_mix,
+                'confirmedDefects': confirmed_parts,
+                'windowConfirmedDefects': window_confirmed,
             }
         if len(lines_info) >= 2:
             assembly_comparisons.append({'assembly': assembly, 'lines': lines_info})
@@ -3971,8 +3985,6 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
             yields = []
             for dt, info in ordered:
                 confirmed = max(0.0, info['ng_parts'] - info['false_calls'])
-                if info['ng_windows'] and not info['parts']:
-                    confirmed = info['ng_windows']
                 if info['windows']:
                     yield_pct = (
                         100.0 * (info['windows'] - info['ng_windows']) / info['windows']

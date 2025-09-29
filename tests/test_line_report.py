@@ -22,6 +22,7 @@ def _sample_line_payload():
                 "windowYield": 98.5,
                 "partYield": 97.2,
                 "confirmedDefects": 5,
+                "windowConfirmedDefects": 6,
                 "falseCallsPerBoard": 0.32,
                 "falseCallPpm": 1200.5,
                 "falseCallDpm": 800.1,
@@ -170,6 +171,15 @@ def test_line_report_api_returns_expected_metrics(app_instance, monkeypatch):
             "FalseCall Parts": 3,
             "NG Parts": 8,
         },
+        {
+            "Report Date": "2024-07-03",
+            "Line": "L3",
+            "Model Name": "AsmC",
+            "Total Parts": 50,
+            "Total Boards": 5,
+            "FalseCall Parts": 1,
+            "NG Parts": 4,
+        },
     ]
     dpm_rows = [
         {
@@ -225,9 +235,14 @@ def test_line_report_api_returns_expected_metrics(app_instance, monkeypatch):
     assert pytest.approx(metrics["L1"]["falseCallPpm"], rel=1e-4) == 36363.6363
     assert pytest.approx(metrics["L1"]["falseCallDpm"], rel=1e-4) == 21875.0
     assert pytest.approx(metrics["L1"]["defectDpm"], rel=1e-4) == 50000.0
-    assert metrics["L1"]["confirmedDefects"] == pytest.approx(16.0)
+    assert metrics["L1"]["confirmedDefects"] == pytest.approx(15.0)
+    assert metrics["L1"]["windowConfirmedDefects"] == pytest.approx(16.0)
     assert pytest.approx(metrics["L1"]["boardsPerDay"], rel=1e-3) == 11.0
     assert metrics["L1"]["totalWindows"] == pytest.approx(320.0)
+
+    assert metrics["L3"]["confirmedDefects"] == pytest.approx(3.0)
+    assert metrics["L3"]["windowConfirmedDefects"] is None
+    assert pytest.approx(metrics["L3"]["defectDpm"], rel=1e-4) == 60000.0
 
     assert payload["assemblyComparisons"]
     asmA = next(item for item in payload["assemblyComparisons"] if item["assembly"] == "AsmA")
