@@ -33,17 +33,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const start = document.getElementById('start-date').value;
     const end = document.getElementById('end-date').value;
     const params = new URLSearchParams({ format: fmt });
-    const includeCover = document.getElementById('include-cover')?.checked;
-    params.append('show_cover', includeCover ? 'true' : 'false');
     if (start) params.append('start_date', start);
     if (end) params.append('end_date', end);
     await downloadFile(`/reports/integrated/export?${params.toString()}`, {
       buttonId: 'download-report',
     });
-  });
-
-  document.getElementById('email-report')?.addEventListener('click', () => {
-    alert('Email sent (placeholder).');
   });
 
   function setDesc(id, lines) {

@@ -4,8 +4,6 @@ document.addEventListener('DOMContentLoaded', () => {
   const runBtn = document.getElementById('run-line-report');
   const downloadControls = document.getElementById('download-controls');
   const downloadBtn = document.getElementById('download-report');
-  const includeCover = document.getElementById('include-cover');
-  const includeSummary = document.getElementById('include-summary');
   const previewDetails = document.getElementById('line-preview');
   let reportData = null;
   let yieldChart = null;
@@ -454,15 +452,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const params = new URLSearchParams({ format: fmt });
     if (start) params.append('start_date', start);
     if (end) params.append('end_date', end);
-    params.append('show_cover', includeCover?.checked ? 'true' : 'false');
-    params.append('show_summary', includeSummary?.checked ? 'true' : 'false');
     await downloadFile(`/reports/line/export?${params.toString()}`, {
       buttonId: 'download-report',
       spinnerId: 'download-spinner',
     });
-  });
-
-  document.getElementById('email-report')?.addEventListener('click', () => {
-    alert('Email sent (placeholder).');
   });
 });

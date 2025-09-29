@@ -78,7 +78,7 @@
     </div>
   </details>
 
-<div class="field-row" id="download-controls">
+<div id="download-controls" class="field-row" style="display:none">
   <div class="field">
     <label for="file-format">Format</label>
     <select id="file-format">
@@ -86,14 +86,8 @@
       <option value="html">html</option>
     </select>
   </div>
-  <div class="field">
-    <label for="include-cover">Cover Page</label>
-    <input type="checkbox" id="include-cover" checked />
-  </div>
   <button id="download-report">Download</button>
   <span class="spinner" id="download-spinner" hidden></span>
-  <button id="email-report">Email Report</button>
-  <p class="pdf-host-warning">PDF generation requires a Linux or Windows host. macOS is not supported.</p>
 </div>
 {% endblock %}
 
