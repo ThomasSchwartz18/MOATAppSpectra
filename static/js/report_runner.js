@@ -19,6 +19,7 @@ export function setupReportRunner({
   onPreviewError,
   buildDownloadUrl,
   downloadOptions = {},
+  showDownloadControlsOnValidation = false,
 } = {}) {
   const runBtn = document.getElementById(runButtonId);
   const downloadBtn = document.getElementById(downloadButtonId);
@@ -39,6 +40,10 @@ export function setupReportRunner({
       return;
     }
 
+    if (downloadControls && showDownloadControlsOnValidation) {
+      downloadControls.style.display = 'flex';
+    }
+
     beforePreview?.(params);
 
     const previewUrl =
@@ -48,6 +53,9 @@ export function setupReportRunner({
 
     if (!previewUrl) {
       console.warn('setupReportRunner: preview URL was not provided.');
+      if (downloadControls && !showDownloadControlsOnValidation) {
+        downloadControls.style.display = 'none';
+      }
       return;
     }
 
@@ -68,7 +76,9 @@ export function setupReportRunner({
       } else {
         alert('Failed to run report.');
       }
-      if (downloadControls) downloadControls.style.display = 'none';
+      if (downloadControls && !showDownloadControlsOnValidation) {
+        downloadControls.style.display = 'none';
+      }
     }
   }
 

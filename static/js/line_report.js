@@ -17,9 +17,19 @@ document.addEventListener('DOMContentLoaded', () => {
   function clearPreview() {
     if (previewData) {
       previewData.textContent = '';
+      previewData.classList.remove('preview-message');
     }
     if (previewDetails) {
       previewDetails.open = false;
+    }
+  }
+
+  function showPreviewMessage(message) {
+    if (!previewData) return;
+    previewData.textContent = message;
+    previewData.classList.add('preview-message');
+    if (previewDetails) {
+      previewDetails.open = true;
     }
   }
 
@@ -52,12 +62,21 @@ document.addEventListener('DOMContentLoaded', () => {
       reportData = data;
       if (previewData) {
         previewData.textContent = JSON.stringify(reportData, null, 2);
+        previewData.classList.remove('preview-message');
       }
       if (previewDetails) {
         previewDetails.open = true;
       }
     },
-    onPreviewError: () => alert('Failed to run line report.'),
+    onPreviewError: (err) => {
+      reportData = null;
+      const reason = err?.message
+        ? `\nDetails: ${err.message}`
+        : '';
+      showPreviewMessage(
+        `We couldn't generate a preview for the selected dates, but you can still download the report.${reason}`,
+      );
+    },
     buildDownloadUrl: ({ start, end, format }) => {
       const selected = (format || '').toLowerCase();
       const preferred = getPreferredReportFormat();
@@ -70,5 +89,6 @@ document.addEventListener('DOMContentLoaded', () => {
     downloadOptions: {
       spinnerId: 'download-spinner',
     },
+    showDownloadControlsOnValidation: true,
   });
 });
