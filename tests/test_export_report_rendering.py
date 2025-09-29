@@ -54,6 +54,78 @@ def _mock_report(monkeypatch):
     monkeypatch.setattr(routes, "render_template", fake_render)
 
 
+def _mock_line_report(monkeypatch):
+    sample_payload = {
+        "lines": [{"label": "LineA", "value": 5}],
+    }
+    monkeypatch.setattr(
+        routes, "build_line_report_payload", lambda start, end: sample_payload
+    )
+    monkeypatch.setattr(routes, "_generate_line_report_charts", lambda payload: {})
+
+    def fake_render(template, **context):
+        assert template == "report/line/index.html"
+        tpl = (
+            "{% if show_cover %}"
+            "<section class='report-section cover-page'>cover</section>"
+            "{% endif %}"
+            "<div class='content'>Line Report</div>"
+        )
+        return render_template_string(tpl, **context)
+
+    monkeypatch.setattr(routes, "render_template", fake_render)
+
+
+def _mock_operator_report(monkeypatch):
+    sample_payload = {
+        "summary": {"avg": 1},
+        "operators": [{"name": "OpA"}],
+    }
+    monkeypatch.setattr(
+        routes,
+        "build_operator_report_payload",
+        lambda start, end, operator=None: sample_payload,
+    )
+    monkeypatch.setattr(routes, "_generate_operator_report_charts", lambda payload: {})
+    monkeypatch.setattr(routes, "fetch_combined_reports", lambda: ({}, None))
+
+    def fake_render(template, **context):
+        assert template == "report/operator/index.html"
+        tpl = (
+            "{% if show_cover %}"
+            "<section class='report-section cover-page'>cover</section>"
+            "{% endif %}"
+            "<div class='content'>Operator Report</div>"
+        )
+        return render_template_string(tpl, **context)
+
+    monkeypatch.setattr(routes, "render_template", fake_render)
+
+
+def _mock_aoi_daily_report(monkeypatch):
+    sample_payload = {
+        "rows": [{"assembly": "A1", "value": 1}],
+    }
+    monkeypatch.setattr(
+        routes,
+        "build_aoi_daily_report_payload",
+        lambda day, operator, assembly: sample_payload,
+    )
+    monkeypatch.setattr(routes, "_generate_aoi_daily_report_charts", lambda payload: {})
+
+    def fake_render(template, **context):
+        assert template == "report/aoi_daily/index.html"
+        tpl = (
+            "{% if show_cover %}"
+            "<section class='report-section cover-page'>cover</section>"
+            "{% endif %}"
+            "<div class='content'>AOI Daily Report</div>"
+        )
+        return render_template_string(tpl, **context)
+
+    monkeypatch.setattr(routes, "render_template", fake_render)
+
+
 def test_show_cover_false_and_summary_one_page(app_instance, monkeypatch):
     _mock_report(monkeypatch)
     client = app_instance.test_client()
@@ -73,6 +145,54 @@ def test_show_cover_false_and_summary_one_page(app_instance, monkeypatch):
         assert "KPI1" in html
         assert "JobA" in html
         assert "Program Review Queue" not in html
+
+
+def test_integrated_export_defaults_include_cover(app_instance, monkeypatch):
+    _mock_report(monkeypatch)
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        with client.session_transaction() as sess:
+            sess["username"] = "tester"
+        resp = client.get("/reports/integrated/export?format=html")
+        assert resp.status_code == 200
+        html = resp.data.decode()
+        assert "cover-page" in html
+
+
+def test_line_export_defaults_include_cover(app_instance, monkeypatch):
+    _mock_line_report(monkeypatch)
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        with client.session_transaction() as sess:
+            sess["username"] = "tester"
+        resp = client.get("/reports/line/export?format=html")
+        assert resp.status_code == 200
+        html = resp.data.decode()
+        assert "cover-page" in html
+
+
+def test_operator_export_defaults_include_cover(app_instance, monkeypatch):
+    _mock_operator_report(monkeypatch)
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        with client.session_transaction() as sess:
+            sess["username"] = "tester"
+        resp = client.get("/reports/operator/export?format=html")
+        assert resp.status_code == 200
+        html = resp.data.decode()
+        assert "cover-page" in html
+
+
+def test_aoi_daily_export_defaults_include_cover(app_instance, monkeypatch):
+    _mock_aoi_daily_report(monkeypatch)
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        with client.session_transaction() as sess:
+            sess["username"] = "tester"
+        resp = client.get("/reports/aoi_daily/export?format=html&date=2024-01-01")
+        assert resp.status_code == 200
+        html = resp.data.decode()
+        assert "cover-page" in html
 
 
 def test_cover_excludes_summary_when_enabled(app_instance, monkeypatch):
