@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const downloadBtn = document.getElementById('download-report');
   const includeCover = document.getElementById('include-cover');
   const includeSummary = document.getElementById('include-summary');
+  const previewDetails = document.getElementById('line-preview');
   let reportData = null;
   let yieldChart = null;
   let falseCallChart = null;
@@ -27,6 +28,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function showSection(section) {
     if (section) section.hidden = false;
+    if (previewDetails && !previewDetails.open) {
+      previewDetails.open = true;
+    }
   }
 
   function hideSections() {
@@ -415,6 +419,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     hideSections();
     clearCharts();
+    if (previewDetails) {
+      previewDetails.open = false;
+    }
     try {
       const response = await fetch(`/api/reports/line?start_date=${start}&end_date=${end}`);
       if (!response.ok) throw new Error('Failed to run report');
