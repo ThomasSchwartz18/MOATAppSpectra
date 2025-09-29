@@ -5,8 +5,21 @@
       <h3>Top Lines</h3>
       <ul>
         {% if benchmarking.bestYield %}
-        {% set best_yield = benchmarking.bestYield.windowYield if benchmarking.bestYield.windowYield is not none else benchmarking.bestYield.partYield if benchmarking.bestYield.partYield is not none else benchmarking.bestYield.yield %}
-        <li><strong>Best Window Yield:</strong> {{ benchmarking.bestYield.line }} ({{ best_yield|round(2) }}%)</li>
+        {% set best = benchmarking.bestYield %}
+        {% if best.windowYield is not none %}
+        {% set best_label = 'Window Yield' %}
+        {% set best_value = best.windowYield %}
+        {% elif best.truePartYield is not none %}
+        {% set best_label = 'True Part Yield' %}
+        {% set best_value = best.truePartYield %}
+        {% elif best.rawPartYield is not none %}
+        {% set best_label = 'Raw Part Yield' %}
+        {% set best_value = best.rawPartYield %}
+        {% else %}
+        {% set best_label = 'Yield' %}
+        {% set best_value = 0 %}
+        {% endif %}
+        <li><strong>Best {{ best_label }}:</strong> {{ best.line }} ({{ best_value|round(2) }}%)</li>
         {% endif %}
         {% if benchmarking.lowestFalseCalls %}
         <li><strong>Lowest False Calls:</strong> {{ benchmarking.lowestFalseCalls.line }} ({{ benchmarking.lowestFalseCalls.falseCallsPerBoard|round(2) }})</li>
@@ -19,7 +32,9 @@
     <article class="section-card">
       <h3>Company Averages</h3>
       <ul>
-        <li>Window Yield: {{ (companyAverages.windowYield if companyAverages.windowYield is not none else companyAverages.yield)|round(2) }}%</li>
+        <li>Window Yield: {{ (companyAverages.windowYield if companyAverages.windowYield is not none else 0)|round(2) }}%</li>
+        <li>True Part Yield: {{ (companyAverages.truePartYield if companyAverages.truePartYield is not none else 0)|round(2) }}%</li>
+        <li>Raw Part Yield: {{ (companyAverages.rawPartYield if companyAverages.rawPartYield is not none else 0)|round(2) }}%</li>
         <li>False Calls / Board: {{ companyAverages.falseCallsPerBoard|round(2) }}</li>
         <li>False Call PPM: {{ (companyAverages.falseCallPpm if companyAverages.falseCallPpm is not none else 0)|round(2) }}</li>
         <li>False Call DPM: {{ (companyAverages.falseCallDpm if companyAverages.falseCallDpm is not none else 0)|round(2) }}</li>

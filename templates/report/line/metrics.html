@@ -28,7 +28,8 @@
       <tr>
         <th>Line</th>
         <th>Window Yield %</th>
-        <th>Part Yield %</th>
+        <th>True Part Yield %</th>
+        <th>Raw Part Yield %</th>
         <th>Confirmed Defects</th>
         <th>False Calls / Board</th>
         <th>False Call PPM</th>
@@ -43,10 +44,23 @@
       {% for metric in lineMetrics %}
       <tr>
         <td>{{ metric.line }}</td>
-        <td>{{ (metric.windowYield if metric.windowYield is not none else metric.yield)|round(2) }}</td>
         <td>
-          {% if metric.partYield is not none %}
-            {{ metric.partYield|round(2) }}
+          {% if metric.windowYield is not none %}
+            {{ metric.windowYield|round(2) }}
+          {% else %}
+            --
+          {% endif %}
+        </td>
+        <td>
+          {% if metric.truePartYield is not none %}
+            {{ metric.truePartYield|round(2) }}
+          {% else %}
+            --
+          {% endif %}
+        </td>
+        <td>
+          {% if metric.rawPartYield is not none %}
+            {{ metric.rawPartYield|round(2) }}
           {% else %}
             --
           {% endif %}
