@@ -1,8 +1,14 @@
 import { setupReportRunner } from './report_runner.js';
+import {
+  configureReportFormatSelector,
+  getPreferredReportFormat,
+} from './utils.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   let reportData = null;
   let yieldChart, operatorChart, modelChart, fcVsNgChart, fcNgRatioChart;
+
+  configureReportFormatSelector({ noteId: 'file-format-note' });
 
   const collectParams = () => {
     const startInput = document.getElementById('start-date');
@@ -11,7 +17,7 @@ document.addEventListener('DOMContentLoaded', () => {
     return {
       start: startInput?.value || '',
       end: endInput?.value || '',
-      format: formatSelect?.value || 'pdf',
+      format: formatSelect?.value || getPreferredReportFormat(),
     };
   };
 
@@ -37,7 +43,9 @@ document.addEventListener('DOMContentLoaded', () => {
     },
     onPreviewError: () => alert('Failed to run report.'),
     buildDownloadUrl: ({ start, end, format }) => {
-      const params = new URLSearchParams({ format: format || 'pdf' });
+      const params = new URLSearchParams({
+        format: format || getPreferredReportFormat(),
+      });
       if (start) params.append('start_date', start);
       if (end) params.append('end_date', end);
       return `/reports/integrated/export?${params.toString()}`;

@@ -1,11 +1,18 @@
 import { setupReportRunner } from './report_runner.js';
+import {
+  configureReportFormatSelector,
+  getPreferredReportFormat,
+} from './utils.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   const previewBox = document.getElementById('preview-data');
 
+  configureReportFormatSelector({ noteId: 'file-format-note' });
+
   const collectParams = () => {
     const date = document.getElementById('report-date')?.value || '';
-    const format = document.getElementById('file-format')?.value || 'pdf';
+    const format =
+      document.getElementById('file-format')?.value || getPreferredReportFormat();
     return { date, format };
   };
 
@@ -29,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     onPreviewError: () => alert('Failed to run report.'),
     buildDownloadUrl: ({ date, format }) => {
       const params = new URLSearchParams({
-        format: format || 'pdf',
+        format: format || getPreferredReportFormat(),
         date,
         show_cover: 'true',
       });

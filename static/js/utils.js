@@ -12,6 +12,59 @@ export function hideSpinner(btnId, spinnerId = 'download-spinner') {
   if (btn) btn.disabled = false;
 }
 
+export function isLikelyLinuxClient() {
+  if (typeof navigator === 'undefined') {
+    return true;
+  }
+
+  const platform = navigator?.platform || '';
+  const userAgent = navigator?.userAgent || '';
+  const combined = `${platform} ${userAgent}`.toLowerCase();
+
+  return combined.includes('linux');
+}
+
+export function getPreferredReportFormat() {
+  return isLikelyLinuxClient() ? 'pdf' : 'html';
+}
+
+export function configureReportFormatSelector({
+  selectId = 'file-format',
+  noteId,
+  disablePdf = true,
+} = {}) {
+  const select = selectId ? document.getElementById(selectId) : null;
+  if (!select) return;
+
+  const noteEl = noteId ? document.getElementById(noteId) : null;
+  const pdfOption = select.querySelector('option[value="pdf"]');
+  const htmlOption = select.querySelector('option[value="html"]');
+  const linuxClient = isLikelyLinuxClient();
+
+  const message =
+    'PDF exports are only available on Linux hosts configured with the required PDF dependencies.';
+
+  if (linuxClient) {
+    if (pdfOption) pdfOption.disabled = false;
+    if (pdfOption) select.value = pdfOption.value;
+    if (noteEl) noteEl.hidden = true;
+    if (!noteEl) select.removeAttribute('title');
+    return;
+  }
+
+  if (htmlOption) select.value = htmlOption.value;
+  if (pdfOption && disablePdf) {
+    pdfOption.disabled = true;
+  }
+
+  if (noteEl) {
+    noteEl.textContent = message;
+    noteEl.hidden = false;
+  } else {
+    select.title = message;
+  }
+}
+
 function decodeFileName(disposition) {
   if (!disposition) return null;
   // RFC 5987 style: filename*=UTF-8''...

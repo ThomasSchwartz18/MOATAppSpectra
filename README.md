@@ -107,6 +107,12 @@ Daily report PDFs:
 Once the packages are present, `pip install -r requirements.txt` will install
 WeasyPrint and the Flask endpoints will be able to stream PDF responses.
 
+The web UI now detects the browser platform and defaults report downloads to
+HTML when the client is not running on Linux. On those systems the PDF option is
+disabled with an explanatory note so users understand the limitation. Linux
+installations that satisfy the native dependencies keep PDF selected by default
+and can continue exporting PDF reports without any extra steps.
+
 If your Linux distribution installs WeasyPrint libraries in non-standard
 locations, set the `WEASYPRINT_NATIVE_LIB_PATHS` environment variable to include
 paths that contain the required `.so` files.

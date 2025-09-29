@@ -1,10 +1,15 @@
 import { setupReportRunner } from './report_runner.js';
+import {
+  configureReportFormatSelector,
+  getPreferredReportFormat,
+} from './utils.js';
 
 document.addEventListener('DOMContentLoaded', () => {
   const selectors = {
     previewContainer: 'preview',
     previewData: 'preview-data',
   };
+  configureReportFormatSelector({ noteId: 'file-format-note' });
   const previewDetails = document.getElementById(selectors.previewContainer);
   const previewData = document.getElementById(selectors.previewData);
   let reportData = null;
@@ -21,7 +26,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const collectParams = () => {
     const start = document.getElementById('start-date')?.value || '';
     const end = document.getElementById('end-date')?.value || '';
-    const format = document.getElementById('file-format')?.value || 'pdf';
+    const format =
+      document.getElementById('file-format')?.value || getPreferredReportFormat();
     return { start, end, format };
   };
 
@@ -54,7 +60,8 @@ document.addEventListener('DOMContentLoaded', () => {
     onPreviewError: () => alert('Failed to run line report.'),
     buildDownloadUrl: ({ start, end, format }) => {
       const selected = (format || '').toLowerCase();
-      const fmt = ['pdf', 'html'].includes(selected) ? selected : 'pdf';
+      const preferred = getPreferredReportFormat();
+      const fmt = ['pdf', 'html'].includes(selected) ? selected : preferred;
       const params = new URLSearchParams({ format: fmt });
       if (start) params.append('start_date', start);
       if (end) params.append('end_date', end);
