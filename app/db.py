@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta, timezone
+from collections import defaultdict
 from typing import Any, Tuple
 
 from flask import current_app
@@ -398,6 +399,73 @@ def fetch_fi_reports():
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to fetch FI reports: {exc}"
+
+
+def query_aoi_base_daily(
+    sql: str, params: dict[str, object] | None = None
+) -> tuple[dict[str, dict[str, list[dict]]] | None, str | None]:
+    """Execute ``sql`` against ``aoi_base_daily`` and group the results.
+
+    Args:
+        sql: Parameterised SQL statement to execute. The query is expected to
+            reference ``aoi_base_daily`` and return at least ``report_date`` and
+            ``line`` columns so that results can be grouped for downstream
+            aggregation.
+        params: Optional mapping of parameters referenced by ``sql``.
+
+    Returns:
+        tuple: (grouped_rows, error). ``grouped_rows`` is a nested dictionary
+        keyed first by ISO formatted ``report_date`` and then by ``line``. Each
+        innermost value is a list of the original row dictionaries returned by
+        Supabase. When the query fails ``grouped_rows`` will be ``None`` and
+        ``error`` will contain an explanatory message.
+    """
+
+    if not sql or not sql.strip():
+        return None, "SQL query is required"
+
+    supabase, error = _ensure_supabase_client()
+    if error:
+        return None, error
+
+    params = params or {}
+
+    try:
+        rpc_payload = {"query": sql, "params": params}
+        response = None
+
+        if hasattr(supabase, "rpc") and callable(getattr(supabase, "rpc")):
+            response = supabase.rpc("execute_sql", rpc_payload)
+        elif hasattr(supabase, "postgrest") and hasattr(supabase.postgrest, "rpc"):
+            response = supabase.postgrest.rpc("execute_sql", rpc_payload)
+        else:  # pragma: no cover - unexpected client shape
+            raise RuntimeError("Supabase client does not expose an RPC interface")
+
+        data = getattr(response, "data", response) or []
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to execute AOI base daily query: {exc}"
+
+    grouped: dict[str, dict[str, list[dict]]] = defaultdict(lambda: defaultdict(list))
+
+    for row in data:
+        if not isinstance(row, dict):  # pragma: no cover - defensive guard
+            continue
+        raw_date = row.get("report_date") or row.get("Report Date")
+        raw_line = row.get("line") or row.get("Line")
+
+        if raw_date in (None, "") or raw_line in (None, ""):
+            continue
+
+        if isinstance(raw_date, datetime):
+            date_key = raw_date.date().isoformat()
+        elif isinstance(raw_date, date):
+            date_key = raw_date.isoformat()
+        else:
+            date_key = str(raw_date)
+
+        grouped[date_key][str(raw_line)].append(row)
+
+    return grouped, None
 
 
 def fetch_combined_reports():
