@@ -1,11 +1,17 @@
 import { downloadFile } from './utils.js';
 
 document.addEventListener('DOMContentLoaded', () => {
-  const runBtn = document.getElementById('run-line-report');
+  const selectors = {
+    runBtn: 'run-report',
+    previewContainer: 'preview',
+    previewData: 'preview-data',
+  };
+
+  const runBtn = document.getElementById(selectors.runBtn);
   const downloadControls = document.getElementById('download-controls');
   const downloadBtn = document.getElementById('download-report');
-  const previewDetails = document.getElementById('line-preview');
-  const previewData = document.getElementById('line-preview-data');
+  const previewDetails = document.getElementById(selectors.previewContainer);
+  const previewData = document.getElementById(selectors.previewData);
   let reportData = null;
 
   if (downloadControls) downloadControls.style.display = 'none';
