@@ -186,6 +186,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const container = document.getElementById('assembly-comparisons');
     if (!container) return;
     container.innerHTML = '';
+    if (!comparisons.length) {
+      container.innerHTML = '<p class="empty-state">No multi-line assemblies available for comparison.</p>';
+      showSection(sections.assembly);
+      return;
+    }
+
     comparisons.forEach((item) => {
       const details = document.createElement('details');
       details.className = 'comparison-block';
