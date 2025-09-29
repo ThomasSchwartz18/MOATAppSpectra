@@ -3457,18 +3457,18 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
             line,
             model_name,
             assembly,
-            total_boards,
-            total_parts,
-            falsecall_parts,
-            ng_parts,
-            total_windows,
-            ng_windows,
-            falsecall_windows,
-            windows_per_board,
+            ppm_total_boards,
+            ppm_total_parts,
+            ppm_false_calls,
+            ppm_ng_parts,
+            dpm_total_boards,
+            dpm_total_windows,
+            dpm_ng_windows,
+            dpm_false_calls,
             defect_name,
-            falsecall_ppm,
-            fc_dpm,
-            dpm
+            ppm_falsecall_ppm,
+            dpm_falsecall_dpm,
+            dpm_dpm
         from aoi_base_daily
         where (%(start_date)s is null or report_date >= %(start_date)s)
           and (%(end_date)s is null or report_date <= %(end_date)s)
@@ -3545,6 +3545,7 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                     'total_parts',
                     'parts',
                     'totalParts',
+                    'ppm_total_parts',
                 )
                 boards = _extract_number(
                     row,
@@ -3552,6 +3553,8 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                     'total_boards',
                     'boards',
                     'totalBoards',
+                    'ppm_total_boards',
+                    'dpm_total_boards',
                 )
                 fc_parts = _extract_number(
                     row,
@@ -3560,6 +3563,7 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                     'false_call_parts',
                     'false_calls',
                     'falseCalls',
+                    'ppm_false_calls',
                 )
                 ng_parts = _extract_number(
                     row,
@@ -3567,6 +3571,7 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                     'ng_parts',
                     'ngParts',
                     'ng_parts_total',
+                    'ppm_ng_parts',
                 )
 
                 windows = _extract_number(
@@ -3575,6 +3580,7 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                     'total_windows',
                     'windows',
                     'totalWindows',
+                    'dpm_total_windows',
                     default=None,
                 )
 
@@ -3595,6 +3601,8 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                             'total_boards',
                             'boards',
                             'totalBoards',
+                            'ppm_total_boards',
+                            'dpm_total_boards',
                             default=None,
                         )
                     )
@@ -3612,6 +3620,7 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                     'NG Windows',
                     'ng_windows',
                     'ngWindows',
+                    'dpm_ng_windows',
                 )
                 fc_windows = _extract_number(
                     row,
@@ -3620,18 +3629,21 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                     'false_call_windows',
                     'fc_windows',
                     'falseCallWindows',
+                    'dpm_false_calls',
                 )
                 dpm_value = _extract_number(
                     row,
                     'DPM',
                     'dpm',
                     'defect_dpm',
+                    'dpm_dpm',
                     default=None,
                 )
                 fc_dpm_value = _extract_number(
                     row,
                     'FC DPM',
                     'fc_dpm',
+                    'dpm_falsecall_dpm',
                     default=None,
                 )
                 ppm_value = _extract_number(
@@ -3639,6 +3651,7 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                     'FalseCall PPM',
                     'falsecall_ppm',
                     'false_call_ppm',
+                    'ppm_falsecall_ppm',
                     default=None,
                 )
                 defect_name = (
