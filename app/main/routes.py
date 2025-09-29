@@ -4245,100 +4245,270 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
 def _generate_line_report_charts(payload: dict) -> dict[str, str]:
     if plt is None:
         return {
-            'lineYieldImg': '',
-            'lineFalseCallImg': '',
-            'linePpmImg': '',
-            'lineTrendImg': '',
+            'lineYieldOverlayImg': '',
+            'lineFalseCallSmallMultiplesImg': '',
+            'lineDefectSmallMultiplesImg': '',
+            'linePpmDpmComparisonImg': '',
         }
+
+    import matplotlib.dates as mdates
+
+    def _empty_chart(message: str):
+        fig, ax = plt.subplots(figsize=(8, 3))
+        ax.text(0.5, 0.5, message, ha='center', va='center', transform=ax.transAxes)
+        ax.axis('off')
+        return fig
+
+    def _sanitize(values: list[float | None]) -> list[float]:
+        cleaned: list[float] = []
+        for value in values:
+            if value is None:
+                cleaned.append(float('nan'))
+            else:
+                try:
+                    cleaned.append(float(value))
+                except (TypeError, ValueError):
+                    cleaned.append(float('nan'))
+        return cleaned
+
+    def _ratio(num, den) -> float | None:
+        try:
+            if den:
+                return float(num) / float(den)
+        except (TypeError, ValueError):
+            return None
+        return None
 
     charts: dict[str, str] = {}
 
-    metrics = payload.get('lineMetrics', [])
-    fig, ax = plt.subplots(figsize=(8, 4))
-    if metrics:
-        lines = [m['line'] for m in metrics]
-        x = list(range(len(lines)))
-        width = 0.25
-        window_yields = [m.get('windowYield') or 0.0 for m in metrics]
-        true_part_yields = [m.get('truePartYield') or 0.0 for m in metrics]
-        raw_part_yields = [m.get('rawPartYield') or 0.0 for m in metrics]
-        ax.bar([i - width for i in x], window_yields, width, label='Window Yield', color='teal')
-        ax.bar(x, true_part_yields, width, label='True Part Yield', color='slateblue')
-        ax.bar([i + width for i in x], raw_part_yields, width, label='Raw Part Yield', color='darkorange')
-        ax.set_xticks(x)
-        ax.set_xticklabels(lines, rotation=45)
-        ax.set_ylabel('Yield %')
-        ax.set_title('Yield by Line')
-        ax.legend(loc='best')
-    charts['lineYieldImg'] = _fig_to_data_uri(fig)
+    trends = payload.get('lineTrends', []) or []
 
-    fig, ax = plt.subplots(figsize=(8, 4))
-    if metrics:
-        lines = [m['line'] for m in metrics]
-        fc_rates = [m.get('falseCallsPerBoard', 0.0) for m in metrics]
-        ax.bar(lines, fc_rates, color='orange')
-        ax.set_ylabel('False Calls / Board')
-        ax.set_title('False Calls per Board by Line')
-        ax.tick_params(axis='x', rotation=45)
-    charts['lineFalseCallImg'] = _fig_to_data_uri(fig)
-
-    fig, ax = plt.subplots(figsize=(8, 4))
-    if metrics:
-        lines = [m['line'] for m in metrics]
-        false_call_ppm = [m.get('falseCallPpm') or 0.0 for m in metrics]
-        defect_dpm = [m.get('defectDpm') or 0.0 for m in metrics]
-        x = list(range(len(lines)))
-        width = 0.35
-        ax.bar(
-            [i - width / 2 for i in x],
-            false_call_ppm,
-            width,
-            label='False Call PPM (parts)',
-            color='steelblue',
-        )
-        ax.bar(
-            [i + width / 2 for i in x],
-            defect_dpm,
-            width,
-            label='Defect DPM (windows)',
-            color='seagreen',
-        )
-        ax.set_xticks(x)
-        ax.set_xticklabels(lines, rotation=45)
-        ax.set_ylabel('Events per Million')
-        ax.set_title('False Call PPM vs Defect DPM')
-        ax.legend()
-    charts['linePpmImg'] = _fig_to_data_uri(fig)
-
-    fig, ax = plt.subplots(figsize=(8, 4))
-    trends = payload.get('lineTrends', [])
-    plotted = False
+    aggregated: dict[str, dict[str, float]] = {}
     for trend in trends:
-        entries = trend.get('entries', [])
-        if not entries:
-            continue
-        dates = [entry.get('date') for entry in entries]
-        series = [
-            ('Window Yield', [entry.get('windowYield') for entry in entries]),
-            ('True Part Yield', [entry.get('truePartYield') for entry in entries]),
-            ('Raw Part Yield', [entry.get('rawPartYield') for entry in entries]),
-        ]
-        for label_suffix, values in series:
-            if sum(value is not None for value in values) < 2:
+        for entry in trend.get('entries', []) or []:
+            date_str = entry.get('date')
+            if not date_str:
                 continue
-            ax.plot(
-                dates,
-                values,
-                marker='o',
-                label=f"{trend.get('line', 'Line')} {label_suffix}",
+            bucket = aggregated.setdefault(
+                date_str,
+                {
+                    'boards': 0.0,
+                    'parts': 0.0,
+                    'ng_parts': 0.0,
+                    'false_calls': 0.0,
+                    'windows': 0.0,
+                    'ng_windows': 0.0,
+                },
             )
-            plotted = True
-    if plotted:
+            bucket['boards'] += float(entry.get('boards') or 0.0)
+            bucket['parts'] += float(entry.get('parts') or 0.0)
+            bucket['ng_parts'] += float(entry.get('ngParts') or 0.0)
+            bucket['false_calls'] += float(entry.get('falseCalls') or 0.0)
+            bucket['windows'] += float(entry.get('windows') or 0.0)
+            bucket['ng_windows'] += float(entry.get('ngWindows') or 0.0)
+
+    aggregated_dates = sorted(aggregated.keys())
+    parsed_dates: list[datetime] = []
+    window_yield: list[float | None] = []
+    true_part_yield: list[float | None] = []
+    raw_part_yield: list[float | None] = []
+    false_call_ppm: list[float | None] = []
+    defect_dpm: list[float | None] = []
+
+    for date_str in aggregated_dates:
+        try:
+            dt = datetime.fromisoformat(date_str)
+        except ValueError:
+            continue
+        totals = aggregated[date_str]
+        boards = totals['boards']
+        parts = totals['parts']
+        ng_parts = totals['ng_parts']
+        false_calls = totals['false_calls']
+        windows = totals['windows']
+        ng_windows = totals['ng_windows']
+
+        parsed_dates.append(dt)
+        window_yield.append(
+            (100.0 * (windows - ng_windows) / windows) if windows else None
+        )
+        raw_part_yield.append(
+            (100.0 * (parts - ng_parts) / parts) if parts else None
+        )
+        confirmed_parts = max(0.0, ng_parts - false_calls)
+        true_part_yield.append(
+            (100.0 * (parts - confirmed_parts) / parts) if parts else None
+        )
+        rate = _ratio(false_calls, parts) if parts else None
+        false_call_ppm.append(rate * 1_000_000 if rate is not None else None)
+        if windows:
+            defect_rate = _ratio(ng_windows, windows)
+            defect_dpm.append(
+                defect_rate * 1_000_000 if defect_rate is not None else None
+            )
+        elif parts:
+            defect_rate = _ratio(confirmed_parts, parts)
+            defect_dpm.append(
+                defect_rate * 1_000_000 if defect_rate is not None else None
+            )
+        else:
+            defect_dpm.append(None)
+
+    # Overlay chart for company-wide yields over time
+    if parsed_dates:
+        fig, ax = plt.subplots(figsize=(8, 4))
+        ax.plot(
+            parsed_dates,
+            _sanitize(window_yield),
+            marker='o',
+            linewidth=2,
+            color='teal',
+            label='Window Yield %',
+        )
+        ax.plot(
+            parsed_dates,
+            _sanitize(true_part_yield),
+            marker='s',
+            linewidth=2,
+            color='slateblue',
+            label='True Part Yield %',
+        )
+        ax.plot(
+            parsed_dates,
+            _sanitize(raw_part_yield),
+            marker='^',
+            linewidth=2,
+            color='darkorange',
+            label='Raw Part Yield %',
+        )
         ax.set_ylabel('Yield %')
-        ax.set_title('Yield Trends by Line')
+        ax.set_xlabel('Date')
+        ax.set_title('Yield Performance Over Time')
+        ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
         ax.tick_params(axis='x', rotation=45)
+        ax.grid(alpha=0.3, linestyle='--')
         ax.legend(loc='best')
-    charts['lineTrendImg'] = _fig_to_data_uri(fig)
+        fig.tight_layout()
+    else:
+        fig = _empty_chart('No yield trend data available')
+    charts['lineYieldOverlayImg'] = _fig_to_data_uri(fig)
+
+    def _extract_series(metric_key: str) -> list[tuple[str, list[datetime], list[float | None]]]:
+        series: list[tuple[str, list[datetime], list[float | None]]] = []
+        for trend in sorted(trends, key=lambda t: t.get('line') or ''):
+            entries = trend.get('entries', []) or []
+            dates: list[datetime] = []
+            values: list[float | None] = []
+            for entry in entries:
+                date_str = entry.get('date')
+                if not date_str:
+                    continue
+                try:
+                    dt = datetime.fromisoformat(date_str)
+                except ValueError:
+                    continue
+                dates.append(dt)
+                values.append(entry.get(metric_key))
+            if dates:
+                series.append((trend.get('line') or 'Line', dates, values))
+        return series
+
+    def _build_small_multiples(
+        metric_key: str,
+        ylabel: str,
+        title: str,
+    ) -> str:
+        series = _extract_series(metric_key)
+        if not series:
+            fig = _empty_chart(f'No {ylabel.lower()} data available')
+            return _fig_to_data_uri(fig)
+
+        cols = 2 if len(series) > 1 else 1
+        rows = math.ceil(len(series) / cols)
+        fig, axes = plt.subplots(
+            rows,
+            cols,
+            figsize=(cols * 3.2, rows * 2.6),
+            sharex=True,
+        )
+        axes_iter = axes.flat if hasattr(axes, 'flat') else [axes]
+        axes_list = list(axes_iter)
+
+        for idx, ax in enumerate(axes_list):
+            if idx < len(series):
+                line_name, dates, values = series[idx]
+                ax.plot(
+                    dates,
+                    _sanitize(values),
+                    marker='o',
+                    linewidth=1.5,
+                    color='tab:blue' if 'False' in ylabel else 'tab:green',
+                )
+                ax.set_title(line_name)
+                ax.set_ylabel(ylabel)
+                ax.grid(alpha=0.3, linestyle='--')
+                ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
+                ax.tick_params(axis='x', rotation=45)
+            else:
+                ax.axis('off')
+
+        fig.suptitle(title)
+        fig.tight_layout(rect=[0, 0, 1, 0.94])
+        return _fig_to_data_uri(fig)
+
+    charts['lineFalseCallSmallMultiplesImg'] = _build_small_multiples(
+        'falseCallsPerBoard',
+        'False Calls / Board',
+        'False Calls per Board by Line',
+    )
+
+    charts['lineDefectSmallMultiplesImg'] = _build_small_multiples(
+        'defectsPerBoard',
+        'Defects / Board',
+        'Defects per Board by Line',
+    )
+
+    # Dual-axis comparison of false-call PPM vs. defect DPM across the date range
+    if parsed_dates:
+        fig, ax_left = plt.subplots(figsize=(8, 4))
+        ax_right = ax_left.twinx()
+
+        ax_left.plot(
+            parsed_dates,
+            _sanitize(false_call_ppm),
+            marker='o',
+            color='tab:blue',
+            linewidth=1.8,
+            label='False Call PPM',
+        )
+        ax_right.plot(
+            parsed_dates,
+            _sanitize(defect_dpm),
+            marker='s',
+            color='tab:red',
+            linewidth=1.8,
+            label='Defect DPM',
+        )
+
+        ax_left.set_xlabel('Date')
+        ax_left.set_ylabel('False Call PPM')
+        ax_right.set_ylabel('Defect DPM')
+        ax_left.set_title('False Call PPM vs Defect DPM')
+        ax_left.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
+        ax_left.tick_params(axis='x', rotation=45)
+        ax_left.grid(alpha=0.3, linestyle='--')
+
+        left_handles, left_labels = ax_left.get_legend_handles_labels()
+        right_handles, right_labels = ax_right.get_legend_handles_labels()
+        ax_left.legend(
+            left_handles + right_handles,
+            left_labels + right_labels,
+            loc='best',
+        )
+        fig.tight_layout()
+    else:
+        fig = _empty_chart('No PPM/DPM trend data available')
+    charts['linePpmDpmComparisonImg'] = _fig_to_data_uri(fig)
 
     return charts
 
