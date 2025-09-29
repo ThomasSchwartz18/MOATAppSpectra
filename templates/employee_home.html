@@ -5,8 +5,10 @@
   <div class="employee-card">
     <header class="employee-card__header">
       <h1>Employee Portal</h1>
-      <p class="employee-card__summary">Signed in as <strong>{{ username or 'Employee' }}</strong></p>
-      <p class="employee-card__summary">Role: <strong>{{ user_role or 'Employee' }}</strong></p>
+      <div>
+        <p class="employee-card__summary">Signed in as <strong>{{ username or 'Employee' }}</strong></p>
+        <p class="employee-card__summary">Role: <strong>{{ user_role or 'Employee' }}</strong></p>
+      </div>
       <a class="employee-card__logout" href="{{ url_for('auth.logout') }}">Log out</a>
     </header>
     <div class="employee-card__body">

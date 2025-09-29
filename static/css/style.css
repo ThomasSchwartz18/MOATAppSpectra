@@ -1293,13 +1293,14 @@ body.employee-layout .content {
   display: flex;
   align-items: center;
   justify-content: center;
-  max-width: 720px;
+  max-width: 1000px;
   margin: 0 auto;
   padding: 48px 16px;
 }
 
 .employee-portal {
   width: 100%;
+  height: 100%;
 }
 
 .employee-card {
@@ -1314,9 +1315,16 @@ body.employee-layout .content {
 
 .employee-card__header {
   display: flex;
-  flex-direction: column;
+  /* flex-direction: column; */
   gap: 8px;
   align-items: flex-start;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.employee-card__header div {
+  display: flex;
+  gap: 10px;
 }
 
 .employee-card__header h1 {
