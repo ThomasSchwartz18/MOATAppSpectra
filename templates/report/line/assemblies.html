@@ -8,6 +8,8 @@
         <tr>
           <th>Line</th>
           <th>Window Yield %</th>
+          <th>True Part Yield %</th>
+          <th>Raw Part Yield %</th>
           <th>False Calls / Board</th>
           <th>False Call PPM</th>
           <th>False Call DPM</th>
@@ -18,7 +20,27 @@
         {% for line, metrics in assembly.lines.items() %}
         <tr>
           <td>{{ line }}</td>
-          <td>{{ (metrics.windowYield if metrics.windowYield is not none else metrics.yield)|default(0)|round(2) }}</td>
+          <td>
+            {% if metrics.windowYield is not none %}
+              {{ metrics.windowYield|round(2) }}
+            {% else %}
+              --
+            {% endif %}
+          </td>
+          <td>
+            {% if metrics.truePartYield is not none %}
+              {{ metrics.truePartYield|round(2) }}
+            {% else %}
+              --
+            {% endif %}
+          </td>
+          <td>
+            {% if metrics.rawPartYield is not none %}
+              {{ metrics.rawPartYield|round(2) }}
+            {% else %}
+              --
+            {% endif %}
+          </td>
           <td>{{ metrics.falseCallsPerBoard|default(0)|round(2) }}</td>
           <td>
             {% if metrics.falseCallPpm is not none %}

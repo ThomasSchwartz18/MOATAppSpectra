@@ -20,7 +20,8 @@ def _sample_line_payload():
             {
                 "line": "L1",
                 "windowYield": 98.5,
-                "partYield": 97.2,
+                "truePartYield": 97.2,
+                "rawPartYield": 96.1,
                 "confirmedDefects": 5,
                 "windowConfirmedDefects": 6,
                 "falseCallsPerBoard": 0.32,
@@ -38,6 +39,8 @@ def _sample_line_payload():
                 "lines": {
                     "L1": {
                         "windowYield": 98.5,
+                        "truePartYield": 97.2,
+                        "rawPartYield": 96.1,
                         "falseCallsPerBoard": 0.32,
                         "falseCallPpm": 1200.5,
                         "falseCallDpm": 800.1,
@@ -63,8 +66,18 @@ def _sample_line_payload():
             {
                 "line": "L1",
                 "entries": [
-                    {"date": "2024-01-01", "yield": 97.0},
-                    {"date": "2024-01-02", "yield": 97.5},
+                    {
+                        "date": "2024-01-01",
+                        "windowYield": 97.0,
+                        "truePartYield": 96.5,
+                        "rawPartYield": 95.0,
+                    },
+                    {
+                        "date": "2024-01-02",
+                        "windowYield": 97.5,
+                        "truePartYield": 96.9,
+                        "rawPartYield": 95.4,
+                    },
                 ],
             }
         ],
@@ -99,6 +112,8 @@ def _sample_line_payload():
         },
         "companyAverages": {
             "windowYield": 97.3,
+            "truePartYield": 96.4,
+            "rawPartYield": 95.1,
             "falseCallsPerBoard": 0.4,
             "falseCallPpm": 1400.0,
             "falseCallDpm": 900.0,
@@ -122,8 +137,18 @@ def _mock_line_report(monkeypatch):
         "lineTrendImg": f"data:image/png;base64,{chart_data}",
     }
 
+    def _charts(payload):
+        for metric in payload.get("lineMetrics", []):
+            assert "rawPartYield" in metric
+            assert "truePartYield" in metric
+        for trend in payload.get("lineTrends", []):
+            for entry in trend.get("entries", []):
+                assert "rawPartYield" in entry
+                assert "truePartYield" in entry
+        return charts.copy()
+
     monkeypatch.setattr(routes, "build_line_report_payload", _build_payload)
-    monkeypatch.setattr(routes, "_generate_line_report_charts", lambda payload: charts.copy())
+    monkeypatch.setattr(routes, "_generate_line_report_charts", _charts)
     monkeypatch.setattr(routes, "_load_report_css", lambda: "")
     monkeypatch.setattr(
         routes,
@@ -230,7 +255,8 @@ def test_line_report_api_returns_expected_metrics(app_instance, monkeypatch):
     assert payload["lineMetrics"]
     metrics = {item["line"]: item for item in payload["lineMetrics"]}
     assert pytest.approx(metrics["L1"]["windowYield"], rel=1e-3) == 95.0
-    assert pytest.approx(metrics["L1"]["partYield"], rel=1e-3) == 93.181818
+    assert pytest.approx(metrics["L1"]["truePartYield"], rel=1e-3) == 93.181818
+    assert pytest.approx(metrics["L1"]["rawPartYield"], rel=1e-3) == 89.545455
     assert pytest.approx(metrics["L1"]["falseCallsPerBoard"], rel=1e-3) == 0.3636
     assert pytest.approx(metrics["L1"]["falseCallPpm"], rel=1e-4) == 36363.6363
     assert pytest.approx(metrics["L1"]["falseCallDpm"], rel=1e-4) == 21875.0
@@ -251,6 +277,8 @@ def test_line_report_api_returns_expected_metrics(app_instance, monkeypatch):
 
     averages = payload["companyAverages"]
     assert averages["windowYield"] == pytest.approx(94.75)
+    assert averages["truePartYield"] == pytest.approx(93.714286)
+    assert averages["rawPartYield"] == pytest.approx(90.571429)
     assert averages["defectDpm"] == pytest.approx(52500.0)
 
 
@@ -296,8 +324,8 @@ def test_line_report_export_handles_pdf_error(app_instance, monkeypatch):
         "benchmarking": {"lineVsCompany": []},
         "companyAverages": {
             "windowYield": 0,
-            "partYield": 0,
-            "yield": 0,
+            "truePartYield": 0,
+            "rawPartYield": 0,
             "falseCallsPerBoard": 0,
             "falseCallPpm": 0,
             "falseCallDpm": 0,

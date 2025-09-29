@@ -3598,12 +3598,16 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
             if windows
             else None
         )
-        part_yield = (
+        raw_part_yield = (
+            100.0 * (parts - ng_parts) / parts
+            if parts
+            else None
+        )
+        true_part_yield = (
             100.0 * (parts - confirmed_parts) / parts
             if parts
             else None
         )
-        yield_pct = window_yield if window_yield is not None else part_yield or 0.0
 
         fc_per_board = _safe_ratio(fc_parts, boards)
         false_call_ppm = (
@@ -3637,8 +3641,8 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
             'confirmedDefects': confirmed_parts,
             'windowConfirmedDefects': window_confirmed,
             'windowYield': window_yield,
-            'partYield': part_yield,
-            'yield': yield_pct,
+            'rawPartYield': raw_part_yield,
+            'truePartYield': true_part_yield,
             'falseCallsPerBoard': fc_per_board,
             'falseCallPpm': false_call_ppm,
             'falseCallDpm': false_call_dpm,
@@ -3659,17 +3663,19 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
         if overall['total_windows']
         else None
     )
-    company_part_yield = (
+    company_raw_part_yield = (
+        100.0
+        * (overall['total_parts'] - overall['ng_parts'])
+        / overall['total_parts']
+        if overall['total_parts']
+        else None
+    )
+    company_true_part_yield = (
         100.0
         * (overall['total_parts'] - company_confirmed)
         / overall['total_parts']
         if overall['total_parts']
         else None
-    )
-    company_yield = (
-        company_window_yield
-        if company_window_yield is not None
-        else company_part_yield or 0.0
     )
     company_fc_rate = _safe_ratio(overall['false_calls'], overall['total_boards'])
     company_false_call_ppm = (
@@ -3692,19 +3698,27 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
         )
     )
 
+    def _resolve_yield(window_value, true_value, raw_value) -> float:
+        for value in (window_value, true_value, raw_value):
+            if value is not None:
+                return value
+        return 0.0
+
+    company_yield_value = _resolve_yield(
+        company_window_yield, company_true_part_yield, company_raw_part_yield
+    )
+
     line_vs_company = []
     for metrics in line_metrics:
-        line_window_yield = metrics.get('windowYield')
-        line_yield_fallback = metrics.get('partYield')
-        line_yield_value = (
-            line_window_yield
-            if line_window_yield is not None
-            else line_yield_fallback if line_yield_fallback is not None else 0.0
-        )
         line_vs_company.append(
             {
                 'line': metrics['line'],
-                'windowYieldDelta': line_yield_value - company_yield,
+                'windowYieldDelta': _resolve_yield(
+                    metrics.get('windowYield'),
+                    metrics.get('truePartYield'),
+                    metrics.get('rawPartYield'),
+                )
+                - company_yield_value,
                 'falseCallDelta': metrics['falseCallsPerBoard'] - company_fc_rate,
                 'falseCallPpmDelta': (
                     (metrics['falseCallPpm'] or 0.0)
@@ -3738,12 +3752,16 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                 if windows
                 else None
             )
-            part_yield = (
+            raw_part_yield = (
+                100.0 * (parts - ng_parts) / parts
+                if parts
+                else None
+            )
+            true_part_yield = (
                 100.0 * (parts - confirmed_parts) / parts
                 if parts
                 else None
             )
-            yield_pct = window_yield if window_yield is not None else part_yield
             fc_rate = _safe_ratio(fc_parts, boards) if boards else None
             false_call_ppm = (
                 _safe_ratio(fc_parts, parts) * 1_000_000
@@ -3768,8 +3786,8 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                 {
                     'date': dt.isoformat(),
                     'windowYield': window_yield,
-                    'partYield': part_yield,
-                    'yield': yield_pct,
+                    'rawPartYield': raw_part_yield,
+                    'truePartYield': true_part_yield,
                     'falseCallsPerBoard': fc_rate,
                     'falseCallPpm': false_call_ppm,
                     'falseCallDpm': false_call_dpm,
@@ -3795,9 +3813,11 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
     benchmarking = {
         'bestYield': max(
             line_metrics,
-            key=lambda m: m['windowYield']
-            if m['windowYield'] is not None
-            else (m['partYield'] if m['partYield'] is not None else -float('inf')),
+            key=lambda m: _resolve_yield(
+                m.get('windowYield'),
+                m.get('truePartYield'),
+                m.get('rawPartYield'),
+            ),
             default=None,
         ),
         'lowestFalseCalls': min(
@@ -3810,11 +3830,20 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
     consistency_scores: list[tuple[str, float]] = []
     for trend in line_trends:
         yields = [
-            entry['windowYield']
-            if entry['windowYield'] is not None
-            else entry['yield']
+            _resolve_yield(
+                entry.get('windowYield'),
+                entry.get('truePartYield'),
+                entry.get('rawPartYield'),
+            )
             for entry in trend['entries']
-            if entry['yield'] is not None or entry['windowYield'] is not None
+            if any(
+                value is not None
+                for value in (
+                    entry.get('windowYield'),
+                    entry.get('truePartYield'),
+                    entry.get('rawPartYield'),
+                )
+            )
         ]
         if not yields:
             continue
@@ -3843,12 +3872,13 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                 if windows
                 else None
             )
-            yield_pct = (
-                window_yield
-                if window_yield is not None
-                else (
-                    100.0 * (parts - confirmed_parts) / parts
-                )
+            raw_part_yield = (
+                100.0 * (parts - ng_parts) / parts
+                if parts
+                else None
+            )
+            true_part_yield = (
+                100.0 * (parts - confirmed_parts) / parts
                 if parts
                 else None
             )
@@ -3877,12 +3907,8 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
             )
             lines_info[line] = {
                 'windowYield': window_yield,
-                'partYield': (
-                    100.0 * (parts - confirmed_parts) / parts
-                    if parts
-                    else None
-                ),
-                'yield': yield_pct,
+                'rawPartYield': raw_part_yield,
+                'truePartYield': true_part_yield,
                 'falseCallsPerBoard': fc_rate,
                 'falseCallPpm': false_call_ppm,
                 'falseCallDpm': false_call_dpm,
@@ -3898,9 +3924,16 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
     false_call_variance = []
     for comp in assembly_comparisons:
         yields = [
-            v['windowYield'] if v['windowYield'] is not None else v['yield']
+            _resolve_yield(
+                v.get('windowYield'), v.get('truePartYield'), v.get('rawPartYield')
+            )
             for v in comp['lines'].values()
-            if v['windowYield'] is not None or v['yield'] is not None
+            if any(
+                value is not None
+                for value in (
+                    v.get('windowYield'), v.get('truePartYield'), v.get('rawPartYield')
+                )
+            )
         ]
         if len(yields) > 1:
             yield_variance.append(
@@ -3961,11 +3994,20 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
     line_drift = []
     for trend in line_trends:
         yields = [
-            entry['windowYield']
-            if entry.get('windowYield') is not None
-            else entry.get('yield')
+            _resolve_yield(
+                entry.get('windowYield'),
+                entry.get('truePartYield'),
+                entry.get('rawPartYield'),
+            )
             for entry in trend['entries']
-            if entry.get('windowYield') is not None or entry.get('yield') is not None
+            if any(
+                value is not None
+                for value in (
+                    entry.get('windowYield'),
+                    entry.get('truePartYield'),
+                    entry.get('rawPartYield'),
+                )
+            )
         ]
         if len(yields) < 2:
             continue
@@ -4030,8 +4072,8 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
         'benchmarking': benchmarking,
         'companyAverages': {
             'windowYield': company_window_yield,
-            'partYield': company_part_yield,
-            'yield': company_yield,
+            'rawPartYield': company_raw_part_yield,
+            'truePartYield': company_true_part_yield,
             'falseCallsPerBoard': company_fc_rate,
             'falseCallPpm': company_false_call_ppm,
             'falseCallDpm': company_false_call_dpm,
@@ -4055,16 +4097,19 @@ def _generate_line_report_charts(payload: dict) -> dict[str, str]:
     fig, ax = plt.subplots(figsize=(8, 4))
     if metrics:
         lines = [m['line'] for m in metrics]
-        yields = [
-            m.get('windowYield')
-            if m.get('windowYield') is not None
-            else m.get('partYield') or 0.0
-            for m in metrics
-        ]
-        ax.bar(lines, yields, color='teal')
-        ax.set_ylabel('Window Yield %')
-        ax.set_title('Window Yield by Line')
-        ax.tick_params(axis='x', rotation=45)
+        x = list(range(len(lines)))
+        width = 0.25
+        window_yields = [m.get('windowYield') or 0.0 for m in metrics]
+        true_part_yields = [m.get('truePartYield') or 0.0 for m in metrics]
+        raw_part_yields = [m.get('rawPartYield') or 0.0 for m in metrics]
+        ax.bar([i - width for i in x], window_yields, width, label='Window Yield', color='teal')
+        ax.bar(x, true_part_yields, width, label='True Part Yield', color='slateblue')
+        ax.bar([i + width for i in x], raw_part_yields, width, label='Raw Part Yield', color='darkorange')
+        ax.set_xticks(x)
+        ax.set_xticklabels(lines, rotation=45)
+        ax.set_ylabel('Yield %')
+        ax.set_title('Yield by Line')
+        ax.legend(loc='best')
     charts['lineYieldImg'] = _fig_to_data_uri(fig)
 
     fig, ax = plt.subplots(figsize=(8, 4))
@@ -4110,25 +4155,27 @@ def _generate_line_report_charts(payload: dict) -> dict[str, str]:
     plotted = False
     for trend in trends:
         entries = trend.get('entries', [])
-        dates = [
-            entry['date']
-            for entry in entries
-            if entry.get('windowYield') is not None or entry.get('yield') is not None
-        ]
-        yields = [
-            entry['windowYield']
-            if entry.get('windowYield') is not None
-            else entry.get('yield')
-            for entry in entries
-            if entry.get('windowYield') is not None or entry.get('yield') is not None
-        ]
-        if len(dates) < 2:
+        if not entries:
             continue
-        ax.plot(dates, yields, marker='o', label=trend.get('line', 'Line'))
-        plotted = True
+        dates = [entry.get('date') for entry in entries]
+        series = [
+            ('Window Yield', [entry.get('windowYield') for entry in entries]),
+            ('True Part Yield', [entry.get('truePartYield') for entry in entries]),
+            ('Raw Part Yield', [entry.get('rawPartYield') for entry in entries]),
+        ]
+        for label_suffix, values in series:
+            if sum(value is not None for value in values) < 2:
+                continue
+            ax.plot(
+                dates,
+                values,
+                marker='o',
+                label=f"{trend.get('line', 'Line')} {label_suffix}",
+            )
+            plotted = True
     if plotted:
-        ax.set_ylabel('Window Yield %')
-        ax.set_title('Window Yield Trend by Line')
+        ax.set_ylabel('Yield %')
+        ax.set_title('Yield Trends by Line')
         ax.tick_params(axis='x', rotation=45)
         ax.legend(loc='best')
     charts['lineTrendImg'] = _fig_to_data_uri(fig)
