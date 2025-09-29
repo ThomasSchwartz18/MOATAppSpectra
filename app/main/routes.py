@@ -3456,19 +3456,14 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
             report_date,
             line,
             model_name,
-            assembly,
             ppm_total_boards,
             ppm_total_parts,
-            ppm_false_calls,
+            ppm_falsecall_parts,
             ppm_ng_parts,
             dpm_total_boards,
             dpm_total_windows,
             dpm_ng_windows,
-            dpm_false_calls,
-            defect_name,
-            ppm_falsecall_ppm,
-            dpm_falsecall_dpm,
-            dpm_dpm
+            dpm_falsecall_windows
         from aoi_base_daily
         where (%(start_date)s is null or report_date >= %(start_date)s)
           and (%(end_date)s is null or report_date <= %(end_date)s)
@@ -3564,6 +3559,7 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                     'false_calls',
                     'falseCalls',
                     'ppm_false_calls',
+                    'ppm_falsecall_parts',
                 )
                 ng_parts = _extract_number(
                     row,
@@ -3630,6 +3626,7 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                     'fc_windows',
                     'falseCallWindows',
                     'dpm_false_calls',
+                    'dpm_falsecall_windows',
                 )
                 dpm_value = _extract_number(
                     row,
@@ -3654,19 +3651,44 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                     'ppm_falsecall_ppm',
                     default=None,
                 )
+                parts_value = parts or 0.0
+                boards_value = boards or 0.0
+                fc_parts_value = fc_parts or 0.0
+                ng_parts_value = ng_parts or 0.0
+                windows_value = windows or 0.0
+                ng_windows_value = ng_windows or 0.0
+                fc_windows_value = fc_windows or 0.0
+
+                if ppm_value is None and parts_value:
+                    ppm_value = _safe_ratio(fc_parts_value, parts_value) * 1_000_000
+
+                if fc_dpm_value is None and windows_value:
+                    fc_dpm_value = _safe_ratio(fc_windows_value, windows_value) * 1_000_000
+
+                if dpm_value is None:
+                    if windows_value:
+                        dpm_value = (
+                            _safe_ratio(ng_windows_value, windows_value) * 1_000_000
+                        )
+                    elif parts_value:
+                        confirmed_value = max(0.0, ng_parts_value - fc_parts_value)
+                        dpm_value = (
+                            _safe_ratio(confirmed_value, parts_value) * 1_000_000
+                        )
+
                 defect_name = (
                     row.get('Defect Name')
                     or row.get('Defect')
                     or row.get('defect_name')
                 )
 
-                bucket['total_parts'] += parts or 0.0
-                bucket['total_boards'] += boards or 0.0
-                bucket['false_call_parts'] += fc_parts or 0.0
-                bucket['ng_parts'] += ng_parts or 0.0
-                bucket['total_windows'] += windows or 0.0
-                bucket['ng_windows'] += ng_windows or 0.0
-                bucket['false_call_windows'] += fc_windows or 0.0
+                bucket['total_parts'] += parts_value
+                bucket['total_boards'] += boards_value
+                bucket['false_call_parts'] += fc_parts_value
+                bucket['ng_parts'] += ng_parts_value
+                bucket['total_windows'] += windows_value
+                bucket['ng_windows'] += ng_windows_value
+                bucket['false_call_windows'] += fc_windows_value
 
                 if ppm_value:
                     bucket['ppm_values'].append(ppm_value)
@@ -3678,46 +3700,49 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                 if dt:
                     bucket['dates'].add(dt)
                     day_bucket = line_daily[line][dt]
-                    day_bucket['parts'] += parts or 0.0
-                    day_bucket['boards'] += boards or 0.0
-                    day_bucket['false_calls'] += fc_parts or 0.0
-                    day_bucket['ng_parts'] += ng_parts or 0.0
-                    day_bucket['windows'] += windows or 0.0
-                    day_bucket['ng_windows'] += ng_windows or 0.0
-                    day_bucket['fc_windows'] += fc_windows or 0.0
+                    day_bucket['parts'] += parts_value
+                    day_bucket['boards'] += boards_value
+                    day_bucket['false_calls'] += fc_parts_value
+                    day_bucket['ng_parts'] += ng_parts_value
+                    day_bucket['windows'] += windows_value
+                    day_bucket['ng_windows'] += ng_windows_value
+                    day_bucket['fc_windows'] += fc_windows_value
 
                 asm_bucket = assembly_line[assembly][line]
-                asm_bucket['total_parts'] += parts or 0.0
-                asm_bucket['false_calls'] += fc_parts or 0.0
-                asm_bucket['ng_parts'] += ng_parts or 0.0
-                asm_bucket['boards'] += boards or 0.0
-                asm_bucket['windows'] += windows or 0.0
-                asm_bucket['ng_windows'] += ng_windows or 0.0
-                asm_bucket['fc_windows'] += fc_windows or 0.0
+                asm_bucket['total_parts'] += parts_value
+                asm_bucket['false_calls'] += fc_parts_value
+                asm_bucket['ng_parts'] += ng_parts_value
+                asm_bucket['boards'] += boards_value
+                asm_bucket['windows'] += windows_value
+                asm_bucket['ng_windows'] += ng_windows_value
+                asm_bucket['fc_windows'] += fc_windows_value
 
                 if defect_name:
                     defect = str(defect_name).strip() or 'Unknown'
-                    asm_bucket['defects'][defect] += ng_windows or 0.0
-                    bucket['defects'][defect] += ng_windows or 0.0
+                    asm_bucket['defects'][defect] += ng_windows_value
+                    bucket['defects'][defect] += ng_windows_value
+                elif ng_windows_value:
+                    asm_bucket['defects']['Unknown'] += ng_windows_value
+                    bucket['defects']['Unknown'] += ng_windows_value
 
                 if dt:
                     asm_bucket['dates'].add(dt)
                     asm_day = assembly_daily[assembly][line][dt]
-                    asm_day['parts'] += parts or 0.0
-                    asm_day['false_calls'] += fc_parts or 0.0
-                    asm_day['ng_parts'] += ng_parts or 0.0
-                    asm_day['boards'] += boards or 0.0
-                    asm_day['windows'] += windows or 0.0
-                    asm_day['ng_windows'] += ng_windows or 0.0
-                    asm_day['fc_windows'] += fc_windows or 0.0
+                    asm_day['parts'] += parts_value
+                    asm_day['false_calls'] += fc_parts_value
+                    asm_day['ng_parts'] += ng_parts_value
+                    asm_day['boards'] += boards_value
+                    asm_day['windows'] += windows_value
+                    asm_day['ng_windows'] += ng_windows_value
+                    asm_day['fc_windows'] += fc_windows_value
 
-                overall['total_parts'] += parts or 0.0
-                overall['false_calls'] += fc_parts or 0.0
-                overall['ng_parts'] += ng_parts or 0.0
-                overall['total_boards'] += boards or 0.0
-                overall['total_windows'] += windows or 0.0
-                overall['ng_windows'] += ng_windows or 0.0
-                overall['false_call_windows'] += fc_windows or 0.0
+                overall['total_parts'] += parts_value
+                overall['false_calls'] += fc_parts_value
+                overall['ng_parts'] += ng_parts_value
+                overall['total_boards'] += boards_value
+                overall['total_windows'] += windows_value
+                overall['ng_windows'] += ng_windows_value
+                overall['false_call_windows'] += fc_windows_value
 
     def _line_metrics(line: str, info: dict[str, object]) -> dict[str, object]:
         parts = info['total_parts']
