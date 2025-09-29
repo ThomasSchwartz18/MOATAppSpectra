@@ -21,6 +21,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 import re
 import json
+import sqlite3
 from datetime import datetime, date, timezone, timedelta
 from zoneinfo import ZoneInfo
 from openpyxl import load_workbook
@@ -2812,6 +2813,124 @@ def dpm_saved_queries():
     if error:
         abort(500, description=error)
     return jsonify(data), status
+
+
+@main_bp.route('/analysis/dpm/fallback_chart', methods=['GET'])
+@feature_required('analysis_dpm')
+def dpm_run_fallback_chart():
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+
+    chart_id = request.args.get('id')
+    if not chart_id:
+        abort(400, description="Chart id is required")
+
+    definitions = _load_local_dpm_saved_charts()
+    definition = next((item for item in definitions if item.get('id') == chart_id), None)
+    if not definition:
+        abort(404, description=f"Unknown fallback chart '{chart_id}'")
+
+    data, error = fetch_moat_dpm()
+    if error:
+        abort(500, description=error)
+    rows = data or []
+
+    sql = definition.get('sql') or ''
+    result_rows: list[dict] = []
+    params: dict[str, str] = {}
+    if sql and rows:
+        placeholders = set(re.findall(r':([A-Za-z_][\w]*)', sql))
+        min_date: datetime | None = None
+        max_date: datetime | None = None
+        for row in rows:
+            for key in ('Report Date', 'report_date'):
+                value = row.get(key)
+                if not value:
+                    continue
+                try:
+                    dt = datetime.fromisoformat(str(value))
+                except ValueError:
+                    continue
+                if min_date is None or dt < min_date:
+                    min_date = dt
+                if max_date is None or dt > max_date:
+                    max_date = dt
+        default_from = (min_date.date().isoformat() if min_date else '1970-01-01')
+        default_to = ((max_date + timedelta(days=1)).date().isoformat() if max_date else '2100-01-01')
+        for name in placeholders:
+            if name == 'from':
+                params['from'] = (
+                    request.args.get('from')
+                    or request.args.get('start')
+                    or default_from
+                )
+            elif name == 'to':
+                params['to'] = (
+                    request.args.get('to')
+                    or request.args.get('end')
+                    or default_to
+                )
+            else:
+                value = request.args.get(name) or request.args.get(name.lower())
+                if value in (None, ''):
+                    abort(400, description=f"Parameter '{name}' is required for chart '{chart_id}'")
+                params[name] = value
+        conn: sqlite3.Connection | None = None
+        try:
+            conn = sqlite3.connect(':memory:')
+            conn.row_factory = sqlite3.Row
+            columns = sorted({key for row in rows for key in row.keys()})
+            if columns:
+                def _quote(col: str) -> str:
+                    return '"' + str(col).replace('"', '""') + '"'
+
+                type_map: dict[str, str] = {col: 'REAL' for col in columns}
+                for row in rows:
+                    for col in columns:
+                        val = row.get(col)
+                        if val is None:
+                            continue
+                        if isinstance(val, (int, float)) and not isinstance(val, bool):
+                            continue
+                        try:
+                            float(val)
+                        except (TypeError, ValueError):
+                            type_map[col] = 'TEXT'
+                quoted_cols = [_quote(col) for col in columns]
+                create_sql = ", ".join(f"{name} {type_map[col]}" for name, col in zip(quoted_cols, columns))
+                conn.execute(f"CREATE TABLE moat_dpm ({create_sql})")
+                insert_sql = (
+                    f"INSERT INTO moat_dpm ({', '.join(quoted_cols)}) VALUES ({', '.join(['?'] * len(columns))})"
+                )
+                for row in rows:
+                    values = [row.get(col) for col in columns]
+                    conn.execute(insert_sql, values)
+                conn.commit()
+                cursor = conn.execute(sql, params)
+                result_rows = [dict(item) for item in cursor.fetchall()]
+            else:
+                result_rows = []
+        except sqlite3.Error as exc:  # pragma: no cover - fallback execution errors
+            abort(500, description=f'Failed to execute chart SQL: {exc}')
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:  # pragma: no cover - close failures
+                    pass
+    else:
+        result_rows = []
+
+    payload = {
+        'id': chart_id,
+        'name': definition.get('name'),
+        'description': definition.get('description'),
+        'chart_type': definition.get('chart_type'),
+        'mappings': definition.get('mappings') or {},
+        'rows': result_rows,
+        'notes': definition.get('notes'),
+    }
+    return jsonify(payload)
 
 
 @main_bp.route('/analysis/ppm', methods=['GET'])

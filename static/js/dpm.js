@@ -128,7 +128,7 @@ function withMetaTooltip(opts, metaLookup, showTooltips = true) {
   return opts;
 }
 
-function buildOptions({ showTooltips, xTitle, yTitle, controlLimits, xTickDisplay = true, metaLookup }) {
+function buildOptions({ showTooltips, xTitle, yTitle, controlLimits, xTickDisplay = true, metaLookup, indexAxis }) {
   const opts = {
     responsive: true,
     maintainAspectRatio: false,
@@ -139,7 +139,9 @@ function buildOptions({ showTooltips, xTitle, yTitle, controlLimits, xTickDispla
     },
     controlLimits: controlLimits || null,
   };
-  return withMetaTooltip(opts, metaLookup, showTooltips);
+  const enriched = withMetaTooltip(opts, metaLookup, showTooltips);
+  if (indexAxis) enriched.indexAxis = indexAxis;
+  return enriched;
 }
 
 function renderChart(targetId, labels, values, cfg) {
@@ -248,8 +250,15 @@ function expandModal(show) {
     const meta = window.currentChartMeta || { labels: currentData.labels, datasets: currentData.datasets.length? currentData.datasets : [{ label: activePreset?.name || 'Series', data: currentData.values }], type: 'line', options: buildOptions(cfg) };
     const opts = { ...meta.options };
     if (opts.scales && opts.scales.x && opts.scales.x.ticks) opts.scales.x.ticks.display = true;
+    const plugins = [];
+    if (meta.controlLimits) {
+      opts.controlLimits = meta.controlLimits;
+      plugins.push(controlLinesPlugin);
+    } else if (activePreset?.kind === 'line-control') {
+      plugins.push(controlLinesPlugin);
+    }
     // eslint-disable-next-line no-undef
-    dpmChartExpandedInstance = new Chart(ctx, { type: meta.type, data: { labels: meta.labels, datasets: meta.datasets }, options: opts, plugins: (activePreset?.kind==='line-control' ? [controlLinesPlugin] : []) });
+    dpmChartExpandedInstance = new Chart(ctx, { type: meta.type, data: { labels: meta.labels, datasets: meta.datasets }, options: opts, plugins });
     const vals = meta.datasets[0] && Array.isArray(meta.datasets[0].data) ? meta.datasets[0].data : currentData.values;
     fillTable(meta.labels || currentData.labels, vals);
   }
@@ -296,6 +305,7 @@ function collectParamsForSave() {
 }
 
 function loadParamsIntoBuilder(row) {
+  activeFallbackChart = null;
   const params = row.params || {};
   document.getElementById('chart-title').value = params.title || '';
   document.getElementById('chart-description').value = row.description || params.description || '';
@@ -347,6 +357,12 @@ function filterSavedList() {
         runChart();
         return;
       }
+      if (isFallbackChart(r) || r.isFallback) {
+        loadFallbackDefinition(r);
+        document.getElementById('saved-chart-sql').style.display = 'none';
+        runChart();
+        return;
+      }
       if (r.kind) {
         setPreset(r.id);
         runChart();
@@ -363,18 +379,23 @@ function loadSavedQueries() {
     .then((res) => res.json())
     .then((rows) => {
       const server = Array.isArray(rows)
-        ? rows.map((r) => ({ ...r, description: r.description || r.params?.description || '' }))
+        ? rows.map((r) => ({
+            ...r,
+            description: r.description || r.params?.description || '',
+            isFallback: isFallbackChart(r),
+          }))
         : [];
-      savedQueriesCache = server;
+      savedQueriesCache = presetsList().concat(server);
       filterSavedList();
     })
     .catch(() => {
-      savedQueriesCache = [];
+      savedQueriesCache = presetsList();
       filterSavedList();
     });
 }
 
 function displaySavedChartDetails(chart) {
+  activeFallbackChart = null;
   const name = chart.name || chart.type || 'Saved Chart';
   const desc = chart.description || '';
   const mappings = chart.mappings || {};
@@ -434,18 +455,116 @@ function runChart() {
   const xSort = document.getElementById('x-cat-sort')?.value || 'alpha-asc';
   const src = document.getElementById('value-source')?.value || 'avg_false_calls_per_assembly';
 
-  const hasCustom = Boolean(
+  const builderHasCustom = Boolean(
     xCol || sCol || expr || src !== 'avg_false_calls_per_assembly' ||
     yAgg !== 'avg' || xBin !== 'none' || xSort !== 'alpha-asc'
   );
+  const fallbackSelection = activeFallbackChart;
+  let useFallback = Boolean(fallbackSelection);
+  if (useFallback && builderHasCustom) {
+    useFallback = false;
+    activeFallbackChart = null;
+  }
+  const hasCustom = !useFallback && builderHasCustom;
 
-  const runner = hasCustom ? runChartFlexible() : runPresetChart();
+  const runner = useFallback
+    ? runFallbackSavedChart(fallbackSelection)
+    : (hasCustom ? runChartFlexible() : runPresetChart());
   runner
     .then((result) => {
       const cfg = collectChartConfig();
       const canvasEl = document.getElementById('dpmChart');
 
       document.getElementById('saved-chart-sql').style.display = 'none';
+      const fallbackHost = document.getElementById('fallback-table');
+      if (fallbackHost) { fallbackHost.style.display = 'none'; fallbackHost.innerHTML = ''; }
+      canvasEl.style.display = '';
+
+      if (result && result.mode === 'fallback') {
+        if (dpmChartInstance) { dpmChartInstance.destroy(); dpmChartInstance = null; }
+        const descriptionText = activeFallbackChart?.description || description;
+        const chartTypeRaw = result.chartType || 'line';
+        if (chartTypeRaw === 'heatmap') {
+          const host = getFallbackTableHost();
+          const table = result.table || { html: '<em>No data available</em>', rowLabels: [], colLabels: [] };
+          host.innerHTML = table.html || '<em>No data available</em>';
+          host.style.display = 'block';
+          canvasEl.style.display = 'none';
+          currentData = { labels: table.rowLabels || [], values: [], datasets: [] };
+          window.currentChartMeta = null;
+          document.getElementById('dpm-info').textContent = table.rowLabels?.length
+            ? `Rows: ${table.rowLabels.length} | Cols: ${table.colLabels?.length || 0}`
+            : 'Heatmap view';
+          document.getElementById('chart-description-result').textContent = descriptionText;
+          return;
+        }
+
+        const chartType = chartTypeRaw === 'area' ? 'line' : chartTypeRaw;
+        const baseOptions = buildOptions({
+          ...cfg,
+          type: chartType,
+          xTitle: result.axisTitles?.x || cfg.xTitle,
+          yTitle: result.axisTitles?.y || cfg.yTitle,
+          metaLookup: result.metaLookup,
+          controlLimits: result.controlLimits,
+          indexAxis: result.indexAxis,
+        });
+        if (chartType === 'line' || chartType === 'bar') {
+          const container = canvasEl.parentElement;
+          const minPerLabel = 120;
+          const width = Math.max(container.clientWidth, (result.labels || []).length * minPerLabel);
+          canvasEl.style.width = width + 'px';
+        } else {
+          canvasEl.style.width = '100%';
+        }
+        const ctx = canvasEl.getContext('2d');
+        let options = baseOptions;
+        let data;
+        let plugins = [];
+        if (chartType === 'scatter' || chartType === 'bubble') {
+          options = withMetaTooltip({
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: true } },
+            scales: {
+              x: { type: 'linear', title: { display: true, text: result.axisTitles?.x || cfg.xTitle || 'X' } },
+              y: { type: 'linear', title: { display: true, text: result.axisTitles?.y || cfg.yTitle || 'Y' } },
+            },
+          }, result.metaLookup, cfg.showTooltips);
+          data = { datasets: result.datasets };
+        } else {
+          data = { labels: result.labels, datasets: result.datasets };
+          if (result.datasets.length > 1) {
+            options.plugins = options.plugins || {};
+            options.plugins.legend = { display: true };
+          }
+          if (result.controlLimits) plugins = [controlLinesPlugin];
+        }
+        // eslint-disable-next-line no-undef
+        dpmChartInstance = new Chart(ctx, { type: chartType, data, options, plugins });
+        currentData = {
+          labels: result.labels || [],
+          values: Array.isArray(result.datasets?.[0]?.data) ? result.datasets[0].data : [],
+          datasets: result.datasets,
+          metaLookup: result.metaLookup,
+        };
+        window.currentChartMeta = {
+          labels: result.labels || [],
+          datasets: result.datasets,
+          type: chartType,
+          options,
+          metaLookup: result.metaLookup,
+          controlLimits: result.controlLimits,
+        };
+        if (chartType === 'scatter' || chartType === 'bubble') {
+          document.getElementById('dpm-info').textContent = `${result.datasets?.[0]?.data?.length || 0} points`;
+        } else {
+          updateInfo(result.labels || [], currentData.values);
+        }
+        if (title) document.getElementById('modal-title').textContent = title;
+        document.getElementById('chart-description-result').textContent = descriptionText;
+        return;
+      }
 
       if (hasCustom) {
         const labels = result.labels || [];
@@ -536,7 +655,10 @@ function runChart() {
       if (title) document.getElementById('modal-title').textContent = title;
       document.getElementById('chart-description-result').textContent = description;
     })
-    .catch(() => { document.getElementById('dpm-info').textContent = 'Failed to build chart.'; });
+    .catch((err) => {
+      const message = err?.message || 'Failed to build chart.';
+      document.getElementById('dpm-info').textContent = message;
+    });
 }
 
 // Flexible builder: group by arbitrary X, optional series, aggregation choice
@@ -672,9 +794,39 @@ async function runChartFlexible() {
 
 // Presets and filter-focused charting
 let activePreset = null; // { id, name, kind, yTitle?, calc? }
+let activeFallbackChart = null;
 
 function presetsList() {
-  return [];
+  return [
+    {
+      id: 'avg_fc_per_board',
+      name: 'Avg False Calls per Board (by Model)',
+      kind: 'line-control',
+      yTitle: 'Avg False Calls/Board',
+      calc: (agg) => (agg.boardSum ? agg.fcSum / agg.boardSum : 0),
+      groupByModel: false,
+    },
+    {
+      id: 'fc_parts_per_total_parts',
+      name: 'False Call % of Program (by Model)',
+      kind: 'line-control',
+      yTitle: 'False Call % of Program',
+      calc: (agg) => (agg.partsSum ? (agg.fcSum / agg.partsSum) * 100 : 0),
+    },
+    {
+      id: 'fc_rate_per_part',
+      name: 'False Call Rate per Part (by Model)',
+      kind: 'line-control',
+      yTitle: 'False Call Rate per Part',
+      calc: (agg) => (agg.partsSum ? (agg.fcSum / agg.partsSum) : 0),
+    },
+    { id: 'fc_avg_and_ppm', name: 'Avg FC/Board + FC PPM (by Model)', kind: 'fc_avg_and_ppm' },
+    { id: 'pareto_ng_by_model', name: 'Pareto of Defects (NG Windows by Model)', kind: 'pareto' },
+    { id: 'scatter_fc_vs_ng', name: 'False Call vs True Defect (Scatter)', kind: 'scatter' },
+    { id: 'ng_rate_over_time_by_line', name: 'Defect Rate Over Time (NG PPM by Line)', kind: 'ts_ng_by_line' },
+    { id: 'fc_vs_ng_rate_over_time', name: 'False Call vs NG Rate Over Time', kind: 'ts_fc_vs_ng' },
+    { id: 'ratio_fc_to_ng', name: 'False Call / True NG Ratio (by Model)', kind: 'ratio_fc_ng' },
+  ];
 }
 
 function setPreset(id) {
@@ -684,6 +836,7 @@ function setPreset(id) {
     activePreset = null;
     return;
   }
+  activeFallbackChart = null;
   activePreset = p;
   const titleEl = document.getElementById('chart-title');
   const yEl = document.getElementById('y-title');
@@ -729,6 +882,260 @@ function uniqueSorted(arr) {
     }
   });
   return Array.from(map.values()).sort((a, b) => a.localeCompare(b));
+}
+
+function fallbackPalette(i, type = 'line') {
+  const hue = (i * 53) % 360;
+  const border = `hsl(${hue} 75% 45%)`;
+  return {
+    border,
+    background: type === 'bar' ? `hsl(${hue} 75% 65% / 0.6)` : `hsl(${hue} 75% 65% / 0.25)`,
+  };
+}
+
+function titleFromKey(key) {
+  if (!key) return '';
+  return key
+    .replace(/[_\s]+/g, ' ')
+    .replace(/\b([a-z])/g, (m, g1) => g1.toUpperCase());
+}
+
+function detectAxisType(values) {
+  const filtered = values.filter((v) => v != null && v !== '');
+  if (!filtered.length) return 'categorical';
+  const asDates = filtered.filter((v) => !Number.isNaN(Date.parse(v)));
+  if (asDates.length / filtered.length >= 0.7) return 'temporal';
+  const asNumbers = filtered.filter((v) => Number.isFinite(Number(v)));
+  if (asNumbers.length / filtered.length >= 0.7) return 'numeric';
+  return 'categorical';
+}
+
+function sortAxisValues(values, type) {
+  const unique = Array.from(new Set(values));
+  if (type === 'numeric') {
+    return unique.sort((a, b) => Number(a) - Number(b));
+  }
+  if (type === 'temporal') {
+    return unique.sort((a, b) => Date.parse(a) - Date.parse(b));
+  }
+  return unique.sort((a, b) => String(a).localeCompare(String(b)));
+}
+
+function metaFromRow(row) {
+  const meta = { date: [], line: [], model: [] };
+  const push = (key, value) => {
+    if (!value && value !== 0) return;
+    if (!meta[key].includes(value)) meta[key].push(value);
+  };
+  const dateKeys = ['d', 'date', 'report_date', 'wk'];
+  dateKeys.forEach((k) => {
+    const v = row[k];
+    if (!v) return;
+    const val = String(v);
+    push('date', val.length > 10 ? val.slice(0, 10) : val);
+  });
+  const lineKeys = ['line', 'Line'];
+  lineKeys.forEach((k) => { if (row[k]) push('line', String(row[k])); });
+  const modelKeys = ['model_name', 'Model Name', 'model', 'assembly', 'Assembly'];
+  modelKeys.forEach((k) => { if (row[k]) push('model', String(row[k])); });
+  return meta;
+}
+
+function buildHeatmapTable(rows, mappings) {
+  const rowKey = mappings.row;
+  const colKey = mappings.col;
+  const valueKey = mappings.value;
+  const rowLabels = uniqueSorted(rows.map((r) => r[rowKey]));
+  const colLabels = uniqueSorted(rows.map((r) => r[colKey]));
+  const lookup = new Map();
+  rows.forEach((row) => {
+    const r = row[rowKey];
+    const c = row[colKey];
+    if (r == null || c == null) return;
+    lookup.set(`${r}||${c}`, Number(row[valueKey]));
+  });
+  const matrix = rowLabels.map((r) => colLabels.map((c) => lookup.get(`${r}||${c}`) ?? 0));
+  const flat = matrix.flat();
+  const max = flat.length ? Math.max(...flat.map((v) => Number(v) || 0)) : 0;
+  let html = '<table class="data-table"><thead><tr><th>'
+    + titleFromKey(rowKey)
+    + '\\'
+    + titleFromKey(colKey)
+    + '</th>'
+    + colLabels.map((c) => `<th>${c}</th>`).join('')
+    + '</tr></thead><tbody>';
+  rowLabels.forEach((label, i) => {
+    html += `<tr><td><b>${label}</b></td>`;
+    (matrix[i] || []).forEach((value) => {
+      const num = Number(value) || 0;
+      const intensity = max ? Math.min(1, Math.abs(num) / max) : 0;
+      const hue = Math.round((1 - intensity) * 120);
+      html += `<td style="background:hsl(${hue} 70% 60% / 0.9); text-align:right;">${num.toFixed ? num.toFixed(2) : num}</td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  return { rowLabels, colLabels, matrix, html };
+}
+
+function buildFallbackChart(definition, rows) {
+  const mappings = definition.mappings || {};
+  const chartType = definition.chart_type || 'line';
+  const metaLookup = {};
+  if (!Array.isArray(rows) || rows.length === 0) {
+    if (chartType === 'heatmap') {
+      return {
+        mode: 'fallback',
+        chartType,
+        table: { rowLabels: [], colLabels: [], matrix: [], html: '<em>No data available</em>' },
+        metaLookup: {},
+        axisTitles: { x: titleFromKey(mappings.col), y: titleFromKey(mappings.row) },
+      };
+    }
+    return {
+      mode: 'fallback',
+      chartType,
+      labels: [],
+      datasets: [],
+      metaLookup: {},
+      axisTitles: { x: titleFromKey(mappings.x), y: titleFromKey(mappings.y) },
+      controlLimits: null,
+    };
+  }
+
+  if (chartType === 'heatmap') {
+    return {
+      mode: 'fallback',
+      chartType,
+      table: buildHeatmapTable(rows, mappings),
+      metaLookup: {},
+      axisTitles: { x: titleFromKey(mappings.col), y: titleFromKey(mappings.row) },
+    };
+  }
+
+  if (chartType === 'scatter' || chartType === 'bubble') {
+    const xKey = mappings.x;
+    const yKey = mappings.y;
+    const labelKey = mappings.label;
+    const sizeKey = mappings.size;
+    const data = rows
+      .map((row) => ({
+        x: Number(row[xKey]),
+        y: Number(row[yKey]),
+        raw: row,
+        label: labelKey ? row[labelKey] : undefined,
+        size: sizeKey ? Number(row[sizeKey]) : Number(row.boards ?? row.windows ?? row.total ?? 0),
+      }))
+      .filter((row) => Number.isFinite(row.x) && Number.isFinite(row.y));
+    const palette = fallbackPalette(0, 'line');
+    const dataset = {
+      label: definition.name || 'Series',
+      data: data.map((item) => ({
+        x: item.x,
+        y: item.y,
+        r: chartType === 'bubble' ? Math.max(4, Math.sqrt(Math.abs(item.size || 0)) || 4) : undefined,
+        label: item.label,
+      })),
+      backgroundColor: palette.background,
+      borderColor: palette.border,
+      pointRadius: chartType === 'scatter' ? 4 : undefined,
+    };
+    dataset.data.forEach((pt, idx) => {
+      const row = data[idx].raw;
+      metaLookup[`${dataset.label}||${pt.x}-${pt.y}`] = metaFromRow(row);
+    });
+    return {
+      mode: 'fallback',
+      chartType,
+      labels: [],
+      datasets: [dataset],
+      metaLookup,
+      axisTitles: { x: titleFromKey(xKey), y: titleFromKey(yKey) },
+    };
+  }
+
+  const xKey = mappings.x;
+  const yKey = mappings.y;
+  const seriesKey = mappings.series;
+  const filteredRows = rows.filter((row) => row[xKey] != null && row[yKey] != null);
+  const xValues = filteredRows.map((row) => row[xKey]);
+  const axisType = detectAxisType(xValues);
+  const labels = sortAxisValues(xValues, axisType);
+  const seriesMap = new Map();
+  filteredRows.forEach((row) => {
+    const series = seriesKey ? String(row[seriesKey] ?? 'Series') : 'Series';
+    if (!seriesMap.has(series)) seriesMap.set(series, new Map());
+    const map = seriesMap.get(series);
+    const key = row[xKey];
+    map.set(key, { value: Number(row[yKey]), meta: metaFromRow(row) });
+  });
+  const datasets = [];
+  let seriesIndex = 0;
+  seriesMap.forEach((map, series) => {
+    const palette = fallbackPalette(seriesIndex++, chartType === 'bar' || chartType === 'bar_horizontal' ? 'bar' : 'line');
+    const data = labels.map((label) => {
+      const entry = map.get(label);
+      if (entry) {
+        metaLookup[`${series}||${label}`] = entry.meta;
+        return Number.isFinite(entry.value) ? entry.value : null;
+      }
+      return null;
+    });
+    const base = {
+      label: series,
+      data,
+      borderColor: palette.border,
+      backgroundColor: palette.background,
+      fill: false,
+      tension: 0.15,
+      spanGaps: true,
+    };
+    if (chartType === 'bar' || chartType === 'bar_horizontal') {
+      base.borderWidth = 1;
+      base.tension = 0;
+      base.spanGaps = false;
+    }
+    datasets.push(base);
+  });
+  const control = (chartType === 'line_with_bands')
+    ? computeControlLimits(datasets.flatMap((d) => d.data.filter((v) => Number.isFinite(v))))
+    : null;
+  return {
+    mode: 'fallback',
+    chartType: chartType === 'line_with_bands' ? 'line' : (chartType === 'bar_horizontal' ? 'bar' : chartType),
+    labels,
+    datasets,
+    metaLookup,
+    axisTitles: { x: titleFromKey(xKey), y: titleFromKey(yKey) },
+    controlLimits: control,
+    indexAxis: chartType === 'bar_horizontal' ? 'y' : undefined,
+  };
+}
+
+function getFallbackTableHost() {
+  let host = document.getElementById('fallback-table');
+  if (!host) {
+    host = document.createElement('div');
+    host.id = 'fallback-table';
+    host.className = 'preview-info';
+    host.style.marginTop = '4px';
+    host.style.display = 'none';
+    const pre = document.getElementById('saved-chart-sql');
+    pre.parentNode.insertBefore(host, pre);
+  }
+  return host;
+}
+
+function isFallbackChart(row) {
+  return !!(row && row.sql && row.chart_type);
+}
+
+function loadFallbackDefinition(row) {
+  activeFallbackChart = row;
+  activePreset = null;
+  document.getElementById('chart-title').value = row.name || '';
+  document.getElementById('chart-description').value = row.description || '';
+  document.getElementById('chart-description-result').textContent = row.description || '';
 }
 
 function initFiltersUI() {
@@ -1119,6 +1526,26 @@ async function runPresetChart() {
   }
 
   return { kind:'line-control', labels:[], values:[], limits:{ mean:0,ucl:0,lcl:0 }, metaLookup:{} };
+}
+
+async function runFallbackSavedChart(definition) {
+  if (!definition || !definition.id) {
+    return { mode: 'fallback', chartType: 'none', labels: [], datasets: [], metaLookup: {} };
+  }
+  const filters = readFilters();
+  const { start, end } = getDateInputs();
+  const params = new URLSearchParams({ id: definition.id });
+  if (start) params.set('from', start);
+  if (end) params.set('to', end);
+  if (filters.assembly) params.set('model', filters.assembly);
+  const url = `/analysis/dpm/fallback_chart?${params.toString()}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(text || 'Failed to run saved chart');
+  }
+  const payload = await res.json();
+  return buildFallbackChart(payload, payload.rows || []);
 }
 
 // Infer simple types and populate encoding dropdowns
