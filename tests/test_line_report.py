@@ -213,90 +213,75 @@ def app_instance(monkeypatch):
 
 
 def test_line_report_api_returns_expected_metrics(app_instance, monkeypatch):
-    ppm_rows = [
-        {
-            "Report Date": "2024-07-01",
-            "Line": "L1",
-            "Model Name": "AsmA",
-            "Total Parts": 100,
-            "Total Boards": 10,
-            "FalseCall Parts": 5,
-            "NG Parts": 15,
+    grouped_rows = {
+        "2024-07-01": {
+            "L1": [
+                {
+                    "report_date": "2024-07-01",
+                    "line": "L1",
+                    "Model Name": "AsmA",
+                    "Total Parts": 100,
+                    "Total Boards": 10,
+                    "FalseCall Parts": 5,
+                    "NG Parts": 15,
+                    "Total Windows": 200,
+                    "NG Windows": 10,
+                    "FalseCall Windows": 4,
+                }
+            ],
+            "L2": [
+                {
+                    "report_date": "2024-07-01",
+                    "line": "L2",
+                    "Model Name": "AsmA",
+                    "Total Parts": 80,
+                    "Total Boards": 8,
+                    "FalseCall Parts": 2,
+                    "NG Parts": 6,
+                    "Total Windows": 80,
+                    "NG Windows": 5,
+                    "FalseCall Windows": 1,
+                }
+            ],
         },
-        {
-            "Report Date": "2024-07-01",
-            "Line": "L2",
-            "Model Name": "AsmA",
-            "Total Parts": 80,
-            "Total Boards": 8,
-            "FalseCall Parts": 2,
-            "NG Parts": 6,
+        "2024-07-02": {
+            "L1": [
+                {
+                    "report_date": "2024-07-02",
+                    "line": "L1",
+                    "Model Name": "AsmB",
+                    "Total Parts": 120,
+                    "Total Boards": 12,
+                    "FalseCall Parts": 3,
+                    "NG Parts": 8,
+                    "Total Windows": 120,
+                    "NG Windows": 6,
+                    "FalseCall Windows": 3,
+                }
+            ],
         },
-        {
-            "Report Date": "2024-07-02",
-            "Line": "L1",
-            "Model Name": "AsmB",
-            "Total Parts": 120,
-            "Total Boards": 12,
-            "FalseCall Parts": 3,
-            "NG Parts": 8,
+        "2024-07-03": {
+            "L3": [
+                {
+                    "report_date": "2024-07-03",
+                    "line": "L3",
+                    "Model Name": "AsmC",
+                    "Total Parts": 50,
+                    "Total Boards": 5,
+                    "FalseCall Parts": 1,
+                    "NG Parts": 4,
+                }
+            ]
         },
-        {
-            "Report Date": "2024-07-03",
-            "Line": "L3",
-            "Model Name": "AsmC",
-            "Total Parts": 50,
-            "Total Boards": 5,
-            "FalseCall Parts": 1,
-            "NG Parts": 4,
-        },
-    ]
-    dpm_rows = [
-        {
-            "Report Date": "2024-07-01",
-            "Line": "L1",
-            "Model Name": "AsmA",
-            "Total Windows": 200,
-            "NG Windows": 10,
-            "FalseCall Windows": 4,
-            "DPM": 50000,
-            "FC DPM": 20000,
-        },
-        {
-            "Report Date": "2024-07-02",
-            "Line": "L1",
-            "Model Name": "AsmB",
-            "Total Windows": 120,
-            "NG Windows": 6,
-            "FalseCall Windows": 3,
-            "DPM": 50000,
-            "FC DPM": 25000,
-        },
-        {
-            "Report Date": "2024-07-01",
-            "Line": "L2",
-            "Model Name": "AsmA",
-            "Total Windows": 80,
-            "NG Windows": 5,
-            "FalseCall Windows": 1,
-            "DPM": 62500,
-            "FC DPM": 12500,
-        },
-    ]
+    }
 
-    ppm_calls: list[tuple[date | None, date | None]] = []
-    dpm_calls: list[tuple[date | None, date | None]] = []
+    query_calls: list[tuple[str, dict[str, object] | None]] = []
 
-    def _fetch_moat(start_date=None, end_date=None):
-        ppm_calls.append((start_date, end_date))
-        return ppm_rows, None
+    def _query(sql, params=None):
+        query_calls.append((sql, params))
+        return grouped_rows, None
 
-    def _fetch_moat_dpm(start_date=None, end_date=None):
-        dpm_calls.append((start_date, end_date))
-        return dpm_rows, None
-
-    monkeypatch.setattr(routes, "fetch_moat", _fetch_moat)
-    monkeypatch.setattr(routes, "fetch_moat_dpm", _fetch_moat_dpm)
+    monkeypatch.setattr(routes, "query_aoi_base_daily", _query)
 
     client = app_instance.test_client()
     with app_instance.app_context():
@@ -308,8 +293,11 @@ def test_line_report_api_returns_expected_metrics(app_instance, monkeypatch):
 
     assert response.status_code == 200
     payload = response.get_json()
-    assert ppm_calls == [(date(2024, 7, 1), date(2024, 7, 5))]
-    assert dpm_calls == [(date(2024, 7, 1), date(2024, 7, 5))]
+    assert query_calls and "aoi_base_daily" in query_calls[0][0]
+    assert query_calls[0][1] == {
+        "start_date": "2024-07-01",
+        "end_date": "2024-07-05",
+    }
     assert payload["lineMetrics"]
     metrics = {item["line"]: item for item in payload["lineMetrics"]}
     assert pytest.approx(metrics["L1"]["windowYield"], rel=1e-3) == 95.0
@@ -364,54 +352,41 @@ def test_line_report_api_returns_expected_metrics(app_instance, monkeypatch):
 
 
 def test_build_line_report_payload_uses_windows_per_board_fallback(monkeypatch):
-    ppm_rows = [
-        {
-            "Report Date": "2024-08-01",
-            "Line": "L1",
-            "Model Name": "AsmX",
-            "Total Parts": 100,
-            "Total Boards": 5,
-            "FalseCall Parts": 3,
-            "NG Parts": 7,
-        },
-        {
-            "Report Date": "2024-08-01",
-            "Line": "L2",
-            "Model Name": "AsmX",
-            "Total Parts": 80,
-            "Total Boards": 4,
-            "FalseCall Parts": 1,
-            "NG Parts": 3,
-        },
-    ]
+    grouped_rows = {
+        "2024-08-01": {
+            "L1": [
+                {
+                    "report_date": "2024-08-01",
+                    "line": "L1",
+                    "Model Name": "AsmX",
+                    "Total Parts": 100,
+                    "Total Boards": 5,
+                    "FalseCall Parts": 3,
+                    "NG Parts": 7,
+                    "Windows per board": 40,
+                    "NG Windows": 4,
+                    "FalseCall Windows": 1,
+                }
+            ],
+            "L2": [
+                {
+                    "report_date": "2024-08-01",
+                    "line": "L2",
+                    "Model Name": "AsmX",
+                    "Total Parts": 80,
+                    "Total Boards": 4,
+                    "FalseCall Parts": 1,
+                    "NG Parts": 3,
+                    "Total Windows": 160,
+                    "NG Windows": 6,
+                    "FalseCall Windows": 2,
+                }
+            ],
+        }
+    }
 
-    dpm_rows = [
-        {
-            "Report Date": "2024-08-01",
-            "Line": "L1",
-            "Model Name": "AsmX",
-            "Windows per board": 40,
-            "Total Boards": 5,
-            "NG Windows": 4,
-            "FalseCall Windows": 1,
-            "DPM": 20000,
-            "FC DPM": 5000,
-        },
-        {
-            "Report Date": "2024-08-01",
-            "Line": "L2",
-            "Model Name": "AsmX",
-            "Total Windows": 160,
-            "NG Windows": 6,
-            "FalseCall Windows": 2,
-            "DPM": 37500,
-            "FC DPM": 12500,
-        },
-    ]
-
-    monkeypatch.setattr(routes, "fetch_moat", lambda *args, **kwargs: (ppm_rows, None))
     monkeypatch.setattr(
-        routes, "fetch_moat_dpm", lambda *args, **kwargs: (dpm_rows, None)
+        routes, "query_aoi_base_daily", lambda *args, **kwargs: (grouped_rows, None)
     )
 
     payload = routes.build_line_report_payload()
@@ -442,110 +417,89 @@ def test_build_line_report_payload_handles_multi_month_range(monkeypatch):
     start = date(2024, 1, 1)
     end = date(2024, 3, 31)
 
-    ppm_rows = [
-        {
-            "Report Date": "2024-01-15",
-            "Line": "L1",
-            "Model Name": "AsmA",
-            "Total Parts": 100,
-            "Total Boards": 10,
-            "FalseCall Parts": 5,
-            "NG Parts": 10,
-            "FalseCall PPM": 1500,
+    grouped_rows = {
+        "2024-01-15": {
+            "L1": [
+                {
+                    "report_date": "2024-01-15",
+                    "line": "L1",
+                    "Model Name": "AsmA",
+                    "Total Parts": 100,
+                    "Total Boards": 10,
+                    "FalseCall Parts": 5,
+                    "NG Parts": 10,
+                    "Total Windows": 200,
+                    "NG Windows": 10,
+                    "FalseCall Windows": 4,
+                }
+            ],
         },
-        {
-            "Report Date": "2024-02-15",
-            "Line": "L1",
-            "Model Name": "AsmA",
-            "Total Parts": 90,
-            "Total Boards": 9,
-            "FalseCall Parts": 4,
-            "NG Parts": 9,
-            "FalseCall PPM": 1400,
+        "2024-02-15": {
+            "L1": [
+                {
+                    "report_date": "2024-02-15",
+                    "line": "L1",
+                    "Model Name": "AsmA",
+                    "Total Parts": 90,
+                    "Total Boards": 9,
+                    "FalseCall Parts": 4,
+                    "NG Parts": 9,
+                    "Total Windows": 180,
+                    "NG Windows": 9,
+                    "FalseCall Windows": 3,
+                }
+            ],
         },
-        {
-            "Report Date": "2024-03-15",
-            "Line": "L1",
-            "Model Name": "AsmA",
-            "Total Parts": 110,
-            "Total Boards": 11,
-            "FalseCall Parts": 6,
-            "NG Parts": 11,
-            "FalseCall PPM": 1600,
+        "2024-03-15": {
+            "L1": [
+                {
+                    "report_date": "2024-03-15",
+                    "line": "L1",
+                    "Model Name": "AsmA",
+                    "Total Parts": 110,
+                    "Total Boards": 11,
+                    "FalseCall Parts": 6,
+                    "NG Parts": 11,
+                    "Total Windows": 220,
+                    "NG Windows": 11,
+                    "FalseCall Windows": 5,
+                }
+            ],
         },
-        {
-            "Report Date": "2024-04-01",
-            "Line": "L1",
-            "Model Name": "AsmA",
-            "Total Parts": 120,
-            "Total Boards": 12,
-            "FalseCall Parts": 7,
-            "NG Parts": 12,
-            "FalseCall PPM": 1700,
+        "2024-04-01": {
+            "L1": [
+                {
+                    "report_date": "2024-04-01",
+                    "line": "L1",
+                    "Model Name": "AsmA",
+                    "Total Parts": 120,
+                    "Total Boards": 12,
+                    "FalseCall Parts": 7,
+                    "NG Parts": 12,
+                    "Total Windows": 240,
+                    "NG Windows": 12,
+                    "FalseCall Windows": 6,
+                }
+            ],
         },
-    ]
+    }
 
-    dpm_rows = [
-        {
-            "Report Date": "2024-01-15",
-            "Line": "L1",
-            "Model Name": "AsmA",
-            "Total Windows": 200,
-            "NG Windows": 10,
-            "FalseCall Windows": 4,
-            "DPM": 50000,
-            "FC DPM": 20000,
-        },
-        {
-            "Report Date": "2024-02-15",
-            "Line": "L1",
-            "Model Name": "AsmA",
-            "Total Windows": 180,
-            "NG Windows": 9,
-            "FalseCall Windows": 3,
-            "DPM": 45000,
-            "FC DPM": 18000,
-        },
-        {
-            "Report Date": "2024-03-15",
-            "Line": "L1",
-            "Model Name": "AsmA",
-            "Total Windows": 220,
-            "NG Windows": 11,
-            "FalseCall Windows": 5,
-            "DPM": 55000,
-            "FC DPM": 22000,
-        },
-        {
-            "Report Date": "2024-04-01",
-            "Line": "L1",
-            "Model Name": "AsmA",
-            "Total Windows": 240,
-            "NG Windows": 12,
-            "FalseCall Windows": 6,
-            "DPM": 60000,
-            "FC DPM": 24000,
-        },
-    ]
+    query_calls: list[tuple[str, dict[str, object] | None]] = []
 
-    ppm_calls: list[tuple[date | None, date | None]] = []
-    dpm_calls: list[tuple[date | None, date | None]] = []
+    def _query(sql, params=None):
+        query_calls.append((sql, params))
+        return grouped_rows, None
 
-    def _fetch_moat(start_date=None, end_date=None):
-        ppm_calls.append((start_date, end_date))
-        return ppm_rows, None
-
-    def _fetch_moat_dpm(start_date=None, end_date=None):
-        dpm_calls.append((start_date, end_date))
-        return dpm_rows, None
-
-    monkeypatch.setattr(routes, "fetch_moat", _fetch_moat)
-    monkeypatch.setattr(routes, "fetch_moat_dpm", _fetch_moat_dpm)
+    monkeypatch.setattr(routes, "query_aoi_base_daily", _query)
 
     payload = routes.build_line_report_payload(start, end)
 
-    assert ppm_calls == [(start, end)]
-    assert dpm_calls == [(start, end)]
+    assert len(query_calls) == 1
+    assert "aoi_base_daily" in query_calls[0][0]
+    assert query_calls[0][1] == {
+        "start_date": start.isoformat(),
+        "end_date": end.isoformat(),
+    }
 
     metrics = {item["line"]: item for item in payload["lineMetrics"]}
     l1_metrics = metrics["L1"]

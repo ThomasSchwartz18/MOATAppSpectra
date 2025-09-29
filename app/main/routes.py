@@ -46,6 +46,7 @@ from app.db import (
     fetch_app_user_credentials,
     fetch_app_users,
     fetch_fi_reports,
+    query_aoi_base_daily,
     fetch_moat,
     fetch_moat_dpm,
     fetch_recent_moat,
@@ -3450,12 +3451,39 @@ def _safe_ratio(num: float, den: float) -> float:
 
 
 def build_line_report_payload(start: date | None = None, end: date | None = None) -> dict:
-    ppm_rows, error = fetch_moat(start_date=start, end_date=end)
+    line_report_sql = """
+        select
+            report_date,
+            line,
+            model_name,
+            assembly,
+            total_boards,
+            total_parts,
+            falsecall_parts,
+            ng_parts,
+            total_windows,
+            ng_windows,
+            falsecall_windows,
+            windows_per_board,
+            defect_name,
+            falsecall_ppm,
+            fc_dpm,
+            dpm
+        from aoi_base_daily
+        where (%(start_date)s is null or report_date >= %(start_date)s)
+          and (%(end_date)s is null or report_date <= %(end_date)s)
+    """
+
+    params = {
+        "start_date": start.isoformat() if start else None,
+        "end_date": end.isoformat() if end else None,
+    }
+
+    grouped_rows, error = query_aoi_base_daily(line_report_sql, params)
     if error:
         abort(500, description=error)
-    dpm_rows, error = fetch_moat_dpm(start_date=start, end_date=end)
-    if error:
-        abort(500, description=error)
+
+    grouped_rows = grouped_rows or {}
 
     line_totals: dict[str, dict[str, object]] = defaultdict(_line_bucket)
     line_daily: dict[str, dict[date, dict[str, float]]] = defaultdict(
@@ -3487,121 +3515,196 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
             return False
         return True
 
-    for row in ppm_rows or []:
-        dt = _coerce_date_key(row, 'Report Date', 'report_date')
+    def _extract_number(
+        row: dict, *keys: str, default: float | None = 0.0
+    ) -> float | None:
+        for key in keys:
+            if key in row:
+                return _coerce_number(row.get(key), default=default)
+        return default
+
+    for date_key, line_map in grouped_rows.items():
+        dt = _parse_date(date_key)
         if start or end:
             if not _within_range(dt):
                 continue
-        line = _normalize_line_name(row.get('Line') or row.get('line'))
-        assembly = _normalize_assembly_name(row)
-        parts = _coerce_number(row.get('Total Parts') or row.get('total_parts'))
-        boards = _coerce_number(row.get('Total Boards') or row.get('total_boards'))
-        fc_parts = _coerce_number(
-            row.get('FalseCall Parts') or row.get('falsecall_parts')
-        )
-        ng_parts = _coerce_number(row.get('NG Parts') or row.get('ng_parts'))
-        ppm_value = _coerce_number(row.get('FalseCall PPM') or row.get('falsecall_ppm'))
 
-        bucket = line_totals[line]
-        bucket['total_parts'] += parts
-        bucket['total_boards'] += boards
-        bucket['false_call_parts'] += fc_parts
-        bucket['ng_parts'] += ng_parts
-        if ppm_value:
-            bucket['ppm_values'].append(ppm_value)
-        if dt:
-            bucket['dates'].add(dt)
-            day_bucket = line_daily[line][dt]
-            day_bucket['parts'] += parts
-            day_bucket['boards'] += boards
-            day_bucket['false_calls'] += fc_parts
-            day_bucket['ng_parts'] += ng_parts
-
-        asm_bucket = assembly_line[assembly][line]
-        asm_bucket['total_parts'] += parts
-        asm_bucket['false_calls'] += fc_parts
-        asm_bucket['ng_parts'] += ng_parts
-        asm_bucket['boards'] += boards
-        if dt:
-            asm_bucket['dates'].add(dt)
-            asm_day = assembly_daily[assembly][line][dt]
-            asm_day['parts'] += parts
-            asm_day['false_calls'] += fc_parts
-            asm_day['ng_parts'] += ng_parts
-            asm_day['boards'] += boards
-
-        overall['total_parts'] += parts
-        overall['false_calls'] += fc_parts
-        overall['ng_parts'] += ng_parts
-        overall['total_boards'] += boards
-
-    for row in dpm_rows or []:
-        dt = _coerce_date_key(row, 'Report Date', 'report_date')
-        if start or end:
-            if not _within_range(dt):
+        for raw_line, records in line_map.items():
+            if not records:
                 continue
-        line = _normalize_line_name(row.get('Line') or row.get('line'))
-        assembly = _normalize_assembly_name(row)
-        windows_value = row.get('Total Windows')
-        if windows_value is None:
-            windows_value = row.get('total_windows')
-        windows = _coerce_number(windows_value, default=None)
 
-        if windows in (None, 0.0):
-            wpb_value = row.get('Windows per board')
-            if wpb_value is None:
-                wpb_value = row.get('windows_per_board')
-            boards_value = row.get('Total Boards')
-            if boards_value is None:
-                boards_value = row.get('total_boards')
-            windows_per_board = _coerce_number(wpb_value, default=None)
-            total_boards = _coerce_number(boards_value, default=None)
-            if windows_per_board is not None and total_boards is not None:
-                windows = windows_per_board * total_boards
+            line = _normalize_line_name(raw_line)
+            bucket = line_totals[line]
+            day_bucket = line_daily[line][dt] if dt else None
 
-        if windows is None:
-            windows = 0.0
-        ng_windows = _coerce_number(row.get('NG Windows') or row.get('ng_windows'))
-        fc_windows = _coerce_number(
-            row.get('FalseCall Windows') or row.get('falsecall_windows')
-        )
-        dpm_value = _coerce_number(row.get('DPM') or row.get('dpm'))
-        fc_dpm = _coerce_number(row.get('FC DPM') or row.get('fc_dpm'))
-        defect_name = row.get('Defect Name') or row.get('Defect') or row.get('defect_name')
+            for row in records:
+                assembly = _normalize_assembly_name(row)
+                parts = _extract_number(
+                    row,
+                    'Total Parts',
+                    'total_parts',
+                    'parts',
+                    'totalParts',
+                )
+                boards = _extract_number(
+                    row,
+                    'Total Boards',
+                    'total_boards',
+                    'boards',
+                    'totalBoards',
+                )
+                fc_parts = _extract_number(
+                    row,
+                    'FalseCall Parts',
+                    'falsecall_parts',
+                    'false_call_parts',
+                    'false_calls',
+                    'falseCalls',
+                )
+                ng_parts = _extract_number(
+                    row,
+                    'NG Parts',
+                    'ng_parts',
+                    'ngParts',
+                    'ng_parts_total',
+                )
 
-        bucket = line_totals[line]
-        bucket['total_windows'] += windows
-        bucket['ng_windows'] += ng_windows
-        bucket['false_call_windows'] += fc_windows
-        if dpm_value:
-            bucket['dpm_values'].append(dpm_value)
-        if fc_dpm:
-            bucket['fc_dpm_values'].append(fc_dpm)
-        if dt:
-            bucket['dates'].add(dt)
-            day_bucket = line_daily[line][dt]
-            day_bucket['windows'] += windows
-            day_bucket['ng_windows'] += ng_windows
-            day_bucket['fc_windows'] += fc_windows
+                windows = _extract_number(
+                    row,
+                    'Total Windows',
+                    'total_windows',
+                    'windows',
+                    'totalWindows',
+                    default=None,
+                )
 
-        asm_bucket = assembly_line[assembly][line]
-        asm_bucket['windows'] += windows
-        asm_bucket['ng_windows'] += ng_windows
-        asm_bucket['fc_windows'] += fc_windows
-        if defect_name:
-            defect = str(defect_name).strip() or 'Unknown'
-            asm_bucket['defects'][defect] += ng_windows or 0.0
-            bucket['defects'][defect] += ng_windows or 0.0
-        if dt:
-            asm_bucket['dates'].add(dt)
-            asm_day = assembly_daily[assembly][line][dt]
-            asm_day['windows'] += windows
-            asm_day['ng_windows'] += ng_windows
-            asm_day['fc_windows'] += fc_windows
+                if windows in (None, 0.0):
+                    windows_per_board = _extract_number(
+                        row,
+                        'Windows per board',
+                        'windows_per_board',
+                        'windowsPerBoard',
+                        default=None,
+                    )
+                    boards_value = (
+                        boards
+                        if boards
+                        else _extract_number(
+                            row,
+                            'Total Boards',
+                            'total_boards',
+                            'boards',
+                            'totalBoards',
+                            default=None,
+                        )
+                    )
+                    if (
+                        windows_per_board is not None
+                        and boards_value is not None
+                    ):
+                        windows = windows_per_board * boards_value
 
-        overall['total_windows'] += windows
-        overall['ng_windows'] += ng_windows
-        overall['false_call_windows'] += fc_windows
+                if windows is None:
+                    windows = 0.0
+
+                ng_windows = _extract_number(
+                    row,
+                    'NG Windows',
+                    'ng_windows',
+                    'ngWindows',
+                )
+                fc_windows = _extract_number(
+                    row,
+                    'FalseCall Windows',
+                    'falsecall_windows',
+                    'false_call_windows',
+                    'fc_windows',
+                    'falseCallWindows',
+                )
+                dpm_value = _extract_number(
+                    row,
+                    'DPM',
+                    'dpm',
+                    'defect_dpm',
+                    default=None,
+                )
+                fc_dpm_value = _extract_number(
+                    row,
+                    'FC DPM',
+                    'fc_dpm',
+                    default=None,
+                )
+                ppm_value = _extract_number(
+                    row,
+                    'FalseCall PPM',
+                    'falsecall_ppm',
+                    'false_call_ppm',
+                    default=None,
+                )
+                defect_name = (
+                    row.get('Defect Name')
+                    or row.get('Defect')
+                    or row.get('defect_name')
+                )
+
+                bucket['total_parts'] += parts or 0.0
+                bucket['total_boards'] += boards or 0.0
+                bucket['false_call_parts'] += fc_parts or 0.0
+                bucket['ng_parts'] += ng_parts or 0.0
+                bucket['total_windows'] += windows or 0.0
+                bucket['ng_windows'] += ng_windows or 0.0
+                bucket['false_call_windows'] += fc_windows or 0.0
+
+                if ppm_value:
+                    bucket['ppm_values'].append(ppm_value)
+                if dpm_value:
+                    bucket['dpm_values'].append(dpm_value)
+                if fc_dpm_value:
+                    bucket['fc_dpm_values'].append(fc_dpm_value)
+
+                if dt:
+                    bucket['dates'].add(dt)
+                    day_bucket = line_daily[line][dt]
+                    day_bucket['parts'] += parts or 0.0
+                    day_bucket['boards'] += boards or 0.0
+                    day_bucket['false_calls'] += fc_parts or 0.0
+                    day_bucket['ng_parts'] += ng_parts or 0.0
+                    day_bucket['windows'] += windows or 0.0
+                    day_bucket['ng_windows'] += ng_windows or 0.0
+                    day_bucket['fc_windows'] += fc_windows or 0.0
+
+                asm_bucket = assembly_line[assembly][line]
+                asm_bucket['total_parts'] += parts or 0.0
+                asm_bucket['false_calls'] += fc_parts or 0.0
+                asm_bucket['ng_parts'] += ng_parts or 0.0
+                asm_bucket['boards'] += boards or 0.0
+                asm_bucket['windows'] += windows or 0.0
+                asm_bucket['ng_windows'] += ng_windows or 0.0
+                asm_bucket['fc_windows'] += fc_windows or 0.0
+
+                if defect_name:
+                    defect = str(defect_name).strip() or 'Unknown'
+                    asm_bucket['defects'][defect] += ng_windows or 0.0
+                    bucket['defects'][defect] += ng_windows or 0.0
+
+                if dt:
+                    asm_bucket['dates'].add(dt)
+                    asm_day = assembly_daily[assembly][line][dt]
+                    asm_day['parts'] += parts or 0.0
+                    asm_day['false_calls'] += fc_parts or 0.0
+                    asm_day['ng_parts'] += ng_parts or 0.0
+                    asm_day['boards'] += boards or 0.0
+                    asm_day['windows'] += windows or 0.0
+                    asm_day['ng_windows'] += ng_windows or 0.0
+                    asm_day['fc_windows'] += fc_windows or 0.0
+
+                overall['total_parts'] += parts or 0.0
+                overall['false_calls'] += fc_parts or 0.0
+                overall['ng_parts'] += ng_parts or 0.0
+                overall['total_boards'] += boards or 0.0
+                overall['total_windows'] += windows or 0.0
+                overall['ng_windows'] += ng_windows or 0.0
+                overall['false_call_windows'] += fc_windows or 0.0
 
     def _line_metrics(line: str, info: dict[str, object]) -> dict[str, object]:
         parts = info['total_parts']
