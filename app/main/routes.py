@@ -23,7 +23,7 @@ import re
 import json
 import sqlite3
 from datetime import datetime, date, timezone, timedelta
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from openpyxl import load_workbook
 import xlrd
 import base64
@@ -98,6 +98,27 @@ def _load_report_css() -> str:
     except OSError as exc:  # pragma: no cover - log & fall back to default styling
         current_app.logger.warning("Unable to load report CSS: %s", exc)
     return ""
+
+
+def _report_timezone():
+    """Return the timezone used for report timestamps.
+
+    Prefers the configured ``LOCAL_TIMEZONE`` (defaulting to America/New_York)
+    and falls back to UTC if the zone cannot be loaded.
+    """
+
+    tz_name = current_app.config.get("LOCAL_TIMEZONE") or "America/New_York"
+    try:
+        return ZoneInfo(tz_name)
+    except ZoneInfoNotFoundError:
+        current_app.logger.warning(
+            "Timezone %s unavailable; falling back to UTC", tz_name
+        )
+    except Exception as exc:  # pragma: no cover - unexpected zoneinfo failures
+        current_app.logger.warning(
+            "Error loading timezone %s: %s; falling back to UTC", tz_name, exc
+        )
+    return timezone.utc
 
 
 def _load_local_dpm_saved_charts() -> list[dict]:
@@ -4657,7 +4678,7 @@ def export_line_report():
     report_id = _get('report_id')
     contact = _get('contact', 'tschwartz@4spectra.com')
     confidentiality = _get('confidentiality', 'Spectra-Tech • Confidential')
-    generated_at = datetime.now(ZoneInfo('EST')).strftime('%Y-%m-%d %H:%M:%S %Z')
+    generated_at = datetime.now(_report_timezone()).strftime('%Y-%m-%d %H:%M:%S %Z')
 
     report_css = _load_report_css()
 
@@ -4770,7 +4791,7 @@ def export_integrated_report():
     report_id = _get('report_id')
     contact = _get('contact', 'tschwartz@4spectra.com')
     confidentiality = _get('confidentiality', 'Spectra-Tech • Confidential')
-    generated_at = datetime.now(ZoneInfo('EST')).strftime('%Y-%m-%d %H:%M:%S %Z')
+    generated_at = datetime.now(_report_timezone()).strftime('%Y-%m-%d %H:%M:%S %Z')
 
     if show_summary:
         payload.setdefault(
@@ -4851,7 +4872,7 @@ def export_aoi_daily_report():
     assembly = request.args.get('assembly') or None
 
     start = end = day.isoformat()
-    generated_at = datetime.now(ZoneInfo('EST')).strftime('%Y-%m-%d %H:%M:%S %Z')
+    generated_at = datetime.now(_report_timezone()).strftime('%Y-%m-%d %H:%M:%S %Z')
     contact = request.args.get('contact', 'tschawtz@4spectra.com')
 
     payload = build_aoi_daily_report_payload(day, operator, assembly)
@@ -5319,7 +5340,7 @@ def export_operator_report():
     report_id = _get('report_id')
     contact = _get('contact', 'tschwartz@4spectra.com')
     confidentiality = _get('confidentiality', 'Spectra-Tech • Confidential')
-    generated_at = datetime.now(ZoneInfo('EST')).strftime('%Y-%m-%d %H:%M:%S %Z')
+    generated_at = datetime.now(_report_timezone()).strftime('%Y-%m-%d %H:%M:%S %Z')
 
     if show_summary:
         payload.setdefault(
