@@ -9,6 +9,46 @@
       </div>
     </div>
   </div>
+  {% set summary = linePeriodSummary or {} %}
+  {% set header = summary.get('overall') %}
+  {% if header %}
+  <div class="kpi-row metrics-kpi-row">
+    <div class="kpi-metric">
+      <span>Window Yield</span>
+      <strong>
+        {% if header.window_yield_pct is not none %}
+          {{ '%.2f'|format(header.window_yield_pct) }}%
+        {% else %}
+          --
+        {% endif %}
+      </strong>
+    </div>
+    <div class="kpi-metric">
+      <span>True Part Yield</span>
+      <strong>
+        {% if header.true_part_yield_pct is not none %}
+          {{ '%.2f'|format(header.true_part_yield_pct) }}%
+        {% else %}
+          --
+        {% endif %}
+      </strong>
+    </div>
+    <div class="kpi-metric">
+      <span>False Calls / Board</span>
+      <strong>{{ '%.2f'|format(header.fc_per_board or 0) }}</strong>
+    </div>
+    <div class="kpi-metric">
+      <span>Defects / Board</span>
+      <strong>
+        {% if header.defects_per_board is not none %}
+          {{ '%.2f'|format(header.defects_per_board) }}
+        {% else %}
+          --
+        {% endif %}
+      </strong>
+    </div>
+  </div>
+  {% endif %}
   <table class="data-table">
     <thead>
       <tr>
