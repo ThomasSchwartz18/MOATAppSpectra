@@ -34,6 +34,7 @@ def _sample_line_payload():
                 "totalWindows": 1500,
                 "totalParts": 1200,
                 "totalBoards": 80,
+                "falseCalls": 8,
                 "ngParts": 25,
                 "ngWindows": 18,
                 "windowsPerBoard": 18.75,
@@ -168,10 +169,10 @@ def _mock_line_report(monkeypatch):
 
     chart_data = base64.b64encode(b"chart").decode()
     charts = {
-        "lineYieldImg": f"data:image/png;base64,{chart_data}",
-        "lineFalseCallImg": f"data:image/png;base64,{chart_data}",
-        "linePpmImg": f"data:image/png;base64,{chart_data}",
-        "lineTrendImg": f"data:image/png;base64,{chart_data}",
+        "lineYieldOverlayImg": f"data:image/png;base64,{chart_data}",
+        "lineFalseCallSmallMultiplesImg": f"data:image/png;base64,{chart_data}",
+        "lineDefectSmallMultiplesImg": f"data:image/png;base64,{chart_data}",
+        "linePpmDpmComparisonImg": f"data:image/png;base64,{chart_data}",
     }
 
     def _charts(payload):

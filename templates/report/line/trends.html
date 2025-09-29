@@ -1,10 +1,28 @@
 <section class="report-section">
   <h2>Trend Insights</h2>
-  <div class="chart-block">
-    <h3>Yield Trend by Line</h3>
-    <img src="{{ lineTrendImg }}" alt="Yield Trend by Line" />
-    <div class="chart-summary">
-      <p>Yield performance by line across the selected period.</p>
+  <div class="chart-grid chart-grid--single">
+    <div class="chart-block chart-block--wide">
+      <h3>False Call PPM vs Defect DPM</h3>
+      <img src="{{ linePpmDpmComparisonImg }}" alt="False Call PPM versus Defect DPM" />
+      <div class="chart-summary">
+        <p>Dual-axis comparison of false-call intensity against confirmed defect rates.</p>
+      </div>
+    </div>
+  </div>
+  <div class="chart-grid chart-grid--two">
+    <div class="chart-block">
+      <h3>False Calls per Board</h3>
+      <img src="{{ lineFalseCallSmallMultiplesImg }}" alt="False Calls per Board small multiples" />
+      <div class="chart-summary">
+        <p>Small-multiple view of false-call rates for each AOI line.</p>
+      </div>
+    </div>
+    <div class="chart-block">
+      <h3>Defects per Board</h3>
+      <img src="{{ lineDefectSmallMultiplesImg }}" alt="Defects per Board small multiples" />
+      <div class="chart-summary">
+        <p>Line-by-line trend of confirmed defects normalized per board.</p>
+      </div>
     </div>
   </div>
   <div class="kpi-grid">

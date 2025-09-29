@@ -358,9 +358,25 @@ pre,
     align-items: stretch;
 }
 
+.chart-grid--single {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+.chart-grid--two {
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+}
+
 .chart-grid .chart-block {
     width: 100%;
     height: auto;
+}
+
+.chart-block--wide {
+    grid-column: 1 / -1;
+}
+
+.chart-block--wide img {
+    max-height: none;
 }
 
 .table-grid .data-table {

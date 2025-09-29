@@ -1,25 +1,11 @@
 <section class="report-section">
   <h2>Line-Level Performance</h2>
-  <div class="chart-grid">
-    <div class="chart-block">
-      <h3>Yield by Line</h3>
-      <img src="{{ lineYieldImg }}" alt="Yield by Line" />
+  <div class="chart-grid chart-grid--single">
+    <div class="chart-block chart-block--wide">
+      <h3>Yield Performance</h3>
+      <img src="{{ lineYieldOverlayImg }}" alt="Yield performance over time" />
       <div class="chart-summary">
-        <p>Yield performance across AOI lines.</p>
-      </div>
-    </div>
-    <div class="chart-block">
-      <h3>False Calls by Line</h3>
-      <img src="{{ lineFalseCallImg }}" alt="False Calls by Line" />
-      <div class="chart-summary">
-        <p>False-call rate per board.</p>
-      </div>
-    </div>
-    <div class="chart-block">
-      <h3>PPM vs DPM</h3>
-      <img src="{{ linePpmImg }}" alt="PPM vs DPM" />
-      <div class="chart-summary">
-        <p>Comparison of false-call PPM and confirmed-defect DPM.</p>
+        <p>Composite window, true-part, and raw-part yields for the selected period.</p>
       </div>
     </div>
   </div>
@@ -27,90 +13,20 @@
     <thead>
       <tr>
         <th>Line</th>
-        <th>Window Yield %</th>
-        <th>True Part Yield %</th>
-        <th>Raw Part Yield %</th>
-        <th>Confirmed Defects</th>
-        <th>NG Parts</th>
-        <th>NG Windows</th>
-        <th>False Calls / Board</th>
-        <th>Windows / Board</th>
-        <th>Defects / Board</th>
-        <th>False Call PPM</th>
-        <th>False Call DPM</th>
-        <th>Defect DPM</th>
-        <th>Boards / Day</th>
-        <th>Total Windows</th>
+        <th>Total Boards</th>
         <th>Total Parts</th>
+        <th>NG Parts</th>
+        <th>False Calls</th>
       </tr>
     </thead>
     <tbody>
       {% for metric in lineMetrics %}
       <tr>
         <td>{{ metric.line }}</td>
-        <td>
-          {% if metric.windowYield is not none %}
-            {{ metric.windowYield|round(2) }}
-          {% else %}
-            --
-          {% endif %}
-        </td>
-        <td>
-          {% if metric.truePartYield is not none %}
-            {{ metric.truePartYield|round(2) }}
-          {% else %}
-            --
-          {% endif %}
-        </td>
-        <td>
-          {% if metric.rawPartYield is not none %}
-            {{ metric.rawPartYield|round(2) }}
-          {% else %}
-            --
-          {% endif %}
-        </td>
-        <td>{{ metric.confirmedDefects|round(0) }}</td>
-        <td>{{ metric.ngParts|round(0) }}</td>
-        <td>{{ metric.ngWindows|round(0) }}</td>
-        <td>{{ metric.falseCallsPerBoard|round(2) }}</td>
-        <td>
-          {% if metric.windowsPerBoard is not none %}
-            {{ metric.windowsPerBoard|round(2) }}
-          {% else %}
-            --
-          {% endif %}
-        </td>
-        <td>
-          {% if metric.defectsPerBoard is not none %}
-            {{ metric.defectsPerBoard|round(2) }}
-          {% else %}
-            --
-          {% endif %}
-        </td>
-        <td>
-          {% if metric.falseCallPpm is not none %}
-            {{ metric.falseCallPpm|round(2) }}
-          {% else %}
-            --
-          {% endif %}
-        </td>
-        <td>
-          {% if metric.falseCallDpm is not none %}
-            {{ metric.falseCallDpm|round(2) }}
-          {% else %}
-            --
-          {% endif %}
-        </td>
-        <td>
-          {% if metric.defectDpm is not none %}
-            {{ metric.defectDpm|round(2) }}
-          {% else %}
-            --
-          {% endif %}
-        </td>
-        <td>{{ metric.boardsPerDay|round(2) }}</td>
-        <td>{{ metric.totalWindows|round(0) }}</td>
+        <td>{{ metric.totalBoards|round(0) }}</td>
         <td>{{ metric.totalParts|round(0) }}</td>
+        <td>{{ metric.ngParts|round(0) }}</td>
+        <td>{{ metric.falseCalls|round(0) }}</td>
       </tr>
       {% endfor %}
     </tbody>
