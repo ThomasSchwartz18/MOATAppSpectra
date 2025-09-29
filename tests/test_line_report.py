@@ -1,5 +1,6 @@
 import base64
 import copy
+import math
 import os
 import sys
 from datetime import date
@@ -352,6 +353,67 @@ def test_line_report_api_returns_expected_metrics(app_instance, monkeypatch):
     assert day1["windowsPerBoard"] == pytest.approx(20.0)
     assert day1["defectsPerBoard"] == pytest.approx(1.0)
 
+
+def test_line_report_api_sanitizes_non_finite_numbers(app_instance, monkeypatch):
+    grouped_rows = {
+        "2024-07-01": {
+            "L1": [
+                {
+                    "report_date": "2024-07-01",
+                    "line": "L1",
+                    "model_name": "AsmA",
+                    "Total Parts": "NaN",
+                    "Total Boards": "Infinity",
+                    "FalseCall Parts": "-Inf",
+                    "NG Parts": "nan",
+                    "Total Windows": "Infinity",
+                    "dpm_total_boards": "Infinity",
+                    "dpm_total_windows": "-Infinity",
+                    "dpm_ng_windows": "NaN",
+                    "dpm_falsecall_windows": "+Infinity",
+                },
+                {
+                    "report_date": "2024-07-01",
+                    "line": "L1",
+                    "model_name": "AsmA",
+                    "Total Parts": 100,
+                    "Total Boards": 10,
+                    "FalseCall Parts": 2,
+                    "NG Parts": 4,
+                    "Total Windows": 200,
+                    "dpm_total_boards": 10,
+                    "dpm_total_windows": 200,
+                    "dpm_ng_windows": 5,
+                    "dpm_falsecall_windows": 3,
+                },
+            ]
+        }
+    }
+
+    monkeypatch.setattr(
+        routes, "query_aoi_base_daily", lambda *args, **kwargs: (grouped_rows, None)
+    )
+
+    client = app_instance.test_client()
+    with app_instance.app_context():
+        with client.session_transaction() as sess:
+            sess["username"] = "tester"
+        response = client.get("/api/reports/line")
+
+    assert response.status_code == 200
+    payload = response.get_json()
+
+    metrics = payload.get("lineMetrics", [])
+    assert metrics
+    for metric in metrics:
+        for value in metric.values():
+            if isinstance(value, (int, float)):
+                assert math.isfinite(value)
+
+    averages = payload.get("companyAverages", {})
+    for value in averages.values():
+        if isinstance(value, (int, float)):
+            assert math.isfinite(value)
 
 def test_build_line_report_payload_uses_windows_per_board_fallback(monkeypatch):
     grouped_rows = {

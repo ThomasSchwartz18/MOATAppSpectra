@@ -265,10 +265,30 @@ def _coerce_number(value, *, default=0.0):
     if not text:
         return default
 
+    lowered = text.lower()
+    invalid_tokens = {
+        'nan',
+        '+nan',
+        '-nan',
+        'inf',
+        '+inf',
+        '-inf',
+        'infinity',
+        '+infinity',
+        '-infinity',
+    }
+    if lowered in invalid_tokens:
+        return default
+
     try:
-        return float(text)
+        number = float(text)
     except (TypeError, ValueError):
         return default
+
+    if math.isnan(number) or math.isinf(number):
+        return default
+
+    return number
 
 
 def _aoi_passed(row):
