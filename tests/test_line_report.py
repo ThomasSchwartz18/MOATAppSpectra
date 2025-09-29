@@ -249,6 +249,8 @@ def test_line_report_export_html_includes_charts(app_instance, monkeypatch):
         resp = client.get("/reports/line/export?format=html")
 
     assert resp.status_code == 200
+    disposition = resp.headers.get("Content-Disposition", "")
+    assert "__line_report.html" in disposition
     html = resp.data.decode()
     assert "data:image/png;base64" in html
     assert "Benchmarking KPIs" in html

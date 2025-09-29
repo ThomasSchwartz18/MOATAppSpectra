@@ -81,6 +81,8 @@ def test_export_operator_report(app_instance, monkeypatch):
             "/reports/operator/export?format=html&start_date=2024-07-01&end_date=2024-07-02&operator=Alice"
         )
         assert resp.status_code == 200
+        disposition = resp.headers.get("Content-Disposition", "")
+        assert "240701_240702_operator_report.html" in disposition
         html = resp.data.decode()
         assert "<style>" in html
         assert "--font-body" in html
