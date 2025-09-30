@@ -1,0 +1,54 @@
+<section class="section-card">
+  <h2>Advanced Analysis</h2>
+  <div class="two-column">
+    <div>
+      <h3>Spatial Metrics</h3>
+      <ul>
+        <li>Offset μX: {{ spatialMetrics.offsets.meanX|round(3) }}</li>
+        <li>Offset μY: {{ spatialMetrics.offsets.meanY|round(3) }}</li>
+        <li>Rotation σ: {{ spatialMetrics.rotation.stdev|round(3) }}</li>
+        <li>Height σ: {{ spatialMetrics.height.stdev|round(3) }}</li>
+      </ul>
+      <h3>False Call Hotspots</h3>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Family</th>
+            <th>False Calls</th>
+            <th>Share</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in (falseCallPatterns.byFamily or [])[:6] %}
+          <tr>
+            <td>{{ row.label }}</td>
+            <td>{{ row.count }}</td>
+            <td>{{ (row.share * 100)|round(1) }}%</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div>
+      <h3>Operator &amp; Process Linkages</h3>
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>Operator</th>
+            <th>Findings</th>
+            <th>FC Rate</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in (operatorLinkages.byOperator or [])[:6] %}
+          <tr>
+            <td>{{ row.operator }}</td>
+            <td>{{ row.total }}</td>
+            <td>{{ (row.falseCallRate * 100)|round(1) }}%</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>

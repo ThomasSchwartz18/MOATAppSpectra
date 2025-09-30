@@ -1,0 +1,28 @@
+<section class="section-card">
+  <h2>Part Performance Overview</h2>
+  <p>
+    This section summarises inspection activity for the selected range
+    {{ meta.dateRange[0] or '—' }} to {{ meta.dateRange[1] or '—' }}. The dataset
+    contains {{ meta.totalRecords|default(0) }} findings across
+    {{ meta.uniquePartNumbers|default(0) }} unique part numbers spanning
+    {{ meta.uniqueAssemblies|default(0) }} assemblies.
+  </p>
+  <div class="metric-grid">
+    <div class="metric">
+      <span class="metric-label">Total Findings</span>
+      <span class="metric-value">{{ meta.totalRecords|default(0) }}</span>
+    </div>
+    <div class="metric">
+      <span class="metric-label">False Calls</span>
+      <span class="metric-value">{{ meta.totalFalseCalls|default(0) }}</span>
+    </div>
+    <div class="metric">
+      <span class="metric-label">Boards Impacted</span>
+      <span class="metric-value">{{ meta.totalBoards|default(0) }}</span>
+    </div>
+    <div class="metric">
+      <span class="metric-label">Active Operators</span>
+      <span class="metric-value">{{ meta.uniqueOperators|default(0) }}</span>
+    </div>
+  </div>
+</section>
