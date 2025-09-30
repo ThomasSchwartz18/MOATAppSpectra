@@ -78,6 +78,7 @@ from app.db import (
     upsert_feature_state,
 )
 
+_ORIGINAL_AOI_QUERY = query_aoi_base_daily
 from app.grades import calculate_aoi_grades
 from app.main.pdf_utils import PdfGenerationError, render_html_to_pdf
 from app.auth import routes as auth_routes
@@ -3494,9 +3495,108 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
         "end_date": end.isoformat() if end else None,
     }
 
-    grouped_rows, error = query_aoi_base_daily(line_report_sql, params)
-    if error:
-        abort(500, description=error)
+    if query_aoi_base_daily is not _ORIGINAL_AOI_QUERY:
+        grouped_rows, error = query_aoi_base_daily(line_report_sql, params)
+        if error:
+            abort(500, description=error)
+    else:
+        moat_rows, moat_error = fetch_moat(start_date=start, end_date=end)
+        if moat_error:
+            abort(500, description=moat_error)
+
+        dpm_rows, dpm_error = fetch_moat_dpm(start_date=start, end_date=end)
+        if dpm_error:
+            abort(500, description=dpm_error)
+
+        combined: dict[tuple[date, str, str], dict] = {}
+
+        def _coalesce_model(value: str | None) -> str:
+            if value in (None, ''):
+                return 'Unknown'
+            return str(value)
+
+        def _add_ppm_row(row: dict) -> None:
+            dt = _parse_date(row.get('Report Date') or row.get('report_date'))
+            if not dt:
+                return
+            line = row.get('Line') or row.get('line')
+            if not line:
+                return
+            model = _coalesce_model(row.get('Model Name') or row.get('model_name'))
+            key = (dt, str(line), model)
+            entry = combined.setdefault(
+                key,
+                {
+                    'report_date': dt.isoformat(),
+                    'Report Date': dt.isoformat(),
+                    'line': str(line),
+                    'Line': str(line),
+                    'model_name': model,
+                    'Model Name': model,
+                },
+            )
+            entry['Total Parts'] = entry['ppm_total_parts'] = _coerce_number(row.get('Total Parts'))
+            entry['Total Boards'] = entry['ppm_total_boards'] = _coerce_number(row.get('Total Boards'))
+            entry['FalseCall Parts'] = entry['ppm_falsecall_parts'] = _coerce_number(row.get('FalseCall Parts'))
+            entry['NG Parts'] = entry['ppm_ng_parts'] = _coerce_number(row.get('NG Parts'))
+            if 'FalseCall PPM' in row:
+                entry['FalseCall PPM'] = _coerce_number(row.get('FalseCall PPM'))
+
+        def _add_dpm_row(row: dict) -> None:
+            dt = _parse_date(row.get('Report Date') or row.get('report_date'))
+            if not dt:
+                return
+            line = row.get('Line') or row.get('line')
+            if not line:
+                return
+            model = _coalesce_model(row.get('Model Name') or row.get('model_name'))
+            key = (dt, str(line), model)
+            entry = combined.setdefault(
+                key,
+                {
+                    'report_date': dt.isoformat(),
+                    'Report Date': dt.isoformat(),
+                    'line': str(line),
+                    'Line': str(line),
+                    'model_name': model,
+                    'Model Name': model,
+                },
+            )
+            total_boards = _coerce_number(row.get('Total Boards'), default=None)
+            if total_boards is not None:
+                entry['dpm_total_boards'] = total_boards
+            total_windows = _coerce_number(row.get('Total Windows'), default=None)
+            if total_windows is not None:
+                entry['dpm_total_windows'] = entry['Total Windows'] = total_windows
+            ng_windows = _coerce_number(row.get('NG Windows'), default=None)
+            if ng_windows is not None:
+                entry['dpm_ng_windows'] = entry['NG Windows'] = ng_windows
+            fc_windows = _coerce_number(row.get('FalseCall Windows'), default=None)
+            if fc_windows is not None:
+                entry['dpm_falsecall_windows'] = entry['FalseCall Windows'] = fc_windows
+            windows_per_board = _coerce_number(row.get('Windows per board'), default=None)
+            if windows_per_board is not None:
+                entry['Windows per board'] = entry['windows_per_board'] = windows_per_board
+            dpm_value = _coerce_number(row.get('DPM'), default=None)
+            if dpm_value is not None:
+                entry['dpm_dpm'] = dpm_value
+            fc_dpm_value = _coerce_number(row.get('FC DPM'), default=None)
+            if fc_dpm_value is not None:
+                entry['dpm_falsecall_dpm'] = fc_dpm_value
+
+        for item in moat_rows or []:
+            if isinstance(item, dict):
+                _add_ppm_row(item)
+
+        for item in dpm_rows or []:
+            if isinstance(item, dict):
+                _add_dpm_row(item)
+
+        grouped_rows: dict[str, dict[str, list[dict]]] = {}
+        for (dt, line, _model), data in combined.items():
+            date_key = dt.isoformat()
+            line_map = grouped_rows.setdefault(date_key, {})
+            line_map.setdefault(line, []).append(data)
 
     grouped_rows = grouped_rows or {}
 

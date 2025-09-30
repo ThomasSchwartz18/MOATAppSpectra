@@ -45,7 +45,7 @@
               --
             {% endif %}
           </td>
-          <td>{{ metrics.falseCallsPerBoard|default(0)|round(2) }}</td>
+          <td>{{ metrics.falseCallsPerBoard|default(0, true)|round(2) }}</td>
           <td>
             {% if metrics.windowsPerBoard is not none %}
               {{ metrics.windowsPerBoard|round(2) }}
