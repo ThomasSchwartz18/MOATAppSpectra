@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<h2>Part Report</h2>
+
+<div class="section-card">
+  <div class="field-row">
+    <div class="field">
+      <label for="start-date">Start Date</label>
+      <input type="date" id="start-date" />
+    </div>
+    <div class="field">
+      <label for="end-date">End Date</label>
+      <input type="date" id="end-date" />
+    </div>
+    <button type="button" id="run-report">Run</button>
+  </div>
+</div>
+
+<section id="summary-section" class="section-card">
+  <h3>Snapshot</h3>
+  <div class="metric-grid" id="part-summary-metrics">
+    <div class="metric">
+      <span class="metric-label">Total Findings</span>
+      <span class="metric-value" id="metric-total-records">0</span>
+    </div>
+    <div class="metric">
+      <span class="metric-label">False Calls</span>
+      <span class="metric-value" id="metric-false-calls">0</span>
+    </div>
+    <div class="metric">
+      <span class="metric-label">Defects / Board</span>
+      <span class="metric-value" id="metric-defects-per-board">0</span>
+    </div>
+    <div class="metric">
+      <span class="metric-label">Unique Parts</span>
+      <span class="metric-value" id="metric-unique-parts">0</span>
+    </div>
+  </div>
+  <p id="part-report-highlight"></p>
+</section>
+
+<details id="defect-preview" class="section-card">
+  <summary>Defect Distributions</summary>
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h4>By Defect Code</h4>
+      <canvas id="defectCodeChart" height="220"></canvas>
+      <table id="defectCodeTable" class="data-table">
+        <thead>
+          <tr>
+            <th>Defect</th>
+            <th>Count</th>
+            <th>Share</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="chart-card">
+      <h4>False Call Hotspots</h4>
+      <canvas id="falseCallChart" height="220"></canvas>
+      <table id="falseCallTable" class="data-table">
+        <thead>
+          <tr>
+            <th>Grouping</th>
+            <th>False Calls</th>
+            <th>Share</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+</details>
+
+<details id="preview" class="section-card">
+  <summary>Payload Preview</summary>
+  <div class="preview-content">
+    <pre id="preview-data" class="json-preview"></pre>
+  </div>
+</details>
+
+<div id="download-controls" class="field-row" style="display:none">
+  <div class="field">
+    <label for="file-format">Format</label>
+    <select id="file-format">
+      <option value="pdf">pdf</option>
+      <option value="html">html</option>
+    </select>
+    <p class="field-note" id="file-format-note" hidden>
+      PDF downloads are available on Linux hosts that have the required PDF dependencies installed.
+    </p>
+  </div>
+  <button id="download-report">Download</button>
+  <span class="spinner" id="download-spinner" hidden></span>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script type="module" src="{{ url_for('static', filename='js/part_report.js') }}"></script>
+{% endblock %}

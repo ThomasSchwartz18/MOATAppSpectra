@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>{{ title or 'Part Report' }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/report.css') }}" />
+  <style>{{ report_css|safe }}</style>
+</head>
+<body>
+  <main class="report-page">
+    {% if show_cover %}
+      {% include 'report/line/cover.html' %}
+    {% endif %}
+    {% if show_overview %}
+      {% include 'report/part/overview.html' %}
+    {% endif %}
+    {% if show_insights %}
+      {% include 'report/part/insights_metrics.html' %}
+    {% endif %}
+    {% if show_advanced %}
+      {% include 'report/part/advanced_analysis.html' %}
+    {% endif %}
+    {% if show_calculations %}
+      {% include 'report/part/calculations.html' %}
+    {% endif %}
+    {% if show_business %}
+      {% include 'report/part/business_value.html' %}
+    {% endif %}
+  </main>
+</body>
+</html>

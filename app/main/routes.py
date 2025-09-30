@@ -55,6 +55,7 @@ from app.db import (
     fetch_dpm_saved_queries,
     fetch_saved_aoi_queries,
     fetch_saved_fi_queries,
+    fetch_part_results,
     insert_saved_query,
     insert_dpm_saved_query,
     update_saved_query,
@@ -87,7 +88,7 @@ from fi_utils import parse_fi_rejections
 # Helpers for AOI Grades analytics
 from collections import defaultdict, Counter
 from itertools import combinations
-from statistics import mean
+from statistics import mean, pstdev
 
 
 def _load_report_css() -> str:
@@ -577,6 +578,13 @@ FEATURE_REGISTRY = [
         "category": "reports",
         "description": "Line-level AOI performance, benchmarking, and synchronization insights.",
         "default_message": "The Line Report is temporarily unavailable while we finish calibrations.",
+    },
+    {
+        "slug": "reports_part",
+        "label": "Part Report",
+        "category": "reports",
+        "description": "Part-level AOI performance, spatial metrics, and false-call intelligence.",
+        "default_message": "The Part Report is temporarily unavailable while we verify data sources.",
     },
     {
         "slug": "reports_aoi_daily",
@@ -5251,6 +5259,467 @@ def build_report_payload(start=None, end=None):
         'avgBoards': avg_boards,
         'appendix': appendix,
     }
+
+
+def build_part_report_payload(
+    start: date | None = None,
+    end: date | None = None,
+    *,
+    page_size: int = 1000,
+    fetcher=None,
+) -> dict:
+    """Aggregate part-level AOI analytics for the Part Report."""
+
+    if fetcher is None:
+        fetcher = fetch_part_results
+
+    rows, error = fetcher(start_date=start, end_date=end, page_size=page_size)
+    if error:
+        abort(500, description=error)
+
+    rows = [row for row in (rows or []) if isinstance(row, dict)]
+
+    def _label(value: object, fallback: str = "Unknown") -> str:
+        if value in (None, ""):
+            return fallback
+        text = str(value).strip()
+        return text or fallback
+
+    defect_code_counter: Counter[str] = Counter()
+    component_family_counter: Counter[str] = Counter()
+    assembly_counter: Counter[str] = Counter()
+    line_counter: Counter[str] = Counter()
+    program_counter: Counter[str] = Counter()
+    part_total_counter: Counter[str] = Counter()
+    part_false_counter: Counter[str] = Counter()
+    defect_type_false_counter: Counter[str] = Counter()
+    program_false_counter: Counter[str] = Counter()
+    family_false_counter: Counter[str] = Counter()
+
+    offset_x: list[float] = []
+    offset_y: list[float] = []
+    rotation_values: list[float] = []
+    height_values: list[float] = []
+    density_values: list[float] = []
+
+    part_numbers: set[str] = set()
+    assemblies: set[str] = set()
+    lines: set[str] = set()
+    programs: set[str] = set()
+    operators: set[str] = set()
+    boards: set[str] = set()
+
+    false_calls: list[dict] = []
+
+    daily_counts: dict[date, dict[str, float]] = defaultdict(
+        lambda: {"defects": 0.0, "false_calls": 0.0}
+    )
+
+    operator_summary: dict[str, dict[str, object]] = defaultdict(
+        lambda: {
+            "total": 0.0,
+            "false_calls": 0.0,
+            "confirmed": 0.0,
+            "dispositions": Counter(),
+            "assemblies": Counter(),
+            "lines": Counter(),
+        }
+    )
+    process_summary: dict[str, dict[str, object]] = defaultdict(
+        lambda: {
+            "defects": 0.0,
+            "false_calls": 0.0,
+            "operators": Counter(),
+        }
+    )
+
+    min_date: date | None = None
+    max_date: date | None = None
+
+    for row in rows:
+        part_number = _label(row.get("part_number"))
+        assembly = _label(row.get("assembly"))
+        line_name = _label(row.get("line"))
+        program_name = _label(row.get("program"))
+        component_family = _label(row.get("component_family"))
+        defect_code = _label(row.get("defect_code"))
+        defect_type = _label(row.get("defect_type"))
+        operator = _label(row.get("operator"), "Unassigned")
+        disposition = _label(row.get("operator_disposition"), "Unreviewed")
+        confirmation = _label(row.get("operator_confirmation"), "").lower()
+
+        part_numbers.add(part_number)
+        assemblies.add(assembly)
+        lines.add(line_name)
+        programs.add(program_name)
+        operators.add(operator)
+
+        board_serial = row.get("board_serial")
+        if board_serial not in (None, ""):
+            boards.add(str(board_serial))
+
+        part_total_counter[part_number] += 1
+        defect_code_counter[defect_code] += 1
+        component_family_counter[component_family] += 1
+        assembly_counter[assembly] += 1
+        line_counter[line_name] += 1
+        program_counter[program_name] += 1
+
+        dt = _parse_date(row.get("inspection_date") or row.get("report_date"))
+        if dt:
+            stats = daily_counts[dt]
+            stats["defects"] += 1
+            min_date = min(min_date, dt) if min_date else dt
+            max_date = max(max_date, dt) if max_date else dt
+
+        offset_value = _coerce_number(row.get("offset_x"), default=None)
+        if offset_value is not None:
+            offset_x.append(offset_value)
+        offset_value = _coerce_number(row.get("offset_y"), default=None)
+        if offset_value is not None:
+            offset_y.append(offset_value)
+        rotation = _coerce_number(row.get("offset_theta") or row.get("rotation"), default=None)
+        if rotation is not None:
+            rotation_values.append(rotation)
+        height = _coerce_number(row.get("height"), default=None)
+        if height is not None:
+            height_values.append(height)
+        density = _coerce_number(row.get("defect_density"), default=None)
+        if density is not None:
+            density_values.append(density)
+
+        is_false_call = bool(row.get("false_call"))
+        if confirmation in {"confirmed", "reject", "true", "ng"}:
+            is_false_call = False
+        if is_false_call:
+            false_calls.append(row)
+            part_false_counter[part_number] += 1
+            defect_type_false_counter[defect_type] += 1
+            program_false_counter[program_name] += 1
+            family_false_counter[component_family] += 1
+            if dt:
+                daily_counts[dt]["false_calls"] += 1
+
+        bucket = operator_summary[operator]
+        bucket["total"] += 1
+        if is_false_call:
+            bucket["false_calls"] += 1
+        if confirmation in {"confirmed", "reject", "true", "ng"} or (
+            disposition.lower() in {"confirmed", "reject", "true", "ng"}
+        ):
+            bucket["confirmed"] += 1
+        bucket["dispositions"][disposition] += 1
+        bucket["assemblies"][assembly] += 1
+        bucket["lines"][line_name] += 1
+
+        process_key = f"{line_name} • {program_name}"
+        process_bucket = process_summary[process_key]
+        process_bucket["defects"] += 1
+        if is_false_call:
+            process_bucket["false_calls"] += 1
+        process_bucket["operators"][operator] += 1
+
+    def _distribution(counter: Counter[str]) -> list[dict[str, object]]:
+        total = sum(counter.values())
+        results: list[dict[str, object]] = []
+        for label, count in counter.most_common():
+            share = _safe_ratio(count, total)
+            results.append({"label": label, "count": count, "share": share})
+        return results
+
+    def _mean(values: list[float]) -> float:
+        return float(mean(values)) if values else 0.0
+
+    def _stdev(values: list[float]) -> float:
+        return float(pstdev(values)) if len(values) > 1 else 0.0
+
+    total_records = len(rows)
+    total_false_calls = len(false_calls)
+    total_boards = len(boards)
+    defects_per_board = _safe_ratio(total_records, total_boards)
+    false_calls_per_board = _safe_ratio(total_false_calls, total_boards)
+
+    time_series = [
+        {
+            "date": dt.isoformat(),
+            "defects": stats["defects"],
+            "falseCalls": stats["false_calls"],
+        }
+        for dt, stats in sorted(daily_counts.items())
+    ]
+
+    operator_rows = []
+    for name, bucket in sorted(
+        operator_summary.items(), key=lambda item: item[1]["total"], reverse=True
+    ):
+        total = bucket["total"]
+        false_count = bucket["false_calls"]
+        confirmed = bucket["confirmed"]
+        operator_rows.append(
+            {
+                "operator": name,
+                "total": total,
+                "falseCalls": false_count,
+                "confirmed": confirmed,
+                "falseCallRate": _safe_ratio(false_count, total),
+                "confirmationRate": _safe_ratio(confirmed, total),
+                "topDispositions": _distribution(bucket["dispositions"])[:5],
+                "topAssemblies": _distribution(bucket["assemblies"])[:5],
+                "topLines": _distribution(bucket["lines"])[:5],
+            }
+        )
+
+    process_rows = []
+    for key, bucket in sorted(
+        process_summary.items(), key=lambda item: item[1]["defects"], reverse=True
+    ):
+        process_rows.append(
+            {
+                "process": key,
+                "defects": bucket["defects"],
+                "falseCalls": bucket["false_calls"],
+                "falseCallRate": _safe_ratio(bucket["false_calls"], bucket["defects"]),
+                "topOperators": _distribution(bucket["operators"])[:5],
+            }
+        )
+
+    defect_by_code = _distribution(defect_code_counter)
+    family_distribution = _distribution(component_family_counter)
+    assembly_distribution = _distribution(assembly_counter)
+    line_distribution = _distribution(line_counter)
+    program_distribution = _distribution(program_counter)
+
+    false_call_patterns = {
+        "total": total_false_calls,
+        "share": _safe_ratio(total_false_calls, total_records),
+        "byPartNumber": _distribution(part_false_counter),
+        "byDefectType": _distribution(defect_type_false_counter),
+        "byProgram": _distribution(program_false_counter),
+        "byFamily": _distribution(family_false_counter),
+    }
+
+    yield_reliability = {
+        "defectsPerBoard": defects_per_board,
+        "falseCallsPerBoard": false_calls_per_board,
+        "criticalPartsPareto": _distribution(part_total_counter)[:10],
+        "dailyTrend": time_series,
+        "familyShare": family_distribution,
+        "densityMean": _mean(density_values) if density_values else 0.0,
+        "densityStdDev": _stdev(density_values) if density_values else 0.0,
+    }
+
+    spatial_metrics = {
+        "offsets": {
+            "meanX": _mean(offset_x),
+            "meanY": _mean(offset_y),
+            "absMeanX": _mean([abs(value) for value in offset_x]) if offset_x else 0.0,
+            "absMeanY": _mean([abs(value) for value in offset_y]) if offset_y else 0.0,
+            "stdevX": _stdev(offset_x),
+            "stdevY": _stdev(offset_y),
+            "samples": len(offset_x),
+        },
+        "rotation": {
+            "mean": _mean(rotation_values),
+            "stdev": _stdev(rotation_values),
+            "samples": len(rotation_values),
+        },
+        "height": {
+            "mean": _mean(height_values),
+            "stdev": _stdev(height_values),
+            "min": float(min(height_values)) if height_values else 0.0,
+            "max": float(max(height_values)) if height_values else 0.0,
+            "samples": len(height_values),
+        },
+    }
+
+    highlights: list[str] = []
+    opportunities: list[str] = []
+    business_value: list[str] = []
+
+    if defect_by_code:
+        top = defect_by_code[0]
+        highlights.append(
+            f"Defect code {top['label']} represents {top['share'] * 100:.1f}% of all detections."
+        )
+    if false_call_patterns["share"] > 0.2:
+        opportunities.append(
+            "False-call share exceeds 20%, indicating additional review automation opportunities."
+        )
+    if yield_reliability["defectsPerBoard"] > 0.0:
+        business_value.append(
+            "Reducing critical part escapes directly improves first-pass yield and lowers rework cost."
+        )
+    if not highlights:
+        highlights.append("Part-level performance remains stable across the selected period.")
+
+    meta = {
+        "totalRecords": total_records,
+        "totalFalseCalls": total_false_calls,
+        "dateRange": [
+            min_date.isoformat() if min_date else None,
+            max_date.isoformat() if max_date else None,
+        ],
+        "uniquePartNumbers": len(part_numbers),
+        "uniqueAssemblies": len(assemblies),
+        "uniquePrograms": len(programs),
+        "uniqueLines": len(lines),
+        "uniqueOperators": len(operators),
+        "totalBoards": total_boards,
+    }
+
+    return {
+        "meta": meta,
+        "defectDistributions": {
+            "byDefectCode": defect_by_code,
+            "byComponentFamily": family_distribution,
+            "byAssembly": assembly_distribution,
+            "byLine": line_distribution,
+            "byProgram": program_distribution,
+        },
+        "spatialMetrics": spatial_metrics,
+        "falseCallPatterns": false_call_patterns,
+        "yieldReliability": yield_reliability,
+        "operatorLinkages": {
+            "byOperator": operator_rows,
+            "byProcess": process_rows,
+        },
+        "timeSeries": {
+            "daily": time_series,
+        },
+        "insights": {
+            "highlights": highlights,
+            "opportunities": opportunities,
+            "businessValue": business_value,
+        },
+    }
+
+
+@main_bp.route('/api/reports/part', methods=['GET'])
+@feature_required('reports_part')
+def api_part_report():
+    """Return aggregated part-level analytics."""
+
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+
+    start = _parse_date(request.args.get('start_date'))
+    end = _parse_date(request.args.get('end_date'))
+
+    payload = build_part_report_payload(start, end)
+    payload['start'] = start.isoformat() if start else ''
+    payload['end'] = end.isoformat() if end else ''
+    return jsonify(payload)
+
+
+@main_bp.route('/reports/part', methods=['GET'])
+@feature_required('reports_part')
+def part_report():
+    """Render the Part Report landing page."""
+
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+
+    return render_template('part_report.html', username=session.get('username'))
+
+
+@main_bp.route('/reports/part/export')
+@feature_required('reports_part')
+def export_part_report():
+    if 'username' not in session:
+        return redirect(url_for('auth.login'))
+
+    start = _parse_date(request.args.get('start_date'))
+    end = _parse_date(request.args.get('end_date'))
+    start_str = start.strftime('%y%m%d') if start else ''
+    end_str = end.strftime('%y%m%d') if end else ''
+
+    payload = build_part_report_payload(start, end)
+    payload['start'] = start.isoformat() if start else ''
+    payload['end'] = end.isoformat() if end else ''
+
+    body = request.get_json(silent=True) or {}
+
+    def _get(name, default=''):
+        return request.args.get(name, body.get(name, default))
+
+    def _get_bool(name, default=True):
+        value = request.args.get(name)
+        if value is None:
+            value = body.get(name)
+        if value is None:
+            return default
+        if isinstance(value, bool):
+            return value
+        return str(value).lower() not in {'0', 'false', 'no'}
+
+    show_cover = _get_bool('show_cover')
+    show_overview = _get_bool('show_overview', default=True)
+    show_insights = _get_bool('show_insights', default=True)
+    show_advanced = _get_bool('show_advanced', default=True)
+    show_calculations = _get_bool('show_calculations', default=True)
+    show_business = _get_bool('show_business', default=True)
+
+    title = _get('title') or 'Part Report'
+    subtitle = _get('subtitle')
+    report_date = _get('report_date')
+    period = _get('period')
+    author = _get('author')
+    logo_url = _get('logo_url') or url_for(
+        'static', filename='images/company-logo.png', _external=True
+    )
+    footer_left = _get('footer_left')
+    report_id = _get('report_id')
+    contact = _get('contact', 'tschwartz@4spectra.com')
+    confidentiality = _get('confidentiality', 'Spectra-Tech • Confidential')
+    generated_at = datetime.now(_report_timezone()).strftime('%Y-%m-%d %H:%M:%S %Z')
+
+    report_css = _load_report_css()
+
+    context = {
+        'show_cover': show_cover,
+        'show_overview': show_overview,
+        'show_insights': show_insights,
+        'show_advanced': show_advanced,
+        'show_calculations': show_calculations,
+        'show_business': show_business,
+        'title': title,
+        'subtitle': subtitle,
+        'report_date': report_date,
+        'period': period,
+        'author': author,
+        'logo_url': logo_url,
+        'footer_left': footer_left,
+        'report_id': report_id,
+        'contact': contact,
+        'confidentiality': confidentiality,
+        'generated_at': generated_at,
+        'report_css': report_css,
+        **payload,
+    }
+
+    html = render_template('report/part/index.html', **context)
+
+    fmt = request.args.get('format') or 'html'
+    filename_stem = f"{start_str}_{end_str}_part_report"
+    if fmt == 'pdf':
+        try:
+            pdf = render_html_to_pdf(html, base_url=request.url_root)
+        except PdfGenerationError as exc:
+            return jsonify({'message': str(exc)}), 503
+        return send_file(
+            io.BytesIO(pdf),
+            mimetype='application/pdf',
+            download_name=f"{filename_stem}.pdf",
+            as_attachment=True,
+        )
+    if fmt == 'html':
+        return send_file(
+            io.BytesIO(html.encode('utf-8')),
+            mimetype='text/html',
+            download_name=f"{filename_stem}.html",
+            as_attachment=True,
+        )
+    return jsonify({'message': 'Unsupported format. Choose pdf or html.'}), 400
 
 
 @main_bp.route('/api/reports/line', methods=['GET'])

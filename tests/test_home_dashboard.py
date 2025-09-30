@@ -1,7 +1,10 @@
 import os
+import sys
 
 os.environ.setdefault("USER_PASSWORD", "pw")
 os.environ.setdefault("ADMIN_PASSWORD", "pw")
+
+sys.path.append(os.path.dirname(os.path.dirname(__file__)))
 
 import json
 from contextlib import contextmanager
@@ -380,6 +383,18 @@ def test_employee_portal_link_hidden_for_non_admin(app_instance):
     assert response.status_code == 200
     html = response.get_data(as_text=True)
     assert 'data-admin-employee-toggle' not in html
+
+
+def test_reports_nav_contains_part_report(app_instance):
+    client = app_instance.test_client()
+
+    _login(client)
+    response = client.get("/home")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'data-feature-slug="reports_part"' in html
+    assert 'Part Report' in html
 
 
 def test_admin_employee_portal_preview_uses_employee_layout(app_instance):

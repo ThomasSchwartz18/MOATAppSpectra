@@ -1,0 +1,29 @@
+<section class="section-card">
+  <h2>Calculations &amp; Trendlines</h2>
+  <p>
+    The chart below highlights longitudinal performance with false-call tracking.
+  </p>
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Findings</th>
+        <th>False Calls</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in (timeSeries.daily or [])[:12] %}
+      <tr>
+        <td>{{ row.date }}</td>
+        <td>{{ row.defects }}</td>
+        <td>{{ row.falseCalls }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p>
+    Defects per board: {{ yieldReliability.defectsPerBoard|round(3) }} • False calls per board:
+    {{ yieldReliability.falseCallsPerBoard|round(3) }} • Density μ:
+    {{ yieldReliability.densityMean|round(3) }}
+  </p>
+</section>

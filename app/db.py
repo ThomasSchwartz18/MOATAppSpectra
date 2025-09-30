@@ -537,6 +537,183 @@ def _fetch_paginated_rows(
     return rows
 
 
+def _normalize_part_result_row(row: dict) -> dict:
+    """Return a copy of ``row`` with standardised part analytics fields."""
+
+    def _normalized_key(key: str) -> str:
+        return (
+            str(key)
+            .strip()
+            .lower()
+            .replace(" ", "_")
+            .replace("-", "_")
+        )
+
+    def _get_value(*aliases: str, default=None):
+        for alias in aliases:
+            if alias in normalized:
+                value = normalized[alias]
+                if value not in (None, ""):
+                    return value
+        return default
+
+    def _get_string(*aliases: str) -> str | None:
+        value = _get_value(*aliases)
+        if value in (None, ""):
+            return None
+        return str(value).strip() or None
+
+    def _get_float(*aliases: str) -> float | None:
+        value = _get_value(*aliases)
+        if value in (None, ""):
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
+
+    def _get_bool(*aliases: str) -> bool | None:
+        value = _get_value(*aliases)
+        if isinstance(value, bool):
+            return value
+        if value in (None, ""):
+            return None
+        text = str(value).strip().lower()
+        if text in {"true", "1", "yes", "y", "t"}:
+            return True
+        if text in {"false", "0", "no", "n", "f"}:
+            return False
+        return None
+
+    normalized: dict[str, object] = {}
+    for key, value in (row or {}).items():
+        key_norm = _normalized_key(key)
+        if key_norm not in normalized:
+            normalized[key_norm] = value
+
+    result = dict(row or {})
+
+    date_value = _get_value("inspection_date", "report_date", "date", "inspected_date")
+    if isinstance(date_value, datetime):
+        inspection_date = date_value.date().isoformat()
+    elif isinstance(date_value, date):
+        inspection_date = date_value.isoformat()
+    else:
+        inspection_date = None
+        if date_value not in (None, ""):
+            text = str(date_value).strip()
+            if text:
+                try:
+                    inspection_date = datetime.fromisoformat(text).date().isoformat()
+                except ValueError:
+                    inspection_date = text
+
+    result["inspection_date"] = inspection_date
+    result["part_number"] = _get_string("part_number", "partno", "part_num", "pn")
+    result["board_serial"] = _get_string(
+        "board_serial",
+        "board_id",
+        "panel_serial",
+        "panel_id",
+        "board",
+    )
+    result["assembly"] = _get_string("assembly", "assembly_name", "model", "model_name")
+    result["line"] = _get_string("line", "line_name")
+    result["program"] = _get_string("program", "program_name", "recipe")
+    result["component_type"] = _get_string("component_type", "component", "componentname")
+    result["component_family"] = _get_string("component_family", "family", "componentgroup")
+    result["defect_code"] = _get_string("defect_code", "code", "defectcode")
+    result["defect_type"] = _get_string("defect_type", "type", "defectcategory")
+    result["operator"] = _get_string("operator", "operator_name", "operatorid")
+    result["operator_disposition"] = _get_string(
+        "operator_disposition",
+        "disposition",
+        "operator_result",
+        "review_result",
+    )
+    result["operator_confirmation"] = _get_string(
+        "operator_confirmation",
+        "confirmation",
+        "operator_confirmation_status",
+    )
+
+    result["offset_x"] = _get_float("offset_x", "x_offset", "delta_x")
+    result["offset_y"] = _get_float("offset_y", "y_offset", "delta_y")
+    result["offset_theta"] = _get_float("offset_theta", "theta", "rotation")
+    result["offset_z"] = _get_float("offset_z", "z_offset", "delta_z")
+    height = _get_float("height", "measured_height", "z_height")
+    if height is None:
+        height = _get_float("offset_height")
+    result["height"] = height
+
+    density = _get_float("defect_density", "density")
+    result["defect_density"] = density
+
+    false_call_flag = _get_bool("false_call", "is_false_call", "falsecall")
+    if false_call_flag is None:
+        disposition = (result.get("operator_disposition") or "").lower()
+        if disposition:
+            if "false" in disposition and "call" in disposition:
+                false_call_flag = True
+            elif disposition in {"confirmed", "ng", "reject", "scrap", "true"}:
+                false_call_flag = False
+    result["false_call"] = bool(false_call_flag)
+
+    disposition_text = (result.get("operator_disposition") or "").strip().lower()
+    if not result["operator_disposition"] and disposition_text:
+        result["operator_disposition"] = disposition_text
+
+    return result
+
+
+def fetch_part_results(
+    *,
+    start_date: date | datetime | str | None = None,
+    end_date: date | datetime | str | None = None,
+    page_size: int = 1000,
+) -> tuple[list[dict] | None, str | None]:
+    """Return normalized SMT part inspection results from Supabase."""
+
+    if page_size <= 0:
+        return None, "page_size must be greater than zero"
+
+    supabase, error = _ensure_supabase_client()
+    if error:
+        return [], error
+
+    start_value = _normalize_date_for_query(start_date)
+    end_value = _normalize_date_for_query(end_date)
+
+    try:
+        rows: list[dict] = []
+        offset = 0
+        while True:
+            query = supabase.table("part_result_table").select("*")
+            query = query.order("inspection_date")
+            if start_value:
+                query = query.gte("inspection_date", start_value)
+            if end_value:
+                query = query.lte("inspection_date", end_value)
+            query = query.range(offset, offset + page_size - 1)
+
+            response = query.execute()
+            batch = response.data or []
+            normalized_batch = [
+                _normalize_part_result_row(item)
+                for item in batch
+                if isinstance(item, dict)
+            ]
+            rows.extend(normalized_batch)
+
+            if len(batch) < page_size:
+                break
+            offset += page_size
+
+        return rows, None
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to fetch part results: {exc}"
+
+
 def fetch_moat(
     start_date: date | datetime | str | None = None,
     end_date: date | datetime | str | None = None,

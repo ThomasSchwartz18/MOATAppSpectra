@@ -2187,6 +2187,76 @@ body.employee-layout .content {
   font-weight: 600;
 }
 
+.metric-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  margin-top: 12px;
+}
+
+.metric {
+  background: #f5f7fa;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metric-label {
+  font-size: 0.85rem;
+  color: #4b5563;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.metric-value {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #0d9ba8;
+}
+
+.chart-grid {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  margin-top: 16px;
+}
+
+.chart-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 320px;
+}
+
+.chart-card canvas {
+  width: 100%;
+  flex: 1;
+}
+
+.chart-card .data-table {
+  margin-top: auto;
+}
+
+.json-preview {
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 16px;
+  border-radius: 8px;
+  overflow: auto;
+  max-height: 320px;
+  font-family: 'Source Code Pro', monospace;
+}
+
+.preview-message {
+  font-style: italic;
+}
+
 @media (max-width: 600px) {
   .bug-chat-container {
     right: 16px;
