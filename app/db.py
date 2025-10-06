@@ -1,6 +1,7 @@
 from datetime import date, datetime, timedelta, timezone
 from collections import defaultdict
 from typing import Any, Tuple
+import math
 
 from flask import current_app
 
@@ -47,6 +48,179 @@ def _apply_report_date_offset(rows: list[dict]) -> list[dict]:
             except Exception:  # pragma: no cover - parsing errors
                 continue
     return rows
+
+
+def _safe_number(value):
+    """Return ``value`` as a float when possible, otherwise ``None``."""
+
+    if value is None:
+        return None
+
+    if isinstance(value, (int, float)):
+        try:
+            number = float(value)
+        except (TypeError, ValueError):
+            return None
+        if math.isnan(number) or math.isinf(number):
+            return None
+        return number
+
+    text = str(value).strip()
+    if not text:
+        return None
+
+    text = text.replace(",", "")
+    if text.endswith("%"):
+        text = text[:-1]
+
+    try:
+        number = float(text)
+    except (TypeError, ValueError):
+        return None
+
+    if math.isnan(number) or math.isinf(number):
+        return None
+
+    return number
+
+
+def _normalize_ppm_row(row: dict) -> dict:
+    """Augment MOAT PPM rows with canonical field names."""
+
+    if not isinstance(row, dict):
+        return row
+
+    def pick(*names):
+        for name in names:
+            if name in row:
+                value = row.get(name)
+                if value not in (None, ""):
+                    return value
+        return None
+
+    def assign_numeric(target: str, *names: str) -> None:
+        if target in row:
+            return
+        raw = pick(*names)
+        number = _safe_number(raw)
+        if number is not None:
+            row[target] = number
+
+    assign_numeric("boards_in", "boards_in", "Boards In", "Total Boards", "total_boards")
+    assign_numeric("boards_out", "boards_out", "Boards Out", "Good Boards", "good_boards")
+    assign_numeric("boards_ng", "boards_ng", "Boards NG", "NG Boards", "boards_ng")
+    assign_numeric("units_in", "units_in", "Units In", "total_units", "Total Units")
+    assign_numeric("units_out", "units_out", "Units Out", "Good Units")
+    assign_numeric("units_ng", "units_ng", "Units NG", "NG Units")
+    assign_numeric("parts_total", "parts_total", "Parts Total", "Total Parts", "total_parts")
+    assign_numeric("ok_parts", "ok_parts", "OK Parts", "Good Parts", "ok_parts")
+    assign_numeric(
+        "ng_parts_true",
+        "ng_parts_true",
+        "True Defect Parts",
+        "NG Parts",
+        "ng_parts",
+    )
+    assign_numeric("fc_parts", "fc_parts", "FalseCall Parts", "falsecall_parts", "FC Parts")
+    assign_numeric("true_defect_ppm", "true_defect_ppm", "NG PPM", "true_ppm", "ng_ppm")
+    assign_numeric(
+        "false_call_ppm",
+        "false_call_ppm",
+        "FalseCall PPM",
+        "fc_ppm",
+    )
+
+    if "first_pass_yield" not in row:
+        raw = pick("first_pass_yield", "First Pass Yield", "first_pass_yield_parts")
+        number = _safe_number(raw)
+        if number is None:
+            total = _safe_number(row.get("parts_total"))
+            ok_parts = _safe_number(row.get("ok_parts"))
+            if ok_parts is None and total is not None:
+                ng_parts = _safe_number(row.get("ng_parts_true")) or 0.0
+                fc_parts = _safe_number(row.get("fc_parts")) or 0.0
+                residual = total - ng_parts - fc_parts
+                ok_parts = residual if residual >= 0 else None
+            if ok_parts is not None and total not in (None, 0):
+                number = ok_parts / total
+        if number is not None:
+            row["first_pass_yield"] = number
+
+    return row
+
+
+def _normalize_dpm_row(row: dict) -> dict:
+    """Augment MOAT DPM rows with canonical field names."""
+
+    if not isinstance(row, dict):
+        return row
+
+    def pick(*names):
+        for name in names:
+            if name in row:
+                value = row.get(name)
+                if value not in (None, ""):
+                    return value
+        return None
+
+    def assign_numeric(target: str, *names: str) -> None:
+        if target in row:
+            return
+        raw = pick(*names)
+        number = _safe_number(raw)
+        if number is not None:
+            row[target] = number
+
+    def assign_text(target: str, *names: str) -> None:
+        if target in row:
+            return
+        raw = pick(*names)
+        if raw is not None:
+            row[target] = raw
+
+    assign_numeric(
+        "opportunities_total",
+        "opportunities_total",
+        "Total Windows",
+        "total_windows",
+        "Opportunities Total",
+    )
+    assign_numeric(
+        "defect_count_true",
+        "defect_count_true",
+        "True Defect Count",
+        "NG Windows",
+        "ng_windows",
+    )
+    assign_numeric(
+        "false_call_count",
+        "false_call_count",
+        "FalseCall Windows",
+        "falsecall_windows",
+        "False Call Count",
+    )
+    assign_numeric("windows_per_board", "windows_per_board", "Windows per board")
+    assign_numeric("boards_total", "boards_total", "Total Boards", "total_boards", "Boards")
+    assign_numeric("dpm", "dpm", "DPM")
+    assign_numeric("fc_dpm", "fc_dpm", "FC DPM", "false_call_dpm")
+
+    assign_text("defect_code", "defect_code", "Defect Code", "ng_code")
+    assign_text("defect_class", "defect_class", "Defect Class")
+    assign_text("inspector_type", "inspector_type", "Inspector Type")
+
+    if row.get("dpm") is None:
+        defects = _safe_number(row.get("defect_count_true"))
+        opportunities = _safe_number(row.get("opportunities_total"))
+        if opportunities not in (None, 0) and defects is not None:
+            row["dpm"] = (defects / opportunities) * 1_000_000
+
+    if row.get("fc_dpm") is None:
+        fc = _safe_number(row.get("false_call_count"))
+        opportunities = _safe_number(row.get("opportunities_total"))
+        if opportunities not in (None, 0) and fc is not None:
+            row["fc_dpm"] = (fc / opportunities) * 1_000_000
+
+    return row
 
 
 def fetch_app_versions() -> tuple[list[dict] | None, str | None]:
@@ -736,6 +910,7 @@ def fetch_moat(
             order_column="Report Date",
         )
         data = _apply_report_date_offset(rows)
+        data = [_normalize_ppm_row(row) for row in data or []]
         return data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to fetch MOAT data: {exc}"
@@ -768,6 +943,7 @@ def fetch_moat_dpm(
             order_column="Report Date",
         )
         data = _apply_report_date_offset(rows)
+        data = [_normalize_dpm_row(row) for row in data or []]
         return data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to fetch MOAT DPM data: {exc}"

@@ -293,6 +293,143 @@ def _coerce_number(value, *, default=0.0):
     return number
 
 
+_PPM_FIELD_ALIASES: dict[str, tuple[str, ...]] = {
+    'boards_in': ('boards_in', 'Boards In', 'Total Boards', 'total_boards'),
+    'boards_out': ('boards_out', 'Boards Out', 'Good Boards', 'good_boards'),
+    'boards_ng': ('boards_ng', 'Boards NG', 'NG Boards', 'boards_ng'),
+    'units_in': ('units_in', 'Units In', 'total_units', 'Total Units'),
+    'units_out': ('units_out', 'Units Out', 'Good Units'),
+    'units_ng': ('units_ng', 'Units NG', 'NG Units'),
+    'parts_total': ('parts_total', 'Parts Total', 'Total Parts', 'total_parts'),
+    'ok_parts': ('ok_parts', 'OK Parts', 'Good Parts'),
+    'ng_parts_true': (
+        'ng_parts_true',
+        'True Defect Parts',
+        'True NG Parts',
+        'NG Parts',
+        'ng_parts',
+    ),
+    'fc_parts': ('fc_parts', 'FalseCall Parts', 'falsecall_parts', 'FC Parts'),
+    'true_defect_ppm': ('true_defect_ppm', 'NG PPM', 'true_ppm', 'ng_ppm'),
+    'false_call_ppm': ('false_call_ppm', 'FalseCall PPM', 'fc_ppm'),
+    'first_pass_yield': (
+        'first_pass_yield',
+        'First Pass Yield',
+        'first_pass_yield_parts',
+    ),
+}
+
+_DPM_FIELD_ALIASES: dict[str, tuple[str, ...]] = {
+    'opportunities_total': (
+        'opportunities_total',
+        'Total Windows',
+        'total_windows',
+        'Opportunities Total',
+    ),
+    'defect_count_true': (
+        'defect_count_true',
+        'True Defect Count',
+        'NG Windows',
+        'ng_windows',
+    ),
+    'false_call_count': (
+        'false_call_count',
+        'FalseCall Windows',
+        'falsecall_windows',
+        'False Call Count',
+    ),
+    'windows_per_board': ('windows_per_board', 'Windows per board'),
+    'boards_total': ('boards_total', 'Total Boards', 'total_boards', 'Boards'),
+    'dpm': ('dpm', 'DPM'),
+    'fc_dpm': ('fc_dpm', 'FC DPM', 'false_call_dpm'),
+    'defect_code': ('defect_code', 'Defect Code', 'ng_code'),
+    'defect_class': ('defect_class', 'Defect Class'),
+    'inspector_type': ('inspector_type', 'Inspector Type'),
+}
+
+
+def _moat_value(
+    row: dict,
+    names: tuple[str, ...] | list[str],
+    *,
+    default=None,
+    numeric: bool = True,
+):
+    """Return the first matching value from ``row`` among ``names``."""
+
+    if isinstance(names, (list, tuple)):
+        candidates = names
+    else:  # pragma: no cover - defensive branch
+        candidates = (names,)
+
+    for name in candidates:
+        if name not in row:
+            continue
+        value = row.get(name)
+        if value in (None, ''):
+            continue
+        if not numeric:
+            return value
+        return _coerce_number(value, default=default)
+    return default
+
+
+def _ppm_value(row: dict, key: str, *, default=None):
+    """Retrieve a numeric MOAT PPM metric using canonical aliases."""
+
+    aliases = _PPM_FIELD_ALIASES.get(key, (key,))
+    return _moat_value(row, aliases, default=default, numeric=True)
+
+
+def _ppm_ratio(row: dict, key: str, *, default=None):
+    """Retrieve a ratio-style PPM value (no coercion to percent)."""
+
+    value = _ppm_value(row, key, default=None)
+    if value is not None:
+        return value
+    if key == 'first_pass_yield':
+        total = _ppm_value(row, 'parts_total', default=None)
+        if not total:
+            return default
+        ok_parts = _ppm_value(row, 'ok_parts', default=None)
+        if ok_parts is None:
+            ng_parts = _ppm_value(row, 'ng_parts_true', default=0.0) or 0.0
+            fc_parts = _ppm_value(row, 'fc_parts', default=0.0) or 0.0
+            residual = total - ng_parts - fc_parts
+            ok_parts = residual if residual >= 0 else None
+        if ok_parts is None:
+            return default
+        return ok_parts / total if total else default
+    return default
+
+
+def _dpm_value(row: dict, key: str, *, default=None):
+    """Retrieve a numeric MOAT DPM metric using canonical aliases."""
+
+    aliases = _DPM_FIELD_ALIASES.get(key, (key,))
+    value = _moat_value(row, aliases, default=None, numeric=True)
+    if value is not None:
+        return value
+    if key == 'dpm':
+        defects = _dpm_value(row, 'defect_count_true', default=None)
+        opportunities = _dpm_value(row, 'opportunities_total', default=None)
+        if opportunities not in (None, 0) and defects is not None:
+            return (defects / opportunities) * 1_000_000
+    if key == 'fc_dpm':
+        fc = _dpm_value(row, 'false_call_count', default=None)
+        opportunities = _dpm_value(row, 'opportunities_total', default=None)
+        if opportunities not in (None, 0) and fc is not None:
+            return (fc / opportunities) * 1_000_000
+    return default
+
+
+def _dpm_text(row: dict, key: str, *, default=None):
+    """Retrieve textual DPM metadata using canonical aliases."""
+
+    aliases = _DPM_FIELD_ALIASES.get(key, (key,))
+    return _moat_value(row, aliases, default=default, numeric=False)
+
+
 def _aoi_passed(row):
     ins = float(row.get('aoi_Quantity Inspected') or row.get('Quantity Inspected') or 0)
     rej = float(row.get('aoi_Quantity Rejected') or row.get('Quantity Rejected') or 0)
@@ -390,13 +527,8 @@ def _aggregate_forecast(
             assembly_customer[asm_key] = cust_raw
         if not asm_key:
             continue
-        try:
-            boards = float(row.get("Total Boards") or row.get("total_boards") or 0)
-            false_calls = float(
-                row.get("FalseCall Parts") or row.get("falsecall_parts") or 0
-            )
-        except (TypeError, ValueError):
-            continue
+        boards = _ppm_value(row, 'boards_in', default=0.0) or 0.0
+        false_calls = _ppm_value(row, 'fc_parts', default=0.0) or 0.0
         moat_map[(asm_key, prog_key)]["boards"] += boards
         moat_map[(asm_key, prog_key)]["falseCalls"] += false_calls
 
@@ -2261,14 +2393,8 @@ def moat_preview():
     grouped = defaultdict(lambda: {"falsecall": 0, "boards": 0})
     date_values: list[date] = []
     for row in data:
-        fc = (
-            row.get('FalseCall Windows')
-            or row.get('falsecall_windows')
-            or row.get('FalseCall Parts')
-            or row.get('falsecall_parts')
-            or 0
-        )
-        boards = row.get('Total Boards') or row.get('total_boards') or 0
+        fc = _ppm_value(row, 'fc_parts', default=0.0) or 0.0
+        boards = _ppm_value(row, 'boards_in', default=0.0) or 0.0
         model = row.get('Model Name') or row.get('model_name') or 'Unknown'
         report_date = _parse_date(row.get('Report Date') or row.get('report_date'))
         if report_date:
@@ -2795,14 +2921,8 @@ def dpm_data():
             edt = parse_date(end)
             if edt and dt > edt:
                 continue
-        fc = (
-            row.get('FalseCall Windows')
-            or row.get('falsecall_windows')
-            or row.get('FalseCall Parts')
-            or row.get('falsecall_parts')
-            or 0
-        )
-        boards = row.get('Total Boards') or row.get('total_boards') or 0
+        fc = _ppm_value(row, 'fc_parts', default=0.0) or 0.0
+        boards = _ppm_value(row, 'boards_in', default=0.0) or 0.0
         try:
             grouped[dt]["falsecall"] += float(fc)
         except (TypeError, ValueError):
@@ -3041,8 +3161,8 @@ def ppm_data():
             edt = parse_date(end)
             if edt and dt > edt:
                 continue
-        fc = row.get('FalseCall Parts') or row.get('falsecall_parts') or 0
-        boards = row.get('Total Boards') or row.get('total_boards') or 0
+        fc = _ppm_value(row, 'fc_parts', default=0.0) or 0.0
+        boards = _ppm_value(row, 'boards_in', default=0.0) or 0.0
         grouped[dt]["falsecall"] += fc
         grouped[dt]["boards"] += boards
 
@@ -3226,10 +3346,9 @@ def _build_assembly_moat_charts(assembly: str, moat_rows: list[dict]) -> dict[st
         model_lower = str(model).lower()
         if asm_lower not in model_lower:
             continue
-        try:
-            fc = float(row.get("FalseCall Parts") or row.get("falsecall_parts") or 0)
-            boards = float(row.get("Total Boards") or row.get("total_boards") or 0)
-        except (TypeError, ValueError):
+        fc = _ppm_value(row, 'fc_parts', default=0.0) or 0.0
+        boards = _ppm_value(row, 'boards_in', default=0.0) or 0.0
+        if not isinstance(fc, (int, float)) or not isinstance(boards, (int, float)):
             continue
         if boards == 0:
             continue
@@ -3543,12 +3662,21 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                     'Model Name': model,
                 },
             )
-            entry['Total Parts'] = entry['ppm_total_parts'] = _coerce_number(row.get('Total Parts'))
-            entry['Total Boards'] = entry['ppm_total_boards'] = _coerce_number(row.get('Total Boards'))
-            entry['FalseCall Parts'] = entry['ppm_falsecall_parts'] = _coerce_number(row.get('FalseCall Parts'))
-            entry['NG Parts'] = entry['ppm_ng_parts'] = _coerce_number(row.get('NG Parts'))
-            if 'FalseCall PPM' in row:
-                entry['FalseCall PPM'] = _coerce_number(row.get('FalseCall PPM'))
+            total_parts = _ppm_value(row, 'parts_total', default=None)
+            if total_parts is not None:
+                entry['Total Parts'] = entry['ppm_total_parts'] = total_parts
+            total_boards = _ppm_value(row, 'boards_in', default=None)
+            if total_boards is not None:
+                entry['Total Boards'] = entry['ppm_total_boards'] = total_boards
+            fc_parts = _ppm_value(row, 'fc_parts', default=None)
+            if fc_parts is not None:
+                entry['FalseCall Parts'] = entry['ppm_falsecall_parts'] = fc_parts
+            ng_parts = _ppm_value(row, 'ng_parts_true', default=None)
+            if ng_parts is not None:
+                entry['NG Parts'] = entry['ppm_ng_parts'] = ng_parts
+            false_call_ppm = _ppm_value(row, 'false_call_ppm', default=None)
+            if false_call_ppm is not None:
+                entry['FalseCall PPM'] = false_call_ppm
 
         def _add_dpm_row(row: dict) -> None:
             dt = _parse_date(row.get('Report Date') or row.get('report_date'))
@@ -3570,25 +3698,25 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                     'Model Name': model,
                 },
             )
-            total_boards = _coerce_number(row.get('Total Boards'), default=None)
+            total_boards = _dpm_value(row, 'boards_total', default=None)
             if total_boards is not None:
                 entry['dpm_total_boards'] = total_boards
-            total_windows = _coerce_number(row.get('Total Windows'), default=None)
+            total_windows = _dpm_value(row, 'opportunities_total', default=None)
             if total_windows is not None:
                 entry['dpm_total_windows'] = entry['Total Windows'] = total_windows
-            ng_windows = _coerce_number(row.get('NG Windows'), default=None)
+            ng_windows = _dpm_value(row, 'defect_count_true', default=None)
             if ng_windows is not None:
                 entry['dpm_ng_windows'] = entry['NG Windows'] = ng_windows
-            fc_windows = _coerce_number(row.get('FalseCall Windows'), default=None)
+            fc_windows = _dpm_value(row, 'false_call_count', default=None)
             if fc_windows is not None:
                 entry['dpm_falsecall_windows'] = entry['FalseCall Windows'] = fc_windows
-            windows_per_board = _coerce_number(row.get('Windows per board'), default=None)
+            windows_per_board = _dpm_value(row, 'windows_per_board', default=None)
             if windows_per_board is not None:
                 entry['Windows per board'] = entry['windows_per_board'] = windows_per_board
-            dpm_value = _coerce_number(row.get('DPM'), default=None)
+            dpm_value = _dpm_value(row, 'dpm', default=None)
             if dpm_value is not None:
                 entry['dpm_dpm'] = dpm_value
-            fc_dpm_value = _coerce_number(row.get('FC DPM'), default=None)
+            fc_dpm_value = _dpm_value(row, 'fc_dpm', default=None)
             if fc_dpm_value is not None:
                 entry['dpm_falsecall_dpm'] = fc_dpm_value
 
@@ -3664,6 +3792,7 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                 assembly = _normalize_assembly_name(row)
                 parts = _extract_number(
                     row,
+                    'parts_total',
                     'Total Parts',
                     'total_parts',
                     'parts',
@@ -3672,6 +3801,8 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                 )
                 boards = _extract_number(
                     row,
+                    'boards_in',
+                    'boards_total',
                     'Total Boards',
                     'total_boards',
                     'boards',
@@ -3681,6 +3812,7 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                 )
                 fc_parts = _extract_number(
                     row,
+                    'fc_parts',
                     'FalseCall Parts',
                     'falsecall_parts',
                     'false_call_parts',
@@ -3691,6 +3823,7 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                 )
                 ng_parts = _extract_number(
                     row,
+                    'ng_parts_true',
                     'NG Parts',
                     'ng_parts',
                     'ngParts',
@@ -3700,6 +3833,7 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
 
                 windows = _extract_number(
                     row,
+                    'opportunities_total',
                     'Total Windows',
                     'total_windows',
                     'windows',
@@ -3741,6 +3875,7 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
 
                 ng_windows = _extract_number(
                     row,
+                    'defect_count_true',
                     'NG Windows',
                     'ng_windows',
                     'ngWindows',
@@ -3748,6 +3883,7 @@ def build_line_report_payload(start: date | None = None, end: date | None = None
                 )
                 fc_windows = _extract_number(
                     row,
+                    'false_call_count',
                     'FalseCall Windows',
                     'falsecall_windows',
                     'false_call_windows',
@@ -5001,29 +5137,15 @@ def build_report_payload(start=None, end=None):
             or row.get('model_name')
             or 'Unknown'
         )
-        fc = float(row.get('FalseCall Parts') or row.get('falsecall_parts') or 0)
-        boards = float(row.get('Total Boards') or row.get('total_boards') or 0)
+        fc = _ppm_value(row, 'fc_parts', default=0.0) or 0.0
+        boards = _ppm_value(row, 'boards_in', default=0.0) or 0.0
         model_group[model]['fc'] += fc
         model_group[model]['boards'] += boards
 
-        parts = float(row.get('Total Parts') or row.get('total_parts') or 0)
-        ng_parts_val = row.get('NG Parts') or row.get('ng_parts')
-        if ng_parts_val is not None:
-            try:
-                ng_parts = float(ng_parts_val)
-            except (TypeError, ValueError):
-                ng_parts = 0.0
-        else:
-            ng_ppm_val = (
-                row.get('NG PPM')
-                or row.get('ng_ppm')
-                or row.get('NG_PPM')
-                or 0
-            )
-            try:
-                ng_ppm = float(ng_ppm_val)
-            except (TypeError, ValueError):
-                ng_ppm = 0.0
+        parts = _ppm_value(row, 'parts_total', default=0.0) or 0.0
+        ng_parts = _ppm_value(row, 'ng_parts_true', default=None)
+        if ng_parts is None:
+            ng_ppm = _ppm_value(row, 'true_defect_ppm', default=0.0) or 0.0
             ng_parts = (parts * ng_ppm) / 1_000_000 if parts and ng_ppm else 0.0
         ag = fc_vs_ng[dt]
         ag['ng'] += ng_parts
@@ -5761,6 +5883,19 @@ def export_line_report():
     payload = build_line_report_payload(start, end)
     payload['start'] = start.isoformat() if start else ''
     payload['end'] = end.isoformat() if end else ''
+
+    line_metrics = payload.get('lineMetrics', [])
+    for metric in line_metrics:
+        if not isinstance(metric, dict):
+            continue
+        if 'falseCalls' not in metric:
+            fallback = (
+                metric.get('false_calls')
+                or metric.get('false_call_parts')
+                or metric.get('confirmedDefects')
+            )
+            metric['falseCalls'] = fallback if fallback is not None else 0.0
+
     charts = _generate_line_report_charts(payload)
 
     body = request.get_json(silent=True) or {}
