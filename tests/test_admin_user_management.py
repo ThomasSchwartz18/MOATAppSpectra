@@ -16,6 +16,7 @@ from flask import template_rendered
 
 import app as app_module
 from app import create_app
+from config.supabase_schema import table_name
 
 
 class FakeQuery:
@@ -151,10 +152,10 @@ def test_admin_overview_lists_tracked_tables(admin_app):
     # Populate representative tables to exercise supabase summary logic.
     supabase.tables.update(
         {
-            "aoi_reports": [],
-            "fi_reports": [],
-            "bug_reports": [],
-            "defects": [],
+            table_name("aoi_reports"): [],
+            table_name("fi_reports"): [],
+            table_name("bug_reports"): [],
+            table_name("defects"): [],
         }
     )
 
@@ -167,11 +168,11 @@ def test_admin_overview_lists_tracked_tables(admin_app):
     overview = context["overview"]
     table_names = [table_info["name"] for table_info in overview["tracked_tables"]]
     for expected in (
-        "bug_reports",
-        "defects",
-        "moat_dpm",
-        "app_feature_states",
-        "part_result_table",
+        table_name("bug_reports"),
+        table_name("defects"),
+        table_name("moat_dpm"),
+        table_name("app_feature_states"),
+        table_name("part_result_table"),
     ):
         assert expected in table_names
 
@@ -195,7 +196,7 @@ def test_admin_can_create_supabase_user(admin_app):
 
     assert response.status_code == 200
     assert b"has been created with the provided temporary password." in response.data
-    stored = supabase.tables.get("app_users", [])
+    stored = supabase.tables.get(table_name("app_users"), [])
     assert len(stored) == 1
     user = stored[0]
     assert user["username"] == "analyst"
@@ -207,7 +208,7 @@ def test_admin_can_create_supabase_user(admin_app):
 
 def test_admin_can_remove_supabase_user(admin_app):
     app, supabase = admin_app
-    supabase.tables["app_users"] = [
+    supabase.tables[table_name("app_users")] = [
         {
             "id": "fake-1",
             "username": "tempuser",
@@ -226,13 +227,13 @@ def test_admin_can_remove_supabase_user(admin_app):
     )
 
     assert response.status_code == 200
-    assert supabase.tables["app_users"] == []
+    assert supabase.tables[table_name("app_users")] == []
     assert b"has been removed" in response.data
 
 
 def test_login_uses_supabase_accounts(admin_app):
     app, supabase = admin_app
-    supabase.tables["app_users"] = [
+    supabase.tables[table_name("app_users")] = [
         {
             "id": "fake-42",
             "username": "analyst",

@@ -5,6 +5,8 @@ import math
 
 from flask import current_app
 
+from config.supabase_schema import column_name, table_name, to_supabase_payload
+
 
 def _get_client():
     """Return the configured Supabase client."""
@@ -232,9 +234,9 @@ def fetch_app_versions() -> tuple[list[dict] | None, str | None]:
 
     try:
         response = (
-            supabase.table("app_versions")
+            supabase.table(table_name("app_versions"))
             .select("*")
-            .order("updated_at", desc=True)
+            .order(column_name("app_versions", "updated_at"), desc=True)
             .execute()
         )
         return response.data or [], None
@@ -254,9 +256,9 @@ def fetch_app_version(platform: str) -> tuple[dict | None, str | None]:
 
     try:
         response = (
-            supabase.table("app_versions")
+            supabase.table(table_name("app_versions"))
             .select("*")
-            .eq("platform", platform)
+            .eq(column_name("app_versions", "platform"), platform)
             .limit(1)
             .execute()
         )
@@ -293,11 +295,12 @@ def upsert_app_version(
         "release_notes": release_notes or None,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
+    payload = to_supabase_payload("app_versions", payload)
 
     try:
         response = (
-            supabase.table("app_versions")
-            .upsert(payload, on_conflict="platform")
+            supabase.table(table_name("app_versions"))
+            .upsert(payload, on_conflict=column_name("app_versions", "platform"))
             .execute()
         )
         return response.data or [], None
@@ -313,7 +316,11 @@ def fetch_feature_states() -> tuple[list[dict] | None, str | None]:
         return [], error
 
     try:
-        response = supabase.table("app_feature_states").select("*").execute()
+        response = (
+            supabase.table(table_name("app_feature_states"))
+            .select("*")
+            .execute()
+        )
         return response.data or [], None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to fetch feature states: {exc}"
@@ -331,9 +338,9 @@ def fetch_feature_state(slug: str) -> tuple[dict | None, str | None]:
 
     try:
         response = (
-            supabase.table("app_feature_states")
+            supabase.table(table_name("app_feature_states"))
             .select("*")
-            .eq("slug", slug)
+            .eq(column_name("app_feature_states", "slug"), slug)
             .limit(1)
             .execute()
         )
@@ -374,11 +381,15 @@ def upsert_feature_state(
         "bug_report_id": bug_value,
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
+    payload = to_supabase_payload("app_feature_states", payload)
 
     try:
         response = (
-            supabase.table("app_feature_states")
-            .upsert(payload, on_conflict="slug")
+            supabase.table(table_name("app_feature_states"))
+            .upsert(
+                payload,
+                on_conflict=column_name("app_feature_states", "slug"),
+            )
             .execute()
         )
         return response.data or [], None
@@ -400,9 +411,12 @@ def fetch_feature_states_for_bug(
 
     try:
         response = (
-            supabase.table("app_feature_states")
+            supabase.table(table_name("app_feature_states"))
             .select("*")
-            .eq("bug_report_id", str(bug_report_id))
+            .eq(
+                column_name("app_feature_states", "bug_report_id"),
+                str(bug_report_id),
+            )
             .execute()
         )
         return response.data or [], None
@@ -428,7 +442,7 @@ def fetch_app_users(include_sensitive: bool = False) -> tuple[list[dict] | None,
         return None, error
 
     try:
-        response = supabase.table("app_users").select("*").execute()
+        response = supabase.table(table_name("app_users")).select("*").execute()
         data = response.data or []
         if not include_sensitive:
             sanitized: list[dict] = []
@@ -464,7 +478,8 @@ def insert_app_user(record: dict) -> tuple[list[dict] | None, str | None]:
         return None, error
 
     try:
-        response = supabase.table("app_users").insert(record).execute()
+        payload = to_supabase_payload("app_users", record)
+        response = supabase.table(table_name("app_users")).insert(payload).execute()
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to create user: {exc}"
@@ -479,9 +494,10 @@ def insert_bug_report(record: dict) -> tuple[list[dict] | None, str | None]:
 
     payload = dict(record)
     payload["updated_at"] = datetime.now(timezone.utc).isoformat()
+    payload = to_supabase_payload("bug_reports", payload)
 
     try:
-        response = supabase.table("bug_reports").insert(payload).execute()
+        response = supabase.table(table_name("bug_reports")).insert(payload).execute()
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to create bug report: {exc}"
@@ -495,7 +511,12 @@ def delete_app_user(user_id: str) -> tuple[list[dict] | None, str | None]:
         return None, error
 
     try:
-        response = supabase.table("app_users").delete().eq("id", user_id).execute()
+        response = (
+            supabase.table(table_name("app_users"))
+            .delete()
+            .eq(column_name("app_users", "id"), user_id)
+            .execute()
+        )
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to delete user: {exc}"
@@ -511,13 +532,17 @@ def fetch_bug_reports(
         return None, error
 
     try:
-        query = supabase.table("bug_reports").select("*")
+        query = supabase.table(table_name("bug_reports")).select("*")
         filters = filters or {}
         for key, value in filters.items():
             if value is None:
                 continue
-            query = query.eq(key, value)
-        response = query.order("created_at", desc=True).execute()
+            column = column_name("bug_reports", key)
+            query = query.eq(column, value)
+        response = (
+            query.order(column_name("bug_reports", "created_at"), desc=True)
+            .execute()
+        )
         return response.data or [], None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to fetch bug reports: {exc}"
@@ -538,12 +563,13 @@ def update_bug_report_status(
 
     payload = dict(updates)
     payload["updated_at"] = datetime.now(timezone.utc).isoformat()
+    payload = to_supabase_payload("bug_reports", payload)
 
     try:
         response = (
-            supabase.table("bug_reports")
+            supabase.table(table_name("bug_reports"))
             .update(payload)
-            .eq("id", report_id)
+            .eq(column_name("bug_reports", "id"), report_id)
             .execute()
         )
         return response.data, None
@@ -559,7 +585,7 @@ def fetch_aoi_reports():
     """
     supabase = _get_client()
     try:
-        response = supabase.table("aoi_reports").select("*").execute()
+        response = supabase.table(table_name("aoi_reports")).select("*").execute()
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to fetch AOI reports: {exc}"
@@ -569,7 +595,7 @@ def fetch_fi_reports():
     """Retrieve all FI reports from the database."""
     supabase = _get_client()
     try:
-        response = supabase.table("fi_reports").select("*").execute()
+        response = supabase.table(table_name("fi_reports")).select("*").execute()
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to fetch FI reports: {exc}"
@@ -650,7 +676,7 @@ def fetch_combined_reports():
     """
     supabase = _get_client()
     try:
-        response = supabase.table("combined_reports").select("*").execute()
+        response = supabase.table(table_name("combined_reports")).select("*").execute()
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to fetch combined reports: {exc}"
@@ -689,15 +715,17 @@ def _fetch_paginated_rows(
     supabase = _get_client()
     rows: list[dict] = []
     offset = 0
+    table_name_value = table_name(table)
+    report_date_column = column_name(table, "report_date")
 
     while True:
-        query = supabase.table(table).select("*")
+        query = supabase.table(table_name_value).select("*")
         if order_column:
-            query = query.order(order_column)
+            query = query.order(column_name(table, order_column))
         if start_date:
-            query = query.gte("Report Date", start_date)
+            query = query.gte(report_date_column, start_date)
         if end_date:
-            query = query.lte("Report Date", end_date)
+            query = query.lte(report_date_column, end_date)
         query = query.range(offset, offset + page_size - 1)
 
         response = query.execute()
@@ -862,12 +890,13 @@ def fetch_part_results(
         rows: list[dict] = []
         offset = 0
         while True:
-            query = supabase.table("part_result_table").select("*")
-            query = query.order("inspection_date")
+            query = supabase.table(table_name("part_result_table")).select("*")
+            inspection_column = column_name("part_result_table", "inspection_date")
+            query = query.order(inspection_column)
             if start_value:
-                query = query.gte("inspection_date", start_value)
+                query = query.gte(inspection_column, start_value)
             if end_value:
-                query = query.lte("inspection_date", end_value)
+                query = query.lte(inspection_column, end_value)
             query = query.range(offset, offset + page_size - 1)
 
             response = query.execute()
@@ -907,7 +936,7 @@ def fetch_moat(
             "moat",
             start_date=start_value,
             end_date=end_value,
-            order_column="Report Date",
+            order_column="report_date",
         )
         data = _apply_report_date_offset(rows)
         data = [_normalize_ppm_row(row) for row in data or []]
@@ -940,7 +969,7 @@ def fetch_moat_dpm(
             "moat_dpm",
             start_date=start_value,
             end_date=end_value,
-            order_column="Report Date",
+            order_column="report_date",
         )
         data = _apply_report_date_offset(rows)
         data = [_normalize_dpm_row(row) for row in data or []]
@@ -964,15 +993,21 @@ def fetch_defect_catalog() -> tuple[list[dict[str, str]] | None, str | None]:
         return None, error
 
     try:
-        response = supabase.table("defects").select("id,name").execute()
+        id_column = column_name("defects", "id")
+        name_column = column_name("defects", "name")
+        response = (
+            supabase.table(table_name("defects"))
+            .select(f"{id_column},{name_column}")
+            .execute()
+        )
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to fetch defects: {exc}"
 
     catalog: list[dict[str, str]] = []
     seen: set[str] = set()
     for row in response.data or []:
-        raw_id = row.get("id")
-        raw_name = row.get("name")
+        raw_id = row.get(id_column)
+        raw_name = row.get(name_column)
         defect_id = str(raw_id).strip() if raw_id is not None else ""
         defect_name = str(raw_name).strip() if raw_name is not None else ""
         if not defect_id:
@@ -1006,7 +1041,8 @@ def insert_aoi_report(data: dict):
     """
     supabase = _get_client()
     try:
-        response = supabase.table("aoi_reports").insert(data).execute()
+        payload = to_supabase_payload("aoi_reports", data)
+        response = supabase.table(table_name("aoi_reports")).insert(payload).execute()
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to insert AOI report: {exc}"
@@ -1020,7 +1056,8 @@ def insert_aoi_reports_bulk(rows: list[dict]):
     """
     supabase = _get_client()
     try:
-        response = supabase.table("aoi_reports").insert(rows).execute()
+        mapped_rows = [to_supabase_payload("aoi_reports", row) for row in rows]
+        response = supabase.table(table_name("aoi_reports")).insert(mapped_rows).execute()
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to insert AOI reports: {exc}"
@@ -1030,7 +1067,8 @@ def insert_fi_report(data: dict):
     """Insert a new FI report."""
     supabase = _get_client()
     try:
-        response = supabase.table("fi_reports").insert(data).execute()
+        payload = to_supabase_payload("fi_reports", data)
+        response = supabase.table(table_name("fi_reports")).insert(payload).execute()
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to insert FI report: {exc}"
@@ -1040,7 +1078,8 @@ def insert_moat(data: dict):
     """Insert MOAT data."""
     supabase = _get_client()
     try:
-        response = supabase.table("moat").insert(data).execute()
+        payload = to_supabase_payload("moat", data)
+        response = supabase.table(table_name("moat")).insert(payload).execute()
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to insert MOAT data: {exc}"
@@ -1050,7 +1089,8 @@ def insert_moat_bulk(rows: list[dict]):
     """Insert multiple MOAT records at once."""
     supabase = _get_client()
     try:
-        response = supabase.table("moat").insert(rows).execute()
+        mapped_rows = [to_supabase_payload("moat", row) for row in rows]
+        response = supabase.table(table_name("moat")).insert(mapped_rows).execute()
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to insert MOAT data: {exc}"
@@ -1061,7 +1101,8 @@ def insert_moat_dpm(data: dict):
 
     supabase = _get_client()
     try:
-        response = supabase.table("moat_dpm").insert(data).execute()
+        payload = to_supabase_payload("moat_dpm", data)
+        response = supabase.table(table_name("moat_dpm")).insert(payload).execute()
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to insert MOAT DPM data: {exc}"
@@ -1072,7 +1113,8 @@ def insert_moat_dpm_bulk(rows: list[dict]):
 
     supabase = _get_client()
     try:
-        response = supabase.table("moat_dpm").insert(rows).execute()
+        mapped_rows = [to_supabase_payload("moat_dpm", row) for row in rows]
+        response = supabase.table(table_name("moat_dpm")).insert(mapped_rows).execute()
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to insert MOAT DPM data: {exc}"
@@ -1098,13 +1140,28 @@ def fetch_saved_queries():
     """
     supabase = _get_client()
     try:
-        response = (
-            supabase.table("ppm_saved_queries")
-            .select(
-                "id,name,type,description,start_date,end_date,value_source,x_column,y_agg,"
-                "chart_type,line_color,params,created_at"
+        ppm_columns = [
+            column_name("ppm_saved_queries", key)
+            for key in (
+                "id",
+                "name",
+                "type",
+                "description",
+                "start_date",
+                "end_date",
+                "value_source",
+                "x_column",
+                "y_agg",
+                "chart_type",
+                "line_color",
+                "params",
+                "created_at",
             )
-            .order("created_at", desc=True)
+        ]
+        response = (
+            supabase.table(table_name("ppm_saved_queries"))
+            .select(",".join(ppm_columns))
+            .order(column_name("ppm_saved_queries", "created_at"), desc=True)
             .execute()
         )
         return response.data, None
@@ -1117,13 +1174,28 @@ def fetch_dpm_saved_queries():
 
     supabase = _get_client()
     try:
-        response = (
-            supabase.table("dpm_saved_queries")
-            .select(
-                "id,name,type,description,start_date,end_date,value_source,x_column,y_agg,"
-                "chart_type,line_color,params,created_at"
+        dpm_columns = [
+            column_name("dpm_saved_queries", key)
+            for key in (
+                "id",
+                "name",
+                "type",
+                "description",
+                "start_date",
+                "end_date",
+                "value_source",
+                "x_column",
+                "y_agg",
+                "chart_type",
+                "line_color",
+                "params",
+                "created_at",
             )
-            .order("created_at", desc=True)
+        ]
+        response = (
+            supabase.table(table_name("dpm_saved_queries"))
+            .select(",".join(dpm_columns))
+            .order(column_name("dpm_saved_queries", "created_at"), desc=True)
             .execute()
         )
         return response.data, None
@@ -1140,7 +1212,8 @@ def insert_saved_query(data: dict):
     """
     supabase = _get_client()
     try:
-        response = supabase.table("ppm_saved_queries").insert(data).execute()
+        payload = to_supabase_payload("ppm_saved_queries", data)
+        response = supabase.table(table_name("ppm_saved_queries")).insert(payload).execute()
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to save chart query: {exc}"
@@ -1151,7 +1224,8 @@ def insert_dpm_saved_query(data: dict):
 
     supabase = _get_client()
     try:
-        response = supabase.table("dpm_saved_queries").insert(data).execute()
+        payload = to_supabase_payload("dpm_saved_queries", data)
+        response = supabase.table(table_name("dpm_saved_queries")).insert(payload).execute()
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to save DPM chart query: {exc}"
@@ -1167,10 +1241,15 @@ def update_saved_query(name: str, data: dict):
     """
     supabase = _get_client()
     try:
-        payload = {**data, "name": name}
+        payload = to_supabase_payload(
+            "ppm_saved_queries", {**data, "name": name}
+        )
         response = (
-            supabase.table("ppm_saved_queries")
-            .upsert(payload, on_conflict="name")
+            supabase.table(table_name("ppm_saved_queries"))
+            .upsert(
+                payload,
+                on_conflict=column_name("ppm_saved_queries", "name"),
+            )
             .execute()
         )
         return response.data, None
@@ -1183,10 +1262,15 @@ def update_dpm_saved_query(name: str, data: dict):
 
     supabase = _get_client()
     try:
-        payload = {**data, "name": name}
+        payload = to_supabase_payload(
+            "dpm_saved_queries", {**data, "name": name}
+        )
         response = (
-            supabase.table("dpm_saved_queries")
-            .upsert(payload, on_conflict="name")
+            supabase.table(table_name("dpm_saved_queries"))
+            .upsert(
+                payload,
+                on_conflict=column_name("dpm_saved_queries", "name"),
+            )
             .execute()
         )
         return response.data, None
@@ -1209,10 +1293,22 @@ def fetch_saved_aoi_queries():
     """
     supabase = _get_client()
     try:
+        aoi_columns = [
+            column_name("aoi_saved_queries", key)
+            for key in (
+                "id",
+                "name",
+                "description",
+                "start_date",
+                "end_date",
+                "params",
+                "created_at",
+            )
+        ]
         response = (
-            supabase.table("aoi_saved_queries")
-            .select("id,name,description,start_date,end_date,params,created_at")
-            .order("created_at", desc=True)
+            supabase.table(table_name("aoi_saved_queries"))
+            .select(",".join(aoi_columns))
+            .order(column_name("aoi_saved_queries", "created_at"), desc=True)
             .execute()
         )
         return response.data, None
@@ -1224,7 +1320,8 @@ def insert_saved_aoi_query(data: dict):
     """Insert a saved AOI chart query definition into Supabase."""
     supabase = _get_client()
     try:
-        response = supabase.table("aoi_saved_queries").insert(data).execute()
+        payload = to_supabase_payload("aoi_saved_queries", data)
+        response = supabase.table(table_name("aoi_saved_queries")).insert(payload).execute()
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to save AOI chart query: {exc}"
@@ -1234,10 +1331,15 @@ def update_saved_aoi_query(name: str, data: dict):
     """Update or upsert a saved AOI chart query by ``name``."""
     supabase = _get_client()
     try:
-        payload = {**data, "name": name}
+        payload = to_supabase_payload(
+            "aoi_saved_queries", {**data, "name": name}
+        )
         response = (
-            supabase.table("aoi_saved_queries")
-            .upsert(payload, on_conflict="name")
+            supabase.table(table_name("aoi_saved_queries"))
+            .upsert(
+                payload,
+                on_conflict=column_name("aoi_saved_queries", "name"),
+            )
             .execute()
         )
         return response.data, None
@@ -1249,10 +1351,22 @@ def fetch_saved_fi_queries():
     """Retrieve saved chart queries for the FI Daily Reports page."""
     supabase = _get_client()
     try:
+        fi_columns = [
+            column_name("fi_saved_queries", key)
+            for key in (
+                "id",
+                "name",
+                "description",
+                "start_date",
+                "end_date",
+                "params",
+                "created_at",
+            )
+        ]
         response = (
-            supabase.table("fi_saved_queries")
-            .select("id,name,description,start_date,end_date,params,created_at")
-            .order("created_at", desc=True)
+            supabase.table(table_name("fi_saved_queries"))
+            .select(",".join(fi_columns))
+            .order(column_name("fi_saved_queries", "created_at"), desc=True)
             .execute()
         )
         return response.data, None
@@ -1264,7 +1378,8 @@ def insert_saved_fi_query(data: dict):
     """Insert a saved FI chart query definition into Supabase."""
     supabase = _get_client()
     try:
-        response = supabase.table("fi_saved_queries").insert(data).execute()
+        payload = to_supabase_payload("fi_saved_queries", data)
+        response = supabase.table(table_name("fi_saved_queries")).insert(payload).execute()
         return response.data, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to save FI chart query: {exc}"
@@ -1274,10 +1389,15 @@ def update_saved_fi_query(name: str, data: dict):
     """Update or upsert a saved FI chart query by ``name``."""
     supabase = _get_client()
     try:
-        payload = {**data, "name": name}
+        payload = to_supabase_payload(
+            "fi_saved_queries", {**data, "name": name}
+        )
         response = (
-            supabase.table("fi_saved_queries")
-            .upsert(payload, on_conflict="name")
+            supabase.table(table_name("fi_saved_queries"))
+            .upsert(
+                payload,
+                on_conflict=column_name("fi_saved_queries", "name"),
+            )
             .execute()
         )
         return response.data, None

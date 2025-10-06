@@ -37,6 +37,8 @@ except Exception:  # pragma: no cover
     matplotlib = None
     plt = None
 
+from config.supabase_schema import table_name
+
 from app.db import (
     fetch_app_versions,
     delete_app_user,
@@ -1041,17 +1043,17 @@ USER_ROLE_CHOICES = [
 
 
 TRACKED_SUPABASE_TABLES = {
-    "aoi_reports": "AOI inspection uploads used across the AOI dashboards.",
-    "fi_reports": "Final inspection data powering FI quality metrics.",
-    "moat": "MOAT data feeding the integrated performance report.",
-    "combined_reports": "Joined AOI/FI views surfaced in integrated analytics.",
-    "app_users": "Application login accounts managed from this console.",
-    "bug_reports": "In-app feedback collected to triage feature issues and bugs.",
-    "defects": "Defect catalog entries referenced when analysing bug submissions.",
-    "app_versions": "Release ledger aligning desktop and web deployments.",
-    "moat_dpm": "MOAT defect-per-million submissions that drive the DPM dashboards.",
-    "app_feature_states": "Feature flag states used to lock or reopen capabilities from bug triage.",
-    "part_result_table": "Part-level AOI results providing deeper context for line quality checks.",
+    table_name("aoi_reports"): "AOI inspection uploads used across the AOI dashboards.",
+    table_name("fi_reports"): "Final inspection data powering FI quality metrics.",
+    table_name("moat"): "MOAT data feeding the integrated performance report.",
+    table_name("combined_reports"): "Joined AOI/FI views surfaced in integrated analytics.",
+    table_name("app_users"): "Application login accounts managed from this console.",
+    table_name("bug_reports"): "In-app feedback collected to triage feature issues and bugs.",
+    table_name("defects"): "Defect catalog entries referenced when analysing bug submissions.",
+    table_name("app_versions"): "Release ledger aligning desktop and web deployments.",
+    table_name("moat_dpm"): "MOAT defect-per-million submissions that drive the DPM dashboards.",
+    table_name("app_feature_states"): "Feature flag states used to lock or reopen capabilities from bug triage.",
+    table_name("part_result_table"): "Part-level AOI results providing deeper context for line quality checks.",
 }
 
 
