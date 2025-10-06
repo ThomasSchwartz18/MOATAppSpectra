@@ -61,15 +61,23 @@ function parseRelativeDate(token) {
 function computeDerived(row, expr) {
   // Safe limited evaluator for expressions like a/b
   const fc = Number(
-    row['FalseCall Windows']
+    row['false_call_count']
+    ?? row['FalseCall Windows']
     ?? row['falsecall_windows']
     ?? row['FalseCall Parts']
     ?? row['falsecall_parts']
     ?? 0,
   );
-  const boards = Number(row['Total Boards'] ?? row['total_boards'] ?? 0);
+  const boards = Number(
+    row['boards_total']
+    ?? row['boards_in']
+    ?? row['Total Boards']
+    ?? row['total_boards']
+    ?? 0,
+  );
   const totalWindows = Number(
-    row['Total Windows']
+    row['opportunities_total']
+    ?? row['Total Windows']
     ?? row['total_windows']
     ?? row['Total Parts']
     ?? row['total_parts']
@@ -681,13 +689,20 @@ async function runChartFlexible() {
     if (yAgg === 'count') return 1;
       if (source === 'avg_false_calls_per_assembly') {
         const fc = Number(
-          row['FalseCall Windows']
+          row['false_call_count']
+          ?? row['FalseCall Windows']
           ?? row['falsecall_windows']
           ?? row['FalseCall Parts']
           ?? row['falsecall_parts']
           ?? 0,
         );
-        const tb = Number(row['Total Boards'] ?? row['total_boards'] ?? 0);
+        const tb = Number(
+          row['boards_total']
+          ?? row['boards_in']
+          ?? row['Total Boards']
+          ?? row['total_boards']
+          ?? 0,
+        );
         return tb ? fc / tb : 0;
       }
     // derived
@@ -865,11 +880,33 @@ function resolveColumns(rows) {
     line: find(['Line','line','Line Name','line_name']),
     assembly: find(['Assembly','assembly','Program','program']),
     rev: find(['Rev','rev','Revision','revision']),
-    ngParts: find(['NG Windows','ng_windows','NG Parts','ng_parts','NG','ng','Defect Parts','defect_parts']),
-    ngPPM: find(['DPM','dpm','NG PPM','ng_ppm','NG_PPM']),
-    fcParts: find(['FalseCall Windows','falsecall_windows','FalseCall Parts','falsecall_parts']),
-    totalBoards: find(['Total Boards','total_boards']),
-    totalParts: find(['Total Windows','total_windows','Total Parts','total_parts']),
+    ngParts: find([
+      'defect_count_true',
+      'NG Windows',
+      'ng_windows',
+      'NG Parts',
+      'ng_parts',
+      'NG',
+      'ng',
+      'Defect Parts',
+      'defect_parts',
+    ]),
+    ngPPM: find(['dpm','DPM','NG PPM','ng_ppm','NG_PPM']),
+    fcParts: find([
+      'false_call_count',
+      'FalseCall Windows',
+      'falsecall_windows',
+      'FalseCall Parts',
+      'falsecall_parts',
+    ]),
+    totalBoards: find(['boards_total','boards_in','Total Boards','total_boards']),
+    totalParts: find([
+      'opportunities_total',
+      'Total Windows',
+      'total_windows',
+      'Total Parts',
+      'total_parts',
+    ]),
   };
 }
 

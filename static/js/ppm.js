@@ -61,9 +61,24 @@ function parseRelativeDate(token) {
 function computeDerived(row, expr) {
   // Safe limited evaluator for expressions like a/b
   const ctx = {
-    falsecall_parts: Number(row['FalseCall Parts'] ?? row['falsecall_parts'] ?? 0),
-    total_boards: Number(row['Total Boards'] ?? row['total_boards'] ?? 0),
-    total_parts: Number(row['Total Parts'] ?? row['total_parts'] ?? 0),
+    falsecall_parts: Number(
+      row['fc_parts']
+      ?? row['FalseCall Parts']
+      ?? row['falsecall_parts']
+      ?? 0,
+    ),
+    total_boards: Number(
+      row['boards_in']
+      ?? row['Total Boards']
+      ?? row['total_boards']
+      ?? 0,
+    ),
+    total_parts: Number(
+      row['parts_total']
+      ?? row['Total Parts']
+      ?? row['total_parts']
+      ?? 0,
+    ),
   };
   // Only allow identifiers, numbers, spaces, and operators + - * / ( ) .
   const safe = /^[\w\s+\-*/().]+$/.test(expr);
@@ -477,8 +492,18 @@ async function runChartFlexible() {
   const valueFn = (row) => {
     if (yAgg === 'count') return 1;
     if (source === 'avg_false_calls_per_assembly') {
-      const fc = Number(row['FalseCall Parts'] ?? row['falsecall_parts'] ?? 0);
-      const tb = Number(row['Total Boards'] ?? row['total_boards'] ?? 0);
+      const fc = Number(
+        row['fc_parts']
+        ?? row['FalseCall Parts']
+        ?? row['falsecall_parts']
+        ?? 0,
+      );
+      const tb = Number(
+        row['boards_in']
+        ?? row['Total Boards']
+        ?? row['total_boards']
+        ?? 0,
+      );
       return tb ? fc / tb : 0;
     }
     // derived
@@ -630,11 +655,11 @@ function resolveColumns(rows) {
     line: find(['Line','line','Line Name','line_name']),
     assembly: find(['Assembly','assembly','Program','program']),
     rev: find(['Rev','rev','Revision','revision']),
-    ngParts: find(['NG Parts','ng_parts','NG','ng','Defect Parts','defect_parts']),
-    ngPPM: find(['NG PPM','ng_ppm','NG_PPM']),
-    fcParts: find(['FalseCall Parts','falsecall_parts']),
-    totalBoards: find(['Total Boards','total_boards']),
-    totalParts: find(['Total Parts','total_parts']),
+    ngParts: find(['ng_parts_true','NG Parts','ng_parts','NG','ng','Defect Parts','defect_parts']),
+    ngPPM: find(['true_defect_ppm','NG PPM','ng_ppm','NG_PPM']),
+    fcParts: find(['fc_parts','FalseCall Parts','falsecall_parts']),
+    totalBoards: find(['boards_in','Total Boards','total_boards']),
+    totalParts: find(['parts_total','Total Parts','total_parts']),
   };
 }
 
