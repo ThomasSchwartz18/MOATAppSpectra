@@ -3,7 +3,6 @@ import { showSpinner, hideSpinner } from './utils.js';
 let dpmChartInstance = null;
 let dpmChartExpandedInstance = null;
 let currentData = { labels: [], values: [], datasets: [] };
-let savedQueriesCache = [];
 
 // Inferred columns/types from /moat_dpm
 let allColumns = [];
@@ -284,162 +283,6 @@ function collectChartConfig() {
   return { type, color, pointStyle, pointRadius, tension, xTitle, yTitle, showTooltips };
 }
 
-function collectParamsForSave() {
-  const params = {
-    title: document.getElementById('chart-title').value || '',
-    description: document.getElementById('chart-description').value || '',
-    start_date: document.getElementById('start-date').value || '',
-    end_date: document.getElementById('end-date').value || '',
-    transform_expression: document.getElementById('transform-expression').value || '',
-    value_source: document.getElementById('value-source').value || 'avg_false_calls_per_assembly',
-    x_column: document.getElementById('x-column').value || '',
-    x_binning: document.getElementById('x-binning').value || 'none',
-    x_cat_sort: document.getElementById('x-cat-sort').value || 'alpha-asc',
-    y_agg: document.getElementById('y-agg').value || 'avg',
-    series_column: document.getElementById('series-column').value || '',
-    options: collectChartConfig(),
-  };
-
-  return {
-    params,
-    start_date: params.start_date,
-    end_date: params.end_date,
-    value_source: params.value_source,
-    x_column: params.x_column,
-    y_agg: params.y_agg,
-    chart_type: params.options.type,
-    line_color: params.options.color,
-  };
-}
-
-function loadParamsIntoBuilder(row) {
-  activeFallbackChart = null;
-  const params = row.params || {};
-  document.getElementById('chart-title').value = params.title || '';
-  document.getElementById('chart-description').value = row.description || params.description || '';
-  document.getElementById('start-date').value = row.start_date || params.start_date || '';
-  document.getElementById('end-date').value = row.end_date || params.end_date || '';
-  document.getElementById('transform-expression').value = params.transform_expression || '';
-  document.getElementById('value-source').value = row.value_source || params.value_source || 'avg_false_calls_per_assembly';
-  const xCol = row.x_column || params.x_column;
-  if (xCol) document.getElementById('x-column').value = xCol;
-  if (params.x_binning) document.getElementById('x-binning').value = params.x_binning;
-  if (params.x_cat_sort) document.getElementById('x-cat-sort').value = params.x_cat_sort;
-  const yAgg = row.y_agg || params.y_agg;
-  if (yAgg) document.getElementById('y-agg').value = yAgg;
-  if (params.series_column !== undefined) document.getElementById('series-column').value = params.series_column;
-  const chartType = row.chart_type || params.options?.type;
-  const lineColor = row.line_color || params.options?.color;
-  if (chartType) document.getElementById('chart-type').value = chartType;
-  if (lineColor) document.getElementById('line-color').value = lineColor;
-  if (params.options) {
-    document.getElementById('point-style').value = params.options.pointStyle || 'circle';
-    document.getElementById('point-radius').value = params.options.pointRadius ?? 3;
-    document.getElementById('line-tension').value = params.options.tension ?? 0;
-    document.getElementById('x-title').value = params.options.xTitle || '';
-    document.getElementById('y-title').value = params.options.yTitle || '';
-    document.getElementById('show-tooltips').value = params.options.showTooltips ? 'yes' : 'no';
-  }
-  updateXTypeUI();
-}
-
-function filterSavedList() {
-  const q = (document.getElementById('saved-search').value || '').toLowerCase();
-  const list = document.getElementById('saved-list');
-  list.innerHTML = '';
-  const items = savedQueriesCache.filter((r) => (r.name || '').toLowerCase().includes(q));
-  if (items.length === 0) {
-    list.innerHTML = '<li style="color:#666;">No matches.</li>';
-    return;
-  }
-  items.forEach((r) => {
-    const li = document.createElement('li');
-    li.textContent = r.name || r.type || 'Saved Chart';
-    li.title = r.description || '';
-    li.style.cursor = 'pointer';
-    li.addEventListener('click', () => {
-      if (r.params) {
-        loadParamsIntoBuilder(r);
-        document.getElementById('chart-description-result').textContent = r.description || '';
-        document.getElementById('saved-chart-sql').style.display = 'none';
-        runChart();
-        return;
-      }
-      if (isFallbackChart(r) || r.isFallback) {
-        loadFallbackDefinition(r);
-        document.getElementById('saved-chart-sql').style.display = 'none';
-        runChart();
-        return;
-      }
-      if (r.kind) {
-        setPreset(r.id);
-        runChart();
-        return;
-      }
-      displaySavedChartDetails(r);
-    });
-    list.appendChild(li);
-  });
-}
-
-function loadSavedQueries() {
-  fetch('/analysis/dpm/saved')
-    .then((res) => res.json())
-    .then((rows) => {
-      const server = Array.isArray(rows)
-        ? rows.map((r) => ({
-            ...r,
-            description: r.description || r.params?.description || '',
-            isFallback: isFallbackChart(r),
-          }))
-        : [];
-      savedQueriesCache = presetsList().concat(server);
-      filterSavedList();
-    })
-    .catch(() => {
-      savedQueriesCache = presetsList();
-      filterSavedList();
-    });
-}
-
-function displaySavedChartDetails(chart) {
-  activeFallbackChart = null;
-  const name = chart.name || chart.type || 'Saved Chart';
-  const desc = chart.description || '';
-  const mappings = chart.mappings || {};
-  const info = [];
-  if (chart.chart_type) info.push(`Chart Type: ${chart.chart_type}`);
-  const mappingEntries = Object.entries(mappings).map(([key, value]) => `${key} → ${value}`);
-  if (mappingEntries.length) info.push(`Mappings: ${mappingEntries.join(', ')}`);
-  if (chart.notes) info.push(chart.notes);
-
-  document.getElementById('result-chart-name').textContent = name;
-  document.getElementById('chart-title').value = name;
-  document.getElementById('chart-description').value = desc;
-  document.getElementById('chart-description-result').textContent = desc;
-  document.getElementById('dpm-info').textContent = info.join(' | ');
-
-  const sqlEl = document.getElementById('saved-chart-sql');
-  if (chart.sql) {
-    sqlEl.textContent = chart.sql;
-    sqlEl.style.display = 'block';
-  } else {
-    sqlEl.textContent = '';
-    sqlEl.style.display = 'none';
-  }
-
-  if (dpmChartInstance) {
-    dpmChartInstance.destroy();
-    dpmChartInstance = null;
-  }
-  if (dpmChartExpandedInstance) {
-    dpmChartExpandedInstance.destroy();
-    dpmChartExpandedInstance = null;
-  }
-  currentData = { labels: [], values: [], datasets: [] };
-  window.currentChartMeta = null;
-}
-
 function getDateInputs() {
   const rawStart = document.getElementById('start-date').value;
   const rawEnd = document.getElementById('end-date').value;
@@ -483,7 +326,6 @@ function runChart() {
       const cfg = collectChartConfig();
       const canvasEl = document.getElementById('dpmChart');
 
-      document.getElementById('saved-chart-sql').style.display = 'none';
       const fallbackHost = document.getElementById('fallback-table');
       if (fallbackHost) { fallbackHost.style.display = 'none'; fallbackHost.innerHTML = ''; }
       canvasEl.style.display = '';
@@ -607,10 +449,9 @@ function runChart() {
           dpmChartInstance.destroy();
           dpmChartInstance = null;
         }
-        document.getElementById('saved-chart-sql').style.display = 'none';
         currentData = { labels: [], values: [], datasets: [] };
         window.currentChartMeta = null;
-        document.getElementById('dpm-info').textContent = 'Select a saved chart or configure the builder to run.';
+        document.getElementById('dpm-info').textContent = 'Configure the builder to run a chart.';
         document.getElementById('chart-description-result').textContent = description;
         return;
       }
@@ -1157,8 +998,13 @@ function getFallbackTableHost() {
     host.className = 'preview-info';
     host.style.marginTop = '4px';
     host.style.display = 'none';
-    const pre = document.getElementById('saved-chart-sql');
-    pre.parentNode.insertBefore(host, pre);
+    const infoEl = document.getElementById('dpm-info');
+    if (infoEl && infoEl.parentNode) {
+      infoEl.parentNode.insertBefore(host, infoEl);
+    } else {
+      const container = document.querySelector('.analysis-bottom-right') || document.body;
+      container.appendChild(host);
+    }
   }
   return host;
 }
@@ -1579,7 +1425,7 @@ async function runFallbackSavedChart(definition) {
   const res = await fetch(url);
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(text || 'Failed to run saved chart');
+    throw new Error(text || 'Failed to run fallback chart');
   }
   const payload = await res.json();
   return buildFallbackChart(payload, payload.rows || []);
@@ -1671,39 +1517,6 @@ function initColumnsUI() {
       columnTypes = { 'Report Date': 'temporal', 'Model Name': 'categorical' };
       updateXTypeUI();
     });
-}
-
-function saveQuery() {
-  const name = document.getElementById('save-name').value.trim();
-  if (!name) { alert('Please provide a name for this chart.'); return; }
-  const existing = savedQueriesCache.find((q) => q.name === name);
-  if (existing && !confirm('Overwrite existing chart?')) return;
-  const description = document.getElementById('chart-description').value.trim();
-  const cfg = collectParamsForSave();
-  const payload = {
-    name,
-    type: 'custom',
-    description,
-    params: cfg.params,
-    start_date: cfg.start_date,
-    end_date: cfg.end_date,
-    value_source: cfg.value_source,
-    x_column: cfg.x_column,
-    y_agg: cfg.y_agg,
-    chart_type: cfg.chart_type,
-    line_color: cfg.line_color,
-  };
-  const method = existing ? 'PUT' : 'POST';
-  fetch('/analysis/dpm/saved', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-    .then((res) => { if (!res.ok) throw new Error('save failed'); return res.json(); })
-    .then((rows) => {
-      document.getElementById('save-name').value='';
-      if (Array.isArray(rows) && rows[0]) {
-        document.getElementById('chart-description').value = rows[0].description || description;
-      }
-      loadSavedQueries();
-    })
-    .catch(() => alert('Failed to save chart. Ensure Supabase table exists.'));
 }
 
 async function copyChartImage() {
@@ -1877,8 +1690,6 @@ document.addEventListener('DOMContentLoaded', () => {
   setPreset(presetId);
 
   document.getElementById('run-chart').addEventListener('click', runChart);
-  document.getElementById('save-chart').addEventListener('click', saveQuery);
-  document.getElementById('saved-search').addEventListener('input', filterSavedList);
   document.getElementById('expand-chart').addEventListener('click', () => expandModal(true));
   document.getElementById('modal-close').addEventListener('click', () => expandModal(false));
   document.getElementById('download-pdf').addEventListener('click', downloadPDF);
@@ -1886,8 +1697,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('modal-download-chart').addEventListener('click', downloadExpandedChart);
   document.getElementById('modal-download-csv').addEventListener('click', downloadTableCSV);
 
-  // Initialize filters and saved preset list
+  // Initialize filters
   initFiltersUI();
-  loadSavedQueries();
   runChart();
 });
