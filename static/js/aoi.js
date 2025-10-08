@@ -3,10 +3,8 @@ import { showSpinner, hideSpinner } from './utils.js';
 let aoiChartInstance = null;
 let aoiChartExpandedInstance = null;
 let currentData = { labels: [], accepted: [], rejected: [] };
-let savedQueriesCache = [];
 let customerOptions = [];
 let operatorOptions = [];
-let activePreset = null;
 
 function uniqueSorted(arr) {
   const map = new Map();
@@ -376,9 +374,6 @@ function runChart() {
     customers: getDropdownValues('filter-customer').join(','),
     operators: getDropdownValues('filter-operator').join(','),
   };
-  if (activePreset && activePreset.params && activePreset.params.view) {
-    params.view = activePreset.params.view;
-  }
   const title = document.getElementById('chart-title').value || '';
   const range = (params.start_date || params.end_date)
     ? ` (${params.start_date || ''} to ${params.end_date || ''})`
@@ -521,120 +516,6 @@ document.getElementById('download-pdf').addEventListener('click', async () => {
   }
 });
 
-function defaultPresets() {
-  return [
-    {
-      name: 'Operator Reject Rate',
-      description: 'Boards accepted vs rejected per operator',
-      params: { start_date: '', end_date: '', job_numbers: [], rev_numbers: [], assemblies: [], customers: [], operators: [] },
-    },
-    {
-      name: 'Shift Reject Rate',
-      description: 'Accepted vs rejected per shift by date',
-      params: { start_date: '', end_date: '', job_numbers: [], rev_numbers: [], assemblies: [], customers: [], operators: [], view: 'shift' },
-    },
-        {
-      name: 'Daily Yield',
-      description: 'Yield percentage per day across both shifts',
-      params: { start_date: '', end_date: '', job_numbers: [], rev_numbers: [], assemblies: [], customers: [], operators: [], view: 'yield' },
-    },
-    {
-      name: 'Customer Rejection Rate',
-      description: 'Rejection rate per customer across all jobs',
-      params: { start_date: '', end_date: '', job_numbers: [], rev_numbers: [], assemblies: [], customers: [], operators: [], view: 'customer_rate' },
-    },
-    {
-      name: 'Assembly Yield Table',
-      description: 'Inspected vs rejected totals and yield per assembly',
-      params: { start_date: '', end_date: '', job_numbers: [], rev_numbers: [], assemblies: [], customers: [], operators: [], view: 'assembly' },
-    },
-  ];
-}
-
-function renderSavedList() {
-  const q = (document.getElementById('saved-search').value || '').toLowerCase();
-  const list = document.getElementById('saved-list');
-  list.innerHTML = '';
-  savedQueriesCache.filter((r) => (r.name || '').toLowerCase().includes(q)).forEach((row) => {
-    const li = document.createElement('li');
-    li.textContent = row.name;
-    li.addEventListener('click', () => loadParams(row));
-    list.appendChild(li);
-  });
-}
-
-document.getElementById('saved-search').addEventListener('input', renderSavedList);
-
-function loadParams(row) {
-  activePreset = row;
-  const p = row.params || {};
-  document.getElementById('chart-title').value = row.name || '';
-  document.getElementById('chart-description').value = row.description || '';
-  document.getElementById('start-date').value = p.start_date || '';
-  document.getElementById('end-date').value = p.end_date || '';
-  document.getElementById('filter-job').value = (p.job_numbers || []).join(', ');
-  document.getElementById('filter-rev').value = (p.rev_numbers || []).join(', ');
-  document.getElementById('filter-assembly').value = (p.assemblies || []).join(', ');
-  populateDynamicSelect('customer-wrapper', 'filter-customer', customerOptions, p.customers || []);
-  populateDynamicSelect('operator-wrapper', 'filter-operator', operatorOptions, p.operators || []);
-  document.getElementById('result-chart-name').textContent = row.name || '';
-  document.getElementById('chart-description-result').textContent = row.description || '';
-  runChart();
-}
-
-function loadSavedQueries() {
-  fetch('/analysis/aoi/saved')
-    .then((r) => r.json())
-    .then((rows) => {
-      savedQueriesCache = defaultPresets().concat(Array.isArray(rows) ? rows : []);
-      renderSavedList();
-      if (savedQueriesCache[0]) loadParams(savedQueriesCache[0]);
-    })
-    .catch(() => {
-      savedQueriesCache = defaultPresets();
-      renderSavedList();
-      if (savedQueriesCache[0]) loadParams(savedQueriesCache[0]);
-    });
-}
-
-function collectParams() {
-  const p = {
-    start_date: document.getElementById('start-date').value || '',
-    end_date: document.getElementById('end-date').value || '',
-    job_numbers: getTextValues('filter-job'),
-    rev_numbers: getTextValues('filter-rev'),
-    assemblies: getTextValues('filter-assembly'),
-    customers: getDropdownValues('filter-customer'),
-    operators: getDropdownValues('filter-operator'),
-  };
-  if (activePreset && activePreset.params && activePreset.params.view) {
-    p.view = activePreset.params.view;
-  }
-  return p;
-}
-
-function saveQuery() {
-  const name = document.getElementById('save-name').value.trim();
-  if (!name) { alert('Please provide a name for this chart.'); return; }
-  const existing = savedQueriesCache.find((q) => q.name === name);
-  if (existing && !confirm('Overwrite existing chart?')) return;
-  const description = document.getElementById('chart-description').value.trim();
-  const payload = {
-    name,
-    description,
-    start_date: document.getElementById('start-date').value || '',
-    end_date: document.getElementById('end-date').value || '',
-    params: collectParams(),
-  };
-  const method = existing ? 'PUT' : 'POST';
-  fetch('/analysis/aoi/saved', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-    .then((res) => { if (!res.ok) throw new Error('save failed'); return res.json(); })
-    .then(() => { document.getElementById('save-name').value=''; loadSavedQueries(); })
-    .catch(() => alert('Failed to save chart. Ensure Supabase table exists.'));
-}
-
-document.getElementById('save-chart').addEventListener('click', saveQuery);
-
 // Tab switching for Chart Builder / Upload
 document.querySelectorAll('.tab').forEach((tab) => {
   tab.addEventListener('click', () => {
@@ -671,4 +552,4 @@ if (uploadForm) {
 }
 
 // Initialize on load
-initFiltersUI().then(loadSavedQueries);
+initFiltersUI().then(() => runChart());

@@ -151,12 +151,7 @@
       </div>
     </div>
 
-      <div class="field-row" style="margin-top:12px;">
-        <div class="field" style="flex:1;">
-          <label for="save-name">Save As</label>
-          <input id="save-name" placeholder="Chart name" />
-        </div>
-        <button type="button" id="save-chart">Save</button>
+      <div class="field-row" style="margin-top:12px; justify-content:flex-end;">
         <button type="button" id="run-chart">Run</button>
       </div>
     </div> <!-- end builder-tab -->
@@ -174,19 +169,6 @@
     </div>
     {% endif %}
     </div>
-
-  <!-- Top Right: Saved Queries + Search -->
-  <div class="analysis-top-right section-card">
-    <div class="section-title">Saved Charts</div>
-    <div class="field-row" style="margin-bottom:8px;">
-      <div class="field" style="flex:1;">
-        <label for="saved-search">Search</label>
-        <input id="saved-search" placeholder="Filter saved charts" />
-      </div>
-    </div>
-    <ul id="saved-list" style="margin:0;padding-left:16px;"></ul>
-    <small>Select a preset to load its metric.</small>
-  </div>
 
   <!-- Bottom Right: Results -->
     <div class="analysis-bottom-right section-card">
