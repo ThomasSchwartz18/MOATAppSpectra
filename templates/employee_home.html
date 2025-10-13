@@ -61,6 +61,7 @@
         <p class="inspection-sheet__subheading" data-sheet-subtitle hidden></p>
         <form class="inspection-sheet" data-sheet-form data-operator-username="{{ username or '' }}" novalidate>
           <input type="hidden" name="program">
+          <input type="hidden" name="area">
           <div class="inspection-progress" data-progress>
             <div class="inspection-progress__track">
               <div class="inspection-progress__bar" data-progress-bar></div>
@@ -86,16 +87,13 @@
                     <option value="" disabled selected>Select shift</option>
                     <option value="1st">1st</option>
                     <option value="2nd">2nd</option>
-                    <option value="3rd">3rd</option>
-                    <option value="Weekend">Weekend</option>
-                    <option value="Other">Other</option>
                   </select>
                 </label>
               </div>
               <div class="inspection-step" data-step data-step-name="operator">
                 <label class="inspection-field">
-                  <span class="inspection-field__label">Operator</span>
-                  <input type="text" name="operator" required>
+                  <span class="inspection-field__label">Operator (first and last)</span>
+                  <input type="text" name="operator" required pattern=".+\s.+" title="Enter first and last name" autocomplete="name">
                 </label>
               </div>
             </fieldset>
@@ -132,13 +130,13 @@
               <legend>Inspection Results</legend>
               <div class="inspection-step" data-step data-step-name="quantity-inspected">
                 <label class="inspection-field">
-                  <span class="inspection-field__label">Quantity Inspected</span>
-                  <input type="number" name="quantity_inspected" min="0" step="1" required>
+                  <span class="inspection-field__label">Boards Processed</span>
+                  <input type="number" name="quantity_inspected" min="1" step="1" required>
                 </label>
               </div>
               <div class="inspection-step" data-step data-step-name="quantity-rejected">
                 <label class="inspection-field">
-                  <span class="inspection-field__label">Quantity Rejected</span>
+                  <span class="inspection-field__label">Boards Rejected</span>
                   <input type="number" name="quantity_rejected" min="0" step="1" required>
                 </label>
               </div>

@@ -109,7 +109,7 @@ function formatDefectOptionLabel(defect) {
   if (!defect) return '';
   const { id, name } = defect;
   if (name) {
-    return `${id} — ${name}`;
+    return `${id} - ${name}`;
   }
   return id;
 }
@@ -286,6 +286,10 @@ function setupInspectionWizard(form) {
 
     const value = input.value ? input.value.trim() : '';
 
+    if (value && typeof input.checkValidity === 'function' && !input.checkValidity()) {
+      return false;
+    }
+
     if (input.required) {
       return value.length > 0;
     }
@@ -414,6 +418,35 @@ function setupAoiArea(container) {
   const operatorUsername = sheetForm ? (sheetForm.dataset.operatorUsername || '').trim() : '';
   const operatorInput = sheetForm ? sheetForm.querySelector('input[name="operator"]') : null;
   const programInput = sheetForm ? sheetForm.querySelector('input[name="program"]') : null;
+  const areaInput = sheetForm ? sheetForm.querySelector('input[name="area"]') : null;
+  const areaName = (container.dataset.areaName || 'AOI').trim();
+  const logoutLink = (sheetForm ? sheetForm.ownerDocument : document).querySelector('.employee-card__logout');
+
+  function getQuantityRejectedTarget() {
+    if (!quantityRejectedInput) return 0;
+    const rawValue = quantityRejectedInput.value;
+    if (rawValue === '') return 0;
+    const parsed = Number(rawValue);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  function updateRejectionRemoveButtons() {
+    if (!rejectionRowsContainer) return;
+    const rows = Array.from(rejectionRowsContainer.querySelectorAll('[data-rejection-row]'));
+    rows.forEach((row, index) => {
+      const removeButton = row.querySelector('[data-action="remove-rejection-row"]');
+      if (!removeButton) return;
+      const disable = index === 0;
+      removeButton.disabled = disable;
+      if (disable) {
+        removeButton.classList.add('is-disabled');
+        removeButton.setAttribute('aria-disabled', 'true');
+      } else {
+        removeButton.classList.remove('is-disabled');
+        removeButton.removeAttribute('aria-disabled');
+      }
+    });
+  }
 
   if (!picker || !sheetPanel || !sheetTitle || !sheetForm || !feedback || !backButton) {
     return;
@@ -440,6 +473,11 @@ function setupAoiArea(container) {
   resetSignatureState();
   if (wizard && typeof wizard.reset === 'function') {
     wizard.reset({ focus: false });
+  }
+
+  if (areaInput) {
+    areaInput.value = areaName;
+    areaInput.readOnly = true;
   }
 
   let activeSheet = null;
@@ -564,6 +602,7 @@ function setupAoiArea(container) {
         row,
         ref,
         reason,
+        reasonLabel,
         reasonId,
         quantity: quantityNumber,
         isQuantityValid,
@@ -576,11 +615,28 @@ function setupAoiArea(container) {
     const rows = collectRejectionRowData();
     const requireDetails = Boolean(rejectionSection && !rejectionSection.hidden);
     const validEntries = rows.filter((entry) => entry.ref && entry.reasonId && entry.isQuantityValid);
-    if (requireDetails && validEntries.length === rows.length && validEntries.length > 0) {
-      const serialized = validEntries.map(({ ref, reason, reasonId, quantity }) => ({
+    const targetQuantity = getQuantityRejectedTarget();
+    const totalQuantity = validEntries.reduce((sum, entry) => sum + entry.quantity, 0);
+
+    if (
+      requireDetails &&
+      targetQuantity > 0 &&
+      totalQuantity < targetQuantity &&
+      !rows.some((entry) => !entry.ref || !entry.reasonId || !entry.isQuantityValid)
+    ) {
+      addRejectionRow();
+    }
+
+    if (
+      requireDetails &&
+      validEntries.length === rows.length &&
+      validEntries.length > 0 &&
+      (targetQuantity === 0 || totalQuantity === targetQuantity)
+    ) {
+      const serialized = validEntries.map(({ ref, reasonId, reasonLabel, quantity }) => ({
         ref,
-        reason,
         reason_id: reasonId,
+        reason_label: reasonLabel || reasonId,
         quantity,
       }));
       rejectionHiddenInput.value = JSON.stringify(serialized);
@@ -589,10 +645,11 @@ function setupAoiArea(container) {
     } else {
       rejectionHiddenInput.value = '';
     }
-    if (wizard) {
-      wizard.evaluate();
-    }
+  if (wizard) {
+    wizard.evaluate();
   }
+  updateRejectionRemoveButtons();
+}
 
   function clearRejectionRows() {
     if (!rejectionRowsContainer) return;
@@ -606,6 +663,7 @@ function setupAoiArea(container) {
     });
     rejectionReasonSelects.clear();
     updateRejectionEmptyState();
+    updateRejectionRemoveButtons();
     syncRejectionDetails();
   }
 
@@ -628,20 +686,11 @@ function setupAoiArea(container) {
     }
     if (signatureDisplay) {
       if (acknowledged) {
-        signatureDisplay.textContent = operatorUsername || 'Signature confirmed';
+        const operatorName = operatorInput ? operatorInput.value.trim() : '';
+        signatureDisplay.textContent = operatorName || operatorUsername || 'Signature confirmed';
       } else {
         signatureDisplay.textContent = signatureDefaultText || 'Sign on file';
       }
-    }
-    if (
-      acknowledged &&
-      operatorInput &&
-      !operatorInput.value.trim() &&
-      operatorUsername
-    ) {
-      operatorInput.value = operatorUsername;
-      operatorInput.dispatchEvent(new Event('input', { bubbles: true }));
-      operatorInput.dispatchEvent(new Event('change', { bubbles: true }));
     }
     if (wizard) {
       wizard.evaluate();
@@ -656,6 +705,8 @@ function setupAoiArea(container) {
     if (!rejectionRowsContainer) return;
     if (!rejectionRowsContainer.querySelector('[data-rejection-row]')) {
       addRejectionRow();
+    } else {
+      updateRejectionRemoveButtons();
     }
   }
 
@@ -720,11 +771,13 @@ function setupAoiArea(container) {
         row.remove();
         updateRejectionEmptyState();
         syncRejectionDetails();
+        updateRejectionRemoveButtons();
       });
     }
 
     rejectionRowsContainer.appendChild(row);
     updateRejectionEmptyState();
+    updateRejectionRemoveButtons();
     syncRejectionDetails();
     if (refInput && typeof refInput.focus === 'function') {
       refInput.focus();
@@ -734,14 +787,15 @@ function setupAoiArea(container) {
 
   function validateRejectionRows() {
     if (!rejectionSection || rejectionSection.hidden) {
-      return { valid: true, entries: [] };
+      return { valid: true, entries: [], totalQuantity: 0, targetQuantity: 0 };
     }
     const rows = collectRejectionRowData();
     if (!rows.length) {
-      return { valid: false, entries: [] };
+      return { valid: false, entries: [], totalQuantity: 0, targetQuantity: getQuantityRejectedTarget() };
     }
     let valid = true;
     const entries = [];
+    let totalQuantity = 0;
     rows.forEach((entry) => {
       const rowValid = Boolean(entry.ref) && Boolean(entry.reasonId) && entry.isQuantityValid;
       markRowValidity(entry.row, rowValid);
@@ -749,17 +803,25 @@ function setupAoiArea(container) {
         valid = false;
         return;
       }
+      totalQuantity += entry.quantity;
       entries.push({
         ref: entry.ref,
         reason: entry.reason,
+        reason_label: entry.reasonLabel,
         reason_id: entry.reasonId,
         quantity: entry.quantity,
       });
     });
-    if (!valid || !entries.length) {
-      return { valid: false, entries: [] };
+    const targetQuantity = getQuantityRejectedTarget();
+    if (!valid || !entries.length || totalQuantity !== targetQuantity) {
+      return {
+        valid: false,
+        entries,
+        totalQuantity,
+        targetQuantity,
+      };
     }
-    return { valid: true, entries };
+    return { valid: true, entries, totalQuantity, targetQuantity };
   }
 
   function handleQuantityRejectedChange() {
@@ -776,6 +838,7 @@ function setupAoiArea(container) {
       clearRejectionRows();
     }
     updateRejectionEmptyState();
+    updateRejectionRemoveButtons();
     syncRejectionDetails();
   }
 
@@ -803,6 +866,15 @@ function setupAoiArea(container) {
   }
 
   resetSignatureState();
+
+  if (operatorInput) {
+    operatorInput.addEventListener('input', () => {
+      if (isSignatureAcknowledged() && signatureDisplay) {
+        const operatorName = operatorInput.value.trim();
+        signatureDisplay.textContent = operatorName || operatorUsername || 'Signature confirmed';
+      }
+    });
+  }
 
   if (signatureControl) {
     signatureControl.addEventListener('click', () => {
@@ -836,11 +908,17 @@ function setupAoiArea(container) {
         sheetSubtitle.hidden = !subtitleText;
       }
       sheetForm.reset();
+      if (areaInput) {
+        areaInput.value = areaName;
+      }
       resetRejectionDetails();
       resetSignatureState();
       setFeedback(feedback, '');
       if (wizard) {
         wizard.reset({ focus: true });
+      }
+      if (logoutLink && typeof logoutLink.focus === 'function') {
+        logoutLink.focus();
       }
       if (programInput) {
         programInput.value = activeSheet || '';
@@ -866,6 +944,9 @@ function setupAoiArea(container) {
     }
     delete sheetPanel.dataset.sheet;
     sheetForm.reset();
+    if (areaInput) {
+      areaInput.value = areaName;
+    }
     resetRejectionDetails();
     resetSignatureState();
     activeSheet = null;
@@ -895,9 +976,9 @@ function setupAoiArea(container) {
     }
 
     const submitButton = sheetForm.querySelector('[type="submit"]');
-    if (submitButton) {
-      submitButton.disabled = true;
-    }
+  if (submitButton) {
+    submitButton.disabled = true;
+  }
 
     if (signatureHiddenInput && signatureControl && !isSignatureAcknowledged()) {
       if (submitButton) {
@@ -920,7 +1001,14 @@ function setupAoiArea(container) {
         if (submitButton) {
           submitButton.disabled = false;
         }
-        const message = 'Complete all rejection detail rows before submitting.';
+        let message = 'Complete all rejection detail rows before submitting.';
+        if (validation.entries.length && validation.targetQuantity !== undefined) {
+          const targetQty = validation.targetQuantity;
+          const totalQty = validation.totalQuantity || 0;
+          if (Number.isFinite(targetQty) && targetQty > 0 && totalQty !== targetQty) {
+            message = `Rejection quantities must total ${targetQty}. They currently total ${totalQty}.`;
+          }
+        }
         employeePortalPopup.show(message, 'error');
         setFeedback(feedback, message, 'error');
         return;
@@ -939,6 +1027,7 @@ function setupAoiArea(container) {
     const payload = Object.fromEntries(formData.entries());
     payload.inspection_type = activeSheet;
     payload.rejection_details = rejectionEntries;
+    payload.area = areaName;
 
     try {
       const response = await fetch('/employee/aoi_reports', {
@@ -963,14 +1052,20 @@ function setupAoiArea(container) {
       }
 
       const successMessage = (responseData && responseData.message) ||
-        'AOI report submitted successfully.';
+        'AOI report submitted successfully. Please sign out for the next operator.';
       employeePortalPopup.show(successMessage, 'success');
       setFeedback(feedback, successMessage, 'success');
       sheetForm.reset();
+      if (areaInput) {
+        areaInput.value = areaName;
+      }
       resetRejectionDetails();
       resetSignatureState();
       if (wizard) {
         wizard.reset({ focus: true });
+      }
+      if (logoutLink && typeof logoutLink.focus === 'function') {
+        logoutLink.focus();
       }
     } catch (error) {
       const message = 'Unable to submit inspection at this time.';
@@ -1049,6 +1144,7 @@ function setupEmployeePortal() {
 
     if (areaName === 'AOI' && aoiTemplate) {
       const areaContent = aoiTemplate.content.firstElementChild.cloneNode(true);
+      areaContent.dataset.areaName = areaName;
       areaSlot.appendChild(areaContent);
       setupAoiArea(areaContent);
       return;

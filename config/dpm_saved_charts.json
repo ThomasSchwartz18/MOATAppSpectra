@@ -2,65 +2,65 @@
   {
     "id": "daily_window_yield_by_line",
     "name": "Daily Window Yield % by Line",
-    "description": "Day-to-day true process yield by AOI window, per line. Quickly exposes drift/spikes.",
+    "description": "Day-to-day true process yield by AOI window, per line. Quickly exposes drift or spikes.",
     "chart_type": "line",
     "mappings": {
       "x": "d",
       "y": "window_yield_pct",
       "series": "line"
     },
-    "sql": "WITH base AS (\n  SELECT\n    \"Report Date\"::date AS d,\n    \"Line\" AS line,\n    COALESCE(\"opportunities_total\", \"Total Windows\", COALESCE(\"windows_per_board\", \"Windows per board\") * COALESCE(\"boards_total\", \"Total Boards\")) AS windows,\n    COALESCE(\"defect_count_true\", \"NG Windows\") AS ng_windows\n  FROM moat_dpm\n)\nSELECT\n  d,\n  line,\n  SUM(windows) AS windows,\n  SUM(ng_windows) AS ng_windows,\n  (SUM(windows) - SUM(ng_windows)) / NULLIF(SUM(windows), 0) * 100.0 AS window_yield_pct\nFROM base\nGROUP BY 1,2\nORDER BY 1,2;"
+    "sql": "WITH base AS (\n  SELECT\n    COALESCE(report_date, \"Report Date\")::date AS report_date,\n    COALESCE(line, \"Line\") AS line,\n    COALESCE(\n      total_windows,\n      \"Total Windows\",\n      COALESCE(windows_per_board, \"Windows per board\") * COALESCE(total_boards, \"Total Boards\")\n    ) AS total_windows,\n    COALESCE(ng_windows, \"NG Windows\") AS ng_windows\n  FROM dpm_moat\n)\nSELECT\n  report_date AS d,\n  line,\n  SUM(total_windows) AS windows,\n  SUM(ng_windows) AS ng_windows,\n  (SUM(total_windows) - SUM(ng_windows)) / NULLIF(SUM(total_windows), 0) * 100.0 AS window_yield_pct\nFROM base\nGROUP BY 1,2\nORDER BY 1,2;"
   },
   {
     "id": "weekly_dpm_trend_by_assembly",
     "name": "Weekly DPM Trend by Assembly",
-    "description": "Defects per million windows over time for each assembly—spot the worst offenders and improvement after fixes.",
+    "description": "Defects per million windows over time for each assembly to spot problem programs quickly.",
     "chart_type": "line",
     "mappings": {
       "x": "wk",
       "y": "dpm",
       "series": "model_name"
     },
-    "sql": "WITH base AS (\n  SELECT\n    date_trunc('week', \"Report Date\")::date AS wk,\n    \"Model Name\" AS model_name,\n    COALESCE(\"opportunities_total\", \"Total Windows\", COALESCE(\"windows_per_board\", \"Windows per board\") * COALESCE(\"boards_total\", \"Total Boards\")) AS windows,\n    COALESCE(\"defect_count_true\", \"NG Windows\") AS ng_windows\n  FROM moat_dpm\n)\nSELECT\n  wk,\n  model_name,\n  SUM(ng_windows) / NULLIF(SUM(windows), 0) * 1e6 AS dpm\nFROM base\nGROUP BY 1,2\nORDER BY wk, model_name;"
+    "sql": "WITH base AS (\n  SELECT\n    COALESCE(report_date, \"Report Date\")::date AS report_date,\n    COALESCE(model_name, \"Model Name\") AS model_name,\n    COALESCE(\n      total_windows,\n      \"Total Windows\",\n      COALESCE(windows_per_board, \"Windows per board\") * COALESCE(total_boards, \"Total Boards\")\n    ) AS total_windows,\n    COALESCE(ng_windows, \"NG Windows\") AS ng_windows\n  FROM dpm_moat\n)\nSELECT\n  date_trunc('week', report_date)::date AS wk,\n  model_name,\n  SUM(ng_windows) / NULLIF(SUM(total_windows), 0) * 1e6 AS dpm\nFROM base\nGROUP BY 1,2\nORDER BY wk, model_name;"
   },
   {
     "id": "top10_assemblies_by_dpm",
     "name": "Top 10 Assemblies by DPM (selected period)",
-    "description": "Pareto-style ranking—where most true defects are concentrated.",
+    "description": "Pareto ranking that shows where most true defects concentrate over the selected range.",
     "chart_type": "bar_horizontal",
     "mappings": {
       "x": "dpm",
       "y": "model_name"
     },
-    "sql": "WITH base AS (\n  SELECT\n    \"Model Name\" AS model_name,\n    COALESCE(\"opportunities_total\", \"Total Windows\", COALESCE(\"windows_per_board\", \"Windows per board\") * COALESCE(\"boards_total\", \"Total Boards\")) AS windows,\n    COALESCE(\"defect_count_true\", \"NG Windows\") AS ng_windows,\n    \"Report Date\"::date AS report_date\n  FROM moat_dpm\n)\nSELECT\n  model_name,\n  SUM(ng_windows) / NULLIF(SUM(windows), 0) * 1e6 AS dpm\nFROM base\nWHERE report_date >= :from AND report_date < :to\nGROUP BY model_name\nORDER BY dpm DESC NULLS LAST\nLIMIT 10;"
+    "sql": "WITH base AS (\n  SELECT\n    COALESCE(report_date, \"Report Date\")::date AS report_date,\n    COALESCE(model_name, \"Model Name\") AS model_name,\n    COALESCE(\n      total_windows,\n      \"Total Windows\",\n      COALESCE(windows_per_board, \"Windows per board\") * COALESCE(total_boards, \"Total Boards\")\n    ) AS total_windows,\n    COALESCE(ng_windows, \"NG Windows\") AS ng_windows\n  FROM dpm_moat\n)\nSELECT\n  model_name,\n  SUM(ng_windows) / NULLIF(SUM(total_windows), 0) * 1e6 AS dpm\nFROM base\nWHERE report_date >= :from AND report_date < :to\nGROUP BY model_name\nORDER BY dpm DESC NULLS LAST\nLIMIT 10;"
   },
   {
     "id": "line_yield_comparison_for_assembly",
     "name": "Line vs Line Window Yield for a Selected Assembly",
-    "description": "For one assembly, which line produces better yield (process quality) across a period.",
+    "description": "For a single assembly, compare which line produces the strongest window yield across the range.",
     "chart_type": "bar",
     "mappings": {
       "x": "line",
       "y": "window_yield_pct"
     },
-    "sql": "WITH base AS (\n  SELECT\n    \"Line\" AS line,\n    \"Model Name\" AS model_name,\n    COALESCE(\"opportunities_total\", \"Total Windows\", COALESCE(\"windows_per_board\", \"Windows per board\") * COALESCE(\"boards_total\", \"Total Boards\")) AS windows,\n    COALESCE(\"defect_count_true\", \"NG Windows\") AS ng_windows,\n    \"Report Date\"::date AS report_date\n  FROM moat_dpm\n)\nSELECT\n  line,\n  SUM(windows) AS windows,\n  SUM(ng_windows) AS ng_windows,\n  (SUM(windows) - SUM(ng_windows)) / NULLIF(SUM(windows), 0) * 100.0 AS window_yield_pct\nFROM base\nWHERE model_name = :model\n  AND report_date >= :from AND report_date < :to\nGROUP BY line\nORDER BY line;"
+    "sql": "WITH base AS (\n  SELECT\n    COALESCE(report_date, \"Report Date\")::date AS report_date,\n    COALESCE(line, \"Line\") AS line,\n    COALESCE(model_name, \"Model Name\") AS model_name,\n    COALESCE(\n      total_windows,\n      \"Total Windows\",\n      COALESCE(windows_per_board, \"Windows per board\") * COALESCE(total_boards, \"Total Boards\")\n    ) AS total_windows,\n    COALESCE(ng_windows, \"NG Windows\") AS ng_windows\n  FROM dpm_moat\n)\nSELECT\n  line,\n  SUM(total_windows) AS windows,\n  SUM(ng_windows) AS ng_windows,\n  (SUM(total_windows) - SUM(ng_windows)) / NULLIF(SUM(total_windows), 0) * 100.0 AS window_yield_pct\nFROM base\nWHERE model_name = :model\n  AND report_date >= :from AND report_date < :to\nGROUP BY line\nORDER BY line;"
   },
   {
     "id": "defects_per_board_by_line_daily",
     "name": "Defects per Board (u-chart friendly) by Line",
-    "description": "Normalized defects load per board—great for SPC and workload impact.",
+    "description": "Normalized defects per board so the team can apply SPC thinking to window-level data.",
     "chart_type": "line",
     "mappings": {
       "x": "d",
       "y": "defects_per_board",
       "series": "line"
     },
-    "sql": "WITH base AS (\n  SELECT\n    \"Report Date\"::date AS d,\n    \"Line\" AS line,\n    COALESCE(\"boards_total\", \"Total Boards\") AS boards,\n    COALESCE(\"defect_count_true\", \"NG Windows\") AS ng_windows\n  FROM moat_dpm\n)\nSELECT\n  d,\n  line,\n  SUM(boards) AS boards,\n  SUM(ng_windows) AS ngw,\n  SUM(ng_windows) / NULLIF(SUM(boards), 0) AS defects_per_board\nFROM base\nGROUP BY 1,2\nORDER BY 1,2;"
+    "sql": "WITH base AS (\n  SELECT\n    COALESCE(report_date, \"Report Date\")::date AS report_date,\n    COALESCE(line, \"Line\") AS line,\n    COALESCE(total_boards, \"Total Boards\") AS total_boards,\n    COALESCE(ng_windows, \"NG Windows\") AS ng_windows\n  FROM dpm_moat\n)\nSELECT\n  report_date AS d,\n  line,\n  SUM(total_boards) AS boards,\n  SUM(ng_windows) AS ngw,\n  SUM(ng_windows) / NULLIF(SUM(total_boards), 0) AS defects_per_board\nFROM base\nGROUP BY 1,2\nORDER BY 1,2;"
   },
   {
     "id": "windows_per_board_vs_dpm_scatter",
     "name": "Windows/Board vs DPM (scatter)",
-    "description": "Normalization check—are high DPM values just because programs have far more windows, or is the process really worse?",
+    "description": "Normalization check: are high DPM values driven by window counts or actual process issues?",
     "chart_type": "scatter",
     "mappings": {
       "x": "windows_per_board",
@@ -68,55 +68,55 @@
       "series": "line",
       "label": "model_name"
     },
-    "sql": "WITH base AS (\n  SELECT\n    \"Model Name\" AS model_name,\n    \"Line\" AS line,\n    COALESCE(\"boards_total\", \"Total Boards\") AS boards,\n    COALESCE(\"opportunities_total\", \"Total Windows\", COALESCE(\"windows_per_board\", \"Windows per board\") * COALESCE(\"boards_total\", \"Total Boards\")) AS windows,\n    COALESCE(\"defect_count_true\", \"NG Windows\") AS ng_windows,\n    \"Report Date\"::date AS report_date\n  FROM moat_dpm\n)\nSELECT\n  model_name,\n  line,\n  SUM(windows) / NULLIF(SUM(boards), 0) AS windows_per_board,\n  SUM(ng_windows) / NULLIF(SUM(windows), 0) * 1e6 AS dpm\nFROM base\nWHERE report_date >= :from AND report_date < :to\nGROUP BY model_name, line\nHAVING SUM(boards) > 0 AND SUM(windows) > 0;"
+    "sql": "WITH base AS (\n  SELECT\n    COALESCE(report_date, \"Report Date\")::date AS report_date,\n    COALESCE(line, \"Line\") AS line,\n    COALESCE(model_name, \"Model Name\") AS model_name,\n    COALESCE(total_boards, \"Total Boards\") AS total_boards,\n    COALESCE(windows_per_board, \"Windows per board\") AS windows_per_board,\n    COALESCE(\n      total_windows,\n      \"Total Windows\",\n      COALESCE(windows_per_board, \"Windows per board\") * COALESCE(total_boards, \"Total Boards\")\n    ) AS total_windows,\n    COALESCE(ng_windows, \"NG Windows\") AS ng_windows\n  FROM dpm_moat\n)\nSELECT\n  model_name,\n  line,\n  SUM(total_windows) / NULLIF(SUM(total_boards), 0) AS windows_per_board,\n  SUM(ng_windows) / NULLIF(SUM(total_windows), 0) * 1e6 AS dpm\nFROM base\nWHERE report_date >= :from AND report_date < :to\nGROUP BY model_name, line\nHAVING SUM(total_boards) > 0 AND SUM(total_windows) > 0;"
   },
   {
     "id": "yield_heatmap_line_by_assembly",
     "name": "Yield Heatmap (Line × Assembly)",
-    "description": "“In-sync” view—who’s great/struggling per assembly across lines.",
+    "description": "At-a-glance view of which line and assembly combinations are excelling or struggling.",
     "chart_type": "heatmap",
     "mappings": {
       "row": "model_name",
       "col": "line",
       "value": "window_yield_pct"
     },
-    "sql": "WITH base AS (\n  SELECT\n    \"Line\" AS line,\n    \"Model Name\" AS model_name,\n    COALESCE(\"opportunities_total\", \"Total Windows\", COALESCE(\"windows_per_board\", \"Windows per board\") * COALESCE(\"boards_total\", \"Total Boards\")) AS windows,\n    COALESCE(\"defect_count_true\", \"NG Windows\") AS ng_windows,\n    \"Report Date\"::date AS report_date\n  FROM moat_dpm\n)\nSELECT\n  line,\n  model_name,\n  (SUM(windows) - SUM(ng_windows)) / NULLIF(SUM(windows), 0) * 100.0 AS window_yield_pct\nFROM base\nWHERE report_date >= :from AND report_date < :to\nGROUP BY line, model_name;"
+    "sql": "WITH base AS (\n  SELECT\n    COALESCE(report_date, \"Report Date\")::date AS report_date,\n    COALESCE(line, \"Line\") AS line,\n    COALESCE(model_name, \"Model Name\") AS model_name,\n    COALESCE(\n      total_windows,\n      \"Total Windows\",\n      COALESCE(windows_per_board, \"Windows per board\") * COALESCE(total_boards, \"Total Boards\")\n    ) AS total_windows,\n    COALESCE(ng_windows, \"NG Windows\") AS ng_windows\n  FROM dpm_moat\n)\nSELECT\n  line,\n  model_name,\n  (SUM(total_windows) - SUM(ng_windows)) / NULLIF(SUM(total_windows), 0) * 100.0 AS window_yield_pct\nFROM base\nWHERE report_date >= :from AND report_date < :to\nGROUP BY line, model_name;"
   },
   {
     "id": "rolling7_window_yield_by_line",
     "name": "Rolling 7-Day Average Yield (per Line)",
-    "description": "Smoothed trend; separates signal from day-to-day noise.",
+    "description": "Smoothed trends separate signal from day-to-day noise for each line.",
     "chart_type": "line",
     "mappings": {
       "x": "d",
       "y": "window_yield_pct_roll7",
       "series": "line"
     },
-    "sql": "WITH base AS (\n  SELECT\n    \"Report Date\"::date AS d,\n    \"Line\" AS line,\n    COALESCE(\"opportunities_total\", \"Total Windows\", COALESCE(\"windows_per_board\", \"Windows per board\") * COALESCE(\"boards_total\", \"Total Boards\")) AS windows,\n    COALESCE(\"defect_count_true\", \"NG Windows\") AS ng_windows\n  FROM moat_dpm\n),\nagg AS (\n  SELECT\n    d,\n    line,\n    SUM(windows) AS windows,\n    SUM(ng_windows) AS ng_windows\n  FROM base\n  GROUP BY d, line\n),\nyield AS (\n  SELECT\n    d,\n    line,\n    (windows - ng_windows) / NULLIF(windows, 0) * 100.0 AS window_yield_pct\n  FROM agg\n)\nSELECT\n  d,\n  line,\n  AVG(window_yield_pct) OVER (\n    PARTITION BY line\n    ORDER BY d\n    ROWS BETWEEN 6 PRECEDING AND CURRENT ROW\n  ) AS window_yield_pct_roll7\nFROM yield\nORDER BY d, line;"
+    "sql": "WITH base AS (\n  SELECT\n    COALESCE(report_date, \"Report Date\")::date AS report_date,\n    COALESCE(line, \"Line\") AS line,\n    COALESCE(\n      total_windows,\n      \"Total Windows\",\n      COALESCE(windows_per_board, \"Windows per board\") * COALESCE(total_boards, \"Total Boards\")\n    ) AS total_windows,\n    COALESCE(ng_windows, \"NG Windows\") AS ng_windows\n  FROM dpm_moat\n),\nagg AS (\n  SELECT\n    report_date,\n    line,\n    SUM(total_windows) AS total_windows,\n    SUM(ng_windows) AS ng_windows\n  FROM base\n  GROUP BY report_date, line\n),\nyield AS (\n  SELECT\n    report_date,\n    line,\n    (total_windows - ng_windows) / NULLIF(total_windows, 0) * 100.0 AS window_yield_pct\n  FROM agg\n)\nSELECT\n  report_date AS d,\n  line,\n  AVG(window_yield_pct) OVER (\n    PARTITION BY line\n    ORDER BY report_date\n    ROWS BETWEEN 6 PRECEDING AND CURRENT ROW\n  ) AS window_yield_pct_roll7\nFROM yield\nORDER BY d, line;"
   },
   {
     "id": "throughput_vs_quality_by_line",
     "name": "Throughput vs Quality: Boards Inspected vs Yield (bubble)",
-    "description": "Which lines sustain high quality and high throughput.",
+    "description": "Highlights which lines sustain both high throughput and strong yields.",
     "chart_type": "bubble",
     "mappings": {
       "x": "boards",
       "y": "window_yield_pct",
       "label": "line"
     },
-    "sql": "WITH base AS (\n  SELECT\n    \"Line\" AS line,\n    COALESCE(\"boards_total\", \"Total Boards\") AS boards,\n    COALESCE(\"opportunities_total\", \"Total Windows\", COALESCE(\"windows_per_board\", \"Windows per board\") * COALESCE(\"boards_total\", \"Total Boards\")) AS windows,\n    COALESCE(\"defect_count_true\", \"NG Windows\") AS ng_windows,\n    \"Report Date\"::date AS report_date\n  FROM moat_dpm\n)\nSELECT\n  line,\n  SUM(boards) AS boards,\n  (SUM(windows) - SUM(ng_windows)) / NULLIF(SUM(windows), 0) * 100.0 AS window_yield_pct\nFROM base\nWHERE report_date >= :from AND report_date < :to\nGROUP BY line;"
+    "sql": "WITH base AS (\n  SELECT\n    COALESCE(report_date, \"Report Date\")::date AS report_date,\n    COALESCE(line, \"Line\") AS line,\n    COALESCE(total_boards, \"Total Boards\") AS total_boards,\n    COALESCE(\n      total_windows,\n      \"Total Windows\",\n      COALESCE(windows_per_board, \"Windows per board\") * COALESCE(total_boards, \"Total Boards\")\n    ) AS total_windows,\n    COALESCE(ng_windows, \"NG Windows\") AS ng_windows\n  FROM dpm_moat\n)\nSELECT\n  line,\n  SUM(total_boards) AS boards,\n  (SUM(total_windows) - SUM(ng_windows)) / NULLIF(SUM(total_windows), 0) * 100.0 AS window_yield_pct\nFROM base\nWHERE report_date >= :from AND report_date < :to\nGROUP BY line;"
   },
   {
     "id": "spc_u_chart_defects_per_board",
     "name": "Control Chart (u-Chart approximation) – Defects/Board per Line",
-    "description": "SPC-style alerting for special-cause variation by line.",
+    "description": "SPC-style alerting for special-cause variation per line; compute bands after fetching results.",
     "chart_type": "line_with_bands",
     "mappings": {
       "x": "d",
       "y": "u_value",
       "series": "line"
     },
-    "sql": "WITH base AS (\n  SELECT\n    \"Report Date\"::date AS d,\n    \"Line\" AS line,\n    COALESCE(\"boards_total\", \"Total Boards\") AS boards,\n    COALESCE(\"defect_count_true\", \"NG Windows\") AS ng_windows\n  FROM moat_dpm\n)\nSELECT\n  d,\n  line,\n  SUM(boards) AS boards,\n  SUM(ng_windows) AS ngw,\n  SUM(ng_windows) / NULLIF(SUM(boards), 0) AS u_value -- defects/board\nFROM base\nGROUP BY 1,2\nORDER BY 1,2;",
-    "notes": "Compute mean and UCL/LCL per line after fetching results: UCL = ū + 3 * sqrt(ū / n_i), LCL = max(0, ū - 3 * sqrt(ū / n_i)), where n_i is the boards inspected on that day."
+    "sql": "WITH base AS (\n  SELECT\n    COALESCE(report_date, \"Report Date\")::date AS report_date,\n    COALESCE(line, \"Line\") AS line,\n    COALESCE(total_boards, \"Total Boards\") AS total_boards,\n    COALESCE(ng_windows, \"NG Windows\") AS ng_windows\n  FROM dpm_moat\n)\nSELECT\n  report_date AS d,\n  line,\n  SUM(total_boards) AS boards,\n  SUM(ng_windows) AS ngw,\n  SUM(ng_windows) / NULLIF(SUM(total_boards), 0) AS u_value\nFROM base\nGROUP BY 1,2\nORDER BY 1,2;",
+    "notes": "Compute mean and UCL/LCL per line after fetching results: UCL = u_bar + 3 * sqrt(u_bar / n_i), LCL = max(0, u_bar - 3 * sqrt(u_bar / n_i)), where n_i is the boards inspected on that day."
   }
 ]

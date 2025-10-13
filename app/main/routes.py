@@ -79,6 +79,10 @@ from app.db import (
     fetch_feature_states,
     fetch_feature_states_for_bug,
     upsert_feature_state,
+    ensure_customer,
+    ensure_customer_assembly,
+    ensure_job,
+    ensure_operator,
 )
 
 _ORIGINAL_AOI_QUERY = query_aoi_base_daily
@@ -295,6 +299,33 @@ def _coerce_number(value, *, default=0.0):
     return number
 
 
+def _coerce_int(value, *, default=0):
+    """Convert Excel cell values to integers, round if needed."""
+
+    number = _coerce_number(value, default=default)
+    try:
+        return int(round(number))
+    except (TypeError, ValueError):
+        return default
+
+
+def _first_non_blank(row: dict, *keys, default=None):
+    """Return the first non-blank value for ``keys`` within ``row``."""
+
+    for key in keys:
+        if not key:
+            continue
+        if key not in row:
+            continue
+        value = row[key]
+        if value is None:
+            continue
+        if isinstance(value, str) and not value.strip():
+            continue
+        return value
+    return default
+
+
 _PPM_FIELD_ALIASES: dict[str, tuple[str, ...]] = {
     'boards_in': ('boards_in', 'Boards In', 'Total Boards', 'total_boards'),
     'boards_out': ('boards_out', 'Boards Out', 'Good Boards', 'good_boards'),
@@ -433,23 +464,61 @@ def _dpm_text(row: dict, key: str, *, default=None):
 
 
 def _aoi_passed(row):
-    ins = float(row.get('aoi_Quantity Inspected') or row.get('Quantity Inspected') or 0)
-    rej = float(row.get('aoi_Quantity Rejected') or row.get('Quantity Rejected') or 0)
-    v = ins - rej
-    return v if v > 0 else 0
+    inspected = _coerce_number(
+        _first_non_blank(
+            row,
+            'aoi_Quantity Inspected',
+            'Quantity Inspected',
+            'aoi_qty_inspected',
+            'aoi_quantity_inspected',
+            'quantity_inspected',
+        ),
+        default=0.0,
+    )
+    rejected = _coerce_number(
+        _first_non_blank(
+            row,
+            'aoi_Quantity Rejected',
+            'Quantity Rejected',
+            'aoi_qty_rejected',
+            'aoi_quantity_rejected',
+            'quantity_rejected',
+        ),
+        default=0.0,
+    )
+    value = inspected - rejected
+    return value if value > 0 else 0.0
 
 
 def _fi_rejected(row):
-    return float(row.get('fi_Quantity Rejected') or 0)
+    return _coerce_number(
+        _first_non_blank(
+            row,
+            'fi_Quantity Rejected',
+            'fi_qty_rejected',
+            'fi_quantity_rejected',
+        ),
+        default=0.0,
+    )
 
 
 def _fi_inspected(row):
-    return float(row.get('fi_Quantity Inspected') or 0)
+    return _coerce_number(
+        _first_non_blank(
+            row,
+            'fi_Quantity Inspected',
+            'fi_qty_inspected',
+            'fi_quantity_inspected',
+        ),
+        default=0.0,
+    )
 
 
 def _gap_days(row):
-    a = _parse_date(row.get('aoi_Date'))
-    f = _parse_date(row.get('fi_Date'))
+    a = _parse_date(
+        _first_non_blank(row, 'aoi_Date', 'Date', 'aoi_date', 'date')
+    )
+    f = _parse_date(_first_non_blank(row, 'fi_Date', 'fi_date'))
     if a and f:
         return (f - a).days
     return None
@@ -1047,6 +1116,9 @@ TRACKED_SUPABASE_TABLES = {
     table_name("fi_reports"): "Final inspection data powering FI quality metrics.",
     table_name("moat"): "MOAT data feeding the integrated performance report.",
     table_name("combined_reports"): "Joined AOI/FI views surfaced in integrated analytics.",
+    table_name("customers"): "Customer directory maintained from operator submissions.",
+    table_name("assemblies"): "Customer assemblies captured from operator submissions.",
+    table_name("operators"): "Operator directory populated from employee submissions.",
     table_name("app_users"): "Application login accounts managed from this console.",
     table_name("bug_reports"): "In-app feedback collected to triage feature issues and bugs.",
     table_name("defects"): "Defect catalog entries referenced when analysing bug submissions.",
@@ -1786,11 +1858,12 @@ def _normalize_employee_date(value: str | None) -> str | None:
     return None
 
 
+
 def _prepare_employee_aoi_record(
     payload: dict[str, str],
-) -> tuple[dict[str, str], dict[str, str], str | None]:
+) -> tuple[dict[str, str | int], dict[str, str], str | None]:
     errors: dict[str, str] = {}
-    record: dict[str, str] = {}
+    record: dict[str, str | int] = {}
 
     date_raw = (payload.get('date') or '').strip()
     if not date_raw:
@@ -1800,115 +1873,149 @@ def _prepare_employee_aoi_record(
         if not normalized_date:
             errors['date'] = 'Enter a valid date.'
         else:
-            record['Date'] = normalized_date
+            record['date'] = normalized_date
 
-    text_fields = (
-        ('shift', 'Shift'),
-        ('operator', 'Operator'),
-        ('customer', 'Customer'),
-        ('program', 'Program'),
-        ('assembly', 'Assembly'),
-        ('job_number', 'Job Number'),
-    )
-    for field, column in text_fields:
-        value = (payload.get(field) or '').strip()
+    program_value = (payload.get('program') or payload.get('inspection_type') or '').strip().upper()
+    if program_value not in {'SMT', 'TH'}:
+        errors['program'] = 'Select SMT or TH to continue.'
+    else:
+        record['program'] = program_value
+
+    shift_value = (payload.get('shift') or '').strip()
+    if shift_value not in {'1st', '2nd'}:
+        errors['shift'] = 'Select a valid shift.'
+    else:
+        record['shift'] = shift_value
+
+    operator_value = (payload.get('operator') or '').strip()
+    if not operator_value:
+        errors['operator'] = 'Operator name is required.'
+    elif len(operator_value.split()) < 2:
+        errors['operator'] = 'Enter first and last name.'
+    else:
+        record['operator'] = operator_value
+
+    for field_key, record_key in (
+        ('customer', 'customer'),
+        ('assembly', 'assembly'),
+        ('job_number', 'job_number'),
+    ):
+        value = (payload.get(field_key) or '').strip()
         if not value:
-            errors[field] = 'This field is required.'
+            errors[field_key] = 'This field is required.'
         else:
-            record[column] = value
+            record[record_key] = value
+
+    rev_value = (payload.get('rev') or '').strip()
+    if rev_value:
+        record['rev'] = rev_value
+
+    def _parse_quantity(field: str, *, minimum: int = 0) -> int | None:
+        raw = (payload.get(field) or '').strip()
+        if raw == '':
+            errors[field] = 'This field is required.'
+            return None
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            errors[field] = 'Enter a whole number of 0 or greater.'
+            return None
+        if value < minimum:
+            errors[field] = 'Enter a whole number of 0 or greater.'
+            return None
+        return value
+
+    quantity_inspected = _parse_quantity('quantity_inspected', minimum=1)
+    quantity_rejected = _parse_quantity('quantity_rejected', minimum=0)
+
+    if quantity_inspected is not None:
+        record['quantity_inspected'] = quantity_inspected
+    if quantity_rejected is not None:
+        record['quantity_rejected'] = quantity_rejected
+
+    if (
+        quantity_inspected is not None
+        and quantity_rejected is not None
+        and quantity_rejected > quantity_inspected
+    ):
+        errors['quantity_rejected'] = 'Rejected boards cannot exceed the total processed.'
 
     signature_value = str(payload.get('operator_signature_acknowledged') or '').strip().lower()
     if signature_value not in {'true', '1', 'yes', 'on'}:
         errors['operator_signature_acknowledged'] = 'Confirm the operator signature before submitting.'
 
-    numeric_fields = (
-        ('quantity_inspected', 'Quantity Inspected'),
-        ('quantity_rejected', 'Quantity Rejected'),
-    )
-    for field, column in numeric_fields:
-        value = (payload.get(field) or '').strip()
-        if not value:
-            errors[field] = 'This field is required.'
-            continue
-        try:
-            number = int(value)
-            if number < 0:
-                raise ValueError
-        except ValueError:
-            errors[field] = 'Enter a whole number of 0 or greater.'
-            continue
-        record[column] = str(number)
-
-    rev_value = (payload.get('rev') or '').strip()
-    if rev_value:
-        record['Rev'] = rev_value
-
-    sheet_key = (payload.get('inspection_type') or '').strip().upper()
-    sheet_label = None
-    if sheet_key:
-        sheet_label = EMPLOYEE_SHEET_LABELS.get(sheet_key)
-        if not sheet_label:
-            errors['inspection_type'] = 'Select a valid inspection data sheet.'
-    else:
-        errors['inspection_type'] = 'Select a valid inspection data sheet.'
-
     notes_value = (payload.get('notes') or '').strip()
 
     rejection_details_raw = payload.get('rejection_details')
-    rejection_entries: list[dict[str, object]] = []
-    if isinstance(rejection_details_raw, str) and rejection_details_raw.strip():
-        try:
-            parsed = json.loads(rejection_details_raw)
-        except json.JSONDecodeError:
-            errors['rejection_details'] = 'Enter valid rejection detail rows.'
-        else:
-            if isinstance(parsed, list):
-                rejection_entries = [entry for entry in parsed if isinstance(entry, dict)]
-                if len(rejection_entries) != len(parsed):
-                    errors['rejection_details'] = 'Enter valid rejection detail rows.'
-            elif parsed:
+    rejection_details: list[dict[str, object]] = []
+    if isinstance(rejection_details_raw, str):
+        if rejection_details_raw.strip():
+            try:
+                parsed = json.loads(rejection_details_raw)
+            except json.JSONDecodeError:
                 errors['rejection_details'] = 'Enter valid rejection detail rows.'
+            else:
+                if isinstance(parsed, list):
+                    rejection_details = [entry for entry in parsed if isinstance(entry, dict)]
+                    if len(rejection_details) != len(parsed):
+                        errors['rejection_details'] = 'Enter valid rejection detail rows.'
+                elif parsed:
+                    errors['rejection_details'] = 'Enter valid rejection detail rows.'
     elif isinstance(rejection_details_raw, list):
-        rejection_entries = [entry for entry in rejection_details_raw if isinstance(entry, dict)]
-        if len(rejection_entries) != len(rejection_details_raw):
+        rejection_details = [entry for entry in rejection_details_raw if isinstance(entry, dict)]
+        if len(rejection_details) != len(rejection_details_raw):
             errors['rejection_details'] = 'Enter valid rejection detail rows.'
-    elif rejection_details_raw not in (None, ''):
-        errors['rejection_details'] = 'Enter valid rejection detail rows.'
 
     formatted_rejections: list[str] = []
-    if rejection_entries:
-        detail_errors = False
-        for entry in rejection_entries:
-            ref = str(entry.get('ref', '') or '').strip()
-            reason = str(entry.get('reason', '') or '').strip()
+    total_rejection_quantity = 0
+    rejection_error = False
+
+    if rejection_details:
+        for index, entry in enumerate(rejection_details):
+            ref = str(entry.get('ref') or '').strip()
+            reason_id = str(entry.get('reason_id') or entry.get('reason') or '').strip()
             quantity_raw = entry.get('quantity')
             try:
                 quantity = int(quantity_raw)
             except (TypeError, ValueError):
                 quantity = None
-            if not ref or not reason or not quantity or quantity <= 0:
-                detail_errors = True
+            if not ref or not reason_id or quantity is None or quantity <= 0:
+                rejection_error = True
                 break
-            reason_normalized = ' '.join(reason.split())
-            formatted_rejections.append(f'{ref} - {reason_normalized} ({quantity})')
-        if detail_errors:
-            errors['rejection_details'] = (
-                'Rejection detail entries must include a reference, reason, '
-                'and quantity of 1 or more.'
-            )
+            formatted_value = f"{ref} {reason_id} ({quantity})"
+            if index < len(rejection_details) - 1:
+                formatted_value = f"{formatted_value},"
+            formatted_rejections.append(formatted_value)
+            total_rejection_quantity += quantity
 
-    additional_parts = []
-    if sheet_label:
-        additional_parts.append(f'{sheet_label} submission')
-    if formatted_rejections:
-        additional_parts.append(', '.join(formatted_rejections))
+        if rejection_error:
+            errors['rejection_details'] = (
+                'Rejection detail entries must include a reference, defect code, and quantity of 1 or more.'
+            )
+        elif (
+            quantity_rejected is not None
+            and quantity_rejected > 0
+            and total_rejection_quantity != quantity_rejected
+        ):
+            errors['rejection_details'] = (
+                f'Rejection quantities must total exactly {quantity_rejected}. '
+                f'Current total: {total_rejection_quantity}.'
+            )
+    elif quantity_rejected:
+        errors['rejection_details'] = 'Provide rejection details for each rejected board.'
+
+    additional_sections: list[str] = []
+    if formatted_rejections and 'rejection_details' not in errors:
+        additional_sections.append('\n'.join(formatted_rejections))
     if notes_value:
-        additional_parts.append(notes_value)
-    if additional_parts:
-        record['Additional Information'] = ' | '.join(additional_parts)
+        additional_sections.append(f'Notes: {notes_value}')
+    if additional_sections and 'rejection_details' not in errors:
+        record['additional_information'] = '\n'.join(additional_sections)
+
+    sheet_key = (payload.get('inspection_type') or '').strip().upper()
+    sheet_label = EMPLOYEE_SHEET_LABELS.get(sheet_key)
 
     return record, errors, sheet_label
-
 
 def _build_defect_response():
     defects, error = fetch_defect_catalog()
@@ -1933,12 +2040,47 @@ def employee_add_aoi_report():
     record, errors, sheet_label = _prepare_employee_aoi_record(payload)
     if errors:
         return jsonify({'errors': errors}), 400
+    customer_name = str(record.get('customer') or '').strip()
+    customer_id = None
+    if customer_name:
+        customer_id, ensure_error = ensure_customer(customer_name)
+        if ensure_error:
+            return jsonify({'errors': {'base': ensure_error}}), 500
+        if customer_id is None:
+            return jsonify({'errors': {'base': 'Unable to resolve customer record.'}}), 500
+        record['customer_id'] = customer_id
+    record.pop('customer', None)
+    assembly_value = str(record.get('assembly') or '').strip()
+    rev_value = record.get('rev') or ''
+    assembly_id = None
+    if assembly_value and customer_id is not None:
+        assembly_id, assembly_error = ensure_customer_assembly(customer_id, assembly_value, rev_value)
+        if assembly_error:
+            return jsonify({'errors': {'base': assembly_error}}), 500
+        if assembly_id is not None:
+            record['assembly_id'] = assembly_id
+    record.pop('assembly', None)
+    area_value = (payload.get('area') or payload.get('inspection_type') or 'AOI').strip() or 'AOI'
+    area_value = area_value.upper()
+    operator_name = str(record.get('operator') or '').strip()
+    operator_id = None
+    if operator_name:
+        operator_id, operator_error = ensure_operator(operator_name, area_value)
+        if operator_error:
+            return jsonify({'errors': {'base': operator_error}}), 500
+        if operator_id is not None:
+            record['operator_id'] = operator_id
+    record.pop('operator', None)
+    job_number_value = str(record.get('job_number') or '').strip()
+    if job_number_value:
+        _, job_error = ensure_job(job_number_value, customer_id=customer_id, assembly_id=assembly_id)
+        if job_error:
+            return jsonify({'errors': {'base': job_error}}), 500
     _, error = insert_aoi_report(record)
     if error:
         return jsonify({'errors': {'base': error}}), 500
-    message = 'AOI report submitted successfully.'
-    if sheet_label:
-        message = f'{sheet_label} submission saved successfully.'
+    descriptor = sheet_label or 'AOI report'
+    message = f"{descriptor} submitted. Please sign out for the next operator."
     return jsonify({'message': message}), 201
 
 
@@ -2220,16 +2362,16 @@ def upload_dpm_reports():
         if str(model).strip().lower() == 'total':
             break
         rows.append({
-            'Model Name': model,
-            'Total Boards': _coerce_number(cell(row_idx, 3)),
-            'Windows per board': _coerce_number(cell(row_idx, 4)),
-            'Total Windows': _coerce_number(cell(row_idx, 5)),
-            'NG Windows': _coerce_number(cell(row_idx, 6)),
-            'DPM': _coerce_number(cell(row_idx, 7)),
-            'FalseCall Windows': _coerce_number(cell(row_idx, 8)),
-            'FC DPM': _coerce_number(cell(row_idx, 9)),
-            'Report Date': report_date,
-            'Line': line,
+            'model_name': model,
+            'total_boards': _coerce_int(cell(row_idx, 3)),
+            'windows_per_board': _coerce_number(cell(row_idx, 4)),
+            'total_windows': _coerce_int(cell(row_idx, 5)),
+            'ng_windows': _coerce_int(cell(row_idx, 6)),
+            'dpm': _coerce_number(cell(row_idx, 7)),
+            'falsecall_windows': _coerce_int(cell(row_idx, 8)),
+            'fc_dpm': _coerce_number(cell(row_idx, 9)),
+            'report_date': report_date,
+            'line': line,
         })
         row_idx += 1
 
@@ -2317,16 +2459,16 @@ def upload_ppm_reports():
         if str(model).strip().lower() == 'total':
             break
         rows.append({
-            'Model Name': model,
-            'Total Boards': cell(row_idx, 3) or 0,
-            'Total Parts/Board': cell(row_idx, 4) or 0,
-            'Total Parts': cell(row_idx, 5) or 0,
-            'NG Parts': cell(row_idx, 6) or 0,
-            'NG PPM': cell(row_idx, 7) or 0,
-            'FalseCall Parts': cell(row_idx, 8) or 0,
-            'FalseCall PPM': cell(row_idx, 9) or 0,
-            'Report Date': report_date,
-            'Line': line,
+            'model_name': model,
+            'total_boards': _coerce_int(cell(row_idx, 3)),
+            'total_parts_per_board': _coerce_int(cell(row_idx, 4)),
+            'total_parts': _coerce_int(cell(row_idx, 5)),
+            'ng_parts': _coerce_int(cell(row_idx, 6)),
+            'ng_ppm': _coerce_number(cell(row_idx, 7)),
+            'falsecall_parts': _coerce_int(cell(row_idx, 8)),
+            'falsecall_ppm': _coerce_number(cell(row_idx, 9)),
+            'report_date': report_date,
+            'line': line,
         })
         row_idx += 1
 

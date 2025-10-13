@@ -225,6 +225,425 @@ def _normalize_dpm_row(row: dict) -> dict:
     return row
 
 
+_AOI_REPORT_ALIAS_MAP: dict[str, tuple[str, ...]] = {
+    "date": ("Date", "aoi_Date"),
+    "shift": ("Shift", "aoi_Shift"),
+    "operator": ("Operator", "aoi_Operator"),
+    "customer": ("Customer", "aoi_Customer"),
+    "assembly": ("Assembly", "aoi_Assembly"),
+    "rev": ("Rev", "aoi_Rev"),
+    "job_number": ("Job Number", "aoi_Job Number"),
+    "quantity_inspected": ("Quantity Inspected", "aoi_Quantity Inspected"),
+    "quantity_rejected": ("Quantity Rejected", "aoi_Quantity Rejected"),
+    "additional_information": ("Additional Information", "aoi_Additional Information"),
+    "program": ("Program", "aoi_Program"),
+    "id": ("aoi_ID",),
+}
+
+
+_FI_REPORT_ALIAS_MAP: dict[str, tuple[str, ...]] = {
+    "date": ("Date", "fi_Date"),
+    "shift": ("Shift", "fi_Shift"),
+    "operator": ("Operator", "fi_Operator"),
+    "customer": ("Customer", "fi_Customer"),
+    "assembly": ("Assembly", "fi_Assembly"),
+    "rev": ("Rev", "fi_Rev"),
+    "job_number": ("Job Number", "fi_Job Number"),
+    "quantity_inspected": ("Quantity Inspected", "fi_Quantity Inspected"),
+    "quantity_rejected": ("Quantity Rejected", "fi_Quantity Rejected"),
+    "additional_information": ("Additional Information", "fi_Additional Information"),
+    "id": ("fi_ID",),
+}
+
+
+_COMBINED_ALIAS_MAP: dict[str, tuple[str, ...]] = {
+    "aoi_date": ("aoi_Date", "Date"),
+    "fi_date": ("fi_Date",),
+    "aoi_qty_inspected": ("aoi_Quantity Inspected", "Quantity Inspected"),
+    "aoi_qty_rejected": ("aoi_Quantity Rejected", "Quantity Rejected"),
+    "fi_qty_inspected": ("fi_Quantity Inspected",),
+    "fi_qty_rejected": ("fi_Quantity Rejected",),
+    "aoi_customer": ("aoi_Customer", "Customer"),
+    "aoi_additional_information": ("aoi_Additional Information",),
+    "fi_operator": ("fi_Operator",),
+    "fi_customer": ("fi_Customer",),
+    "fi_assembly": ("fi_Assembly",),
+    "fi_rev": ("fi_Rev",),
+    "fi_additional_information": ("fi_Additional Information",),
+    "aoi_assembly": ("aoi_Assembly", "Assembly"),
+    "aoi_rev": ("aoi_Rev", "Rev"),
+    "job_number": ("aoi_Job Number", "Job Number"),
+    "fi_shift": ("fi_Shift",),
+    "aoi_program": ("aoi_Program", "Program"),
+    "aoi_shift": ("aoi_Shift", "Shift"),
+    "aoi_operator": ("aoi_Operator", "Operator"),
+    "aoi_station": ("aoi_Station", "Station"),
+    "fi_part_type": ("fi_Part Type",),
+    "days_from_aoi_to_fi": ("Days From AOI to FI",),
+    "aoi_id": ("aoi_ID",),
+    "fi_id": ("fi_ID",),
+    "has_fi": ("has_fi",),
+}
+
+
+def _apply_aliases(rows: list[dict], mapping: dict[str, tuple[str, ...]]) -> list[dict]:
+    """Populate legacy keys expected by analytics from modern snake_case data."""
+
+    for row in rows or []:
+        if not isinstance(row, dict):
+            continue
+        for source, targets in mapping.items():
+            if source not in row:
+                continue
+            value = row[source]
+            for target in targets:
+                row.setdefault(target, value)
+    return rows
+
+
+def _apply_aoi_aliases(rows: list[dict]) -> list[dict]:
+    return _apply_aliases(rows, _AOI_REPORT_ALIAS_MAP)
+
+
+def _apply_fi_aliases(rows: list[dict]) -> list[dict]:
+    return _apply_aliases(rows, _FI_REPORT_ALIAS_MAP)
+
+
+def _apply_combined_aliases(rows: list[dict]) -> list[dict]:
+    return _apply_aliases(rows, _COMBINED_ALIAS_MAP)
+
+
+def ensure_customer(name: str) -> tuple[int | None, str | None]:
+    """Return the customer id for ``name``; create the row when missing."""
+
+    normalized = (name or '').strip()
+    if not normalized:
+        return None, "Customer name is required."
+
+    supabase, error = _ensure_supabase_client()
+    if error:
+        return None, error
+
+    table = table_name("customers")
+    id_column = column_name("customers", "id")
+    name_column = column_name("customers", "name")
+    alt_column = column_name("customers", "alt_names")
+
+    def _lookup_existing() -> tuple[dict | None, str | None]:
+        try:
+            response = (
+                supabase.table(table)
+                .select(f"{id_column},{alt_column}")
+                .eq(name_column, normalized)
+                .limit(1)
+                .execute()
+            )
+        except Exception as exc:  # pragma: no cover - network errors
+            return None, f"Failed to lookup customer: {exc}"
+
+        rows = getattr(response, "data", None) or []
+        if rows:
+            return rows[0], None
+
+        try:
+            response = (
+                supabase.table(table)
+                .select(f"{id_column},{alt_column}")
+                .ilike(name_column, normalized)
+                .limit(1)
+                .execute()
+            )
+        except Exception as exc:  # pragma: no cover - network errors
+            return None, f"Failed to lookup customer: {exc}"
+
+        rows = getattr(response, "data", None) or []
+        if rows:
+            return rows[0], None
+
+        try:
+            response = supabase.table(table).select(f"{id_column},{alt_column}").execute()
+        except Exception as exc:  # pragma: no cover - network errors
+            return None, f"Failed to lookup customer: {exc}"
+
+        for row in getattr(response, "data", None) or []:
+            alt_names = row.get(alt_column) or []
+            if not isinstance(alt_names, list):
+                continue
+            alt_lower = {alt.strip().lower() for alt in alt_names if isinstance(alt, str)}
+            if normalized.lower() in alt_lower:
+                return row, None
+        return None, None
+
+    existing_row, lookup_error = _lookup_existing()
+    if lookup_error:
+        return None, lookup_error
+
+    if existing_row:
+        alt_names = existing_row.get(alt_column) or []
+        if isinstance(alt_names, list):
+            alt_lower = {alt.strip().lower() for alt in alt_names if isinstance(alt, str)}
+            if normalized.lower() not in alt_lower:
+                updated_alt_names = alt_names + [normalized]
+                try:
+                    supabase.table(table).update({alt_column: updated_alt_names}).eq(id_column, existing_row.get(id_column)).execute()
+                except Exception:  # pragma: no cover - ignore update failure
+                    pass
+        return existing_row.get(id_column), None
+
+    insert_payload = {
+        name_column: normalized,
+        alt_column: [normalized],
+    }
+    try:
+        insert_response = (
+            supabase.table(table)
+            .insert(insert_payload)
+            .execute()
+        )
+    except Exception as exc:  # pragma: no cover - network errors
+        err_args = getattr(exc, "args", [])
+        for entry in err_args or []:
+            if isinstance(entry, dict) and entry.get("code") == "23505":
+                existing_row, lookup_error = _lookup_existing()
+                if lookup_error:
+                    return None, lookup_error
+                if existing_row:
+                    return existing_row.get(id_column), None
+        return None, f"Failed to create customer record: {exc}"
+
+    inserted = getattr(insert_response, "data", None) or []
+    if not inserted:
+        return None, "Failed to create customer record."
+    return inserted[0].get(id_column), None
+
+
+def ensure_customer_assembly(customer_id: int, assembly_no: str, rev: str | None) -> tuple[int | None, str | None]:
+    """Return the assembly id for ``assembly_no``/``rev`` creating/updating as required."""
+
+    if not isinstance(customer_id, int):
+        return None, "Customer id must be an integer."
+
+    assembly_value = (assembly_no or '').strip()
+    if not assembly_value:
+        return None, "Assembly number is required."
+
+    rev_value = (rev or '').strip()
+
+    supabase, error = _ensure_supabase_client()
+    if error:
+        return None, error
+
+    table = table_name("assemblies")
+    id_column = column_name("assemblies", "id")
+    customer_column = column_name("assemblies", "customer_id")
+    assembly_column = column_name("assemblies", "assembly_no")
+    rev_column = column_name("assemblies", "rev")
+
+    try:
+        response = (
+            supabase.table(table)
+            .select(f"{id_column},{assembly_column},{rev_column}")
+            .eq(customer_column, customer_id)
+            .execute()
+        )
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to lookup assembly: {exc}"
+
+    rows = []
+    for row in getattr(response, "data", None) or []:
+        existing_assembly = (row.get(assembly_column) or '').strip()
+        if existing_assembly.lower() == assembly_value.lower():
+            rows.append(row)
+
+    def _update_rev(row: dict, new_rev: str) -> tuple[int | None, str | None]:
+        try:
+            supabase.table(table).update({rev_column: new_rev}).eq(id_column, row.get(id_column)).execute()
+        except Exception as exc:  # pragma: no cover - network errors
+            return None, f"Failed to update assembly revision: {exc}"
+        row[rev_column] = new_rev
+        return row.get(id_column), None
+
+    if rev_value:
+        for row in rows:
+            existing_rev = (row.get(rev_column) or '').strip()
+            if existing_rev and existing_rev.lower() == rev_value.lower():
+                return row.get(id_column), None
+        for row in rows:
+            existing_rev = (row.get(rev_column) or '').strip()
+            if not existing_rev:
+                return _update_rev(row, rev_value)
+        insert_payload = {
+            customer_column: customer_id,
+            assembly_column: assembly_value,
+            rev_column: rev_value,
+        }
+        try:
+            insert_response = (
+                supabase.table(table)
+                .insert(insert_payload)
+                .execute()
+            )
+        except Exception as exc:  # pragma: no cover - network errors
+            return None, f"Failed to create assembly record: {exc}"
+        inserted = getattr(insert_response, "data", None) or []
+        if not inserted:
+            return None, "Failed to create assembly record."
+        return inserted[0].get(id_column), None
+
+    # No revision specified yet.
+    if rows:
+        for row in rows:
+            existing_rev = (row.get(rev_column) or '').strip()
+            if not existing_rev:
+                return row.get(id_column), None
+        return rows[0].get(id_column), None
+
+    insert_payload = {
+        customer_column: customer_id,
+        assembly_column: assembly_value,
+        rev_column: None,
+    }
+    try:
+        insert_response = (
+            supabase.table(table)
+            .insert(insert_payload)
+            .execute()
+        )
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to create assembly record: {exc}"
+
+    inserted = getattr(insert_response, "data", None) or []
+    if not inserted:
+        return None, "Failed to create assembly record."
+    return inserted[0].get(id_column), None
+
+
+def ensure_operator(name: str, role: str | None) -> tuple[int | None, str | None]:
+    """Ensure ``name`` exists in the operator table, appending ``role`` when provided."""
+
+    normalized_name = (name or "").strip()
+    if not normalized_name:
+        return None, "Operator name is required."
+
+    role_value = (role or "").strip()
+
+    supabase, error = _ensure_supabase_client()
+    if error:
+        return None, error
+
+    table = table_name("operators")
+    id_column = column_name("operators", "id")
+    name_column = column_name("operators", "name")
+    role_column = column_name("operators", "role")
+
+    def _lookup_existing() -> tuple[dict | None, str | None]:
+        try:
+            response = supabase.table(table).select(f"{id_column},{name_column},{role_column}").execute()
+        except Exception as exc:  # pragma: no cover - network errors
+            return None, f"Failed to lookup operator: {exc}"
+        for row in getattr(response, "data", None) or []:
+            existing_name = (row.get(name_column) or "").strip()
+            if existing_name.lower() == normalized_name.lower():
+                return row, None
+        return None, None
+
+    existing_row, lookup_error = _lookup_existing()
+    if lookup_error:
+        return None, lookup_error
+
+    if existing_row:
+        existing_roles = (existing_row.get(role_column) or "").strip()
+        if role_value:
+            role_parts = [part.strip() for part in existing_roles.split(",") if part.strip()]
+            role_lower = {part.lower() for part in role_parts}
+            if role_value.lower() not in role_lower:
+                role_parts.append(role_value)
+                updated_roles = ", ".join(role_parts)
+                try:
+                    supabase.table(table).update({role_column: updated_roles}).eq(id_column, existing_row.get(id_column)).execute()
+                except Exception as exc:  # pragma: no cover - network errors
+                    return None, f"Failed to update operator role: {exc}"
+        return existing_row.get(id_column), None
+
+    insert_payload = {
+        name_column: normalized_name,
+        role_column: role_value or None,
+    }
+    try:
+        insert_response = supabase.table(table).insert(insert_payload).execute()
+    except Exception as exc:  # pragma: no cover - network errors
+        err_args = getattr(exc, "args", [])
+        for entry in err_args or []:
+            if isinstance(entry, dict) and entry.get("code") == "23505":
+                existing_row, lookup_error = _lookup_existing()
+                if lookup_error:
+                    return None, lookup_error
+                if existing_row:
+                    return existing_row.get(id_column), None
+        return None, f"Failed to create operator record: {exc}"
+
+    inserted = getattr(insert_response, "data", None) or []
+    if not inserted:
+        return None, "Failed to create operator record."
+    return inserted[0].get(id_column), None
+
+
+def ensure_job(
+    job_number: str,
+    *,
+    customer_id: int | None = None,
+    assembly_id: int | None = None,
+) -> tuple[int | None, str | None]:
+    """Ensure a ``job`` row exists for ``job_number`` with optional associations."""
+
+    normalized = (job_number or "").strip()
+    if not normalized:
+        return None, "Job number is required."
+
+    supabase, error = _ensure_supabase_client()
+    if error:
+        return None, error
+
+    table = table_name("jobs")
+    id_column = column_name("jobs", "id")
+    job_number_column = column_name("jobs", "job_number")
+    customer_column = column_name("jobs", "customer_id")
+    assembly_column = column_name("jobs", "assembly_id")
+
+    try:
+        response = (
+            supabase.table(table)
+            .select(f"{id_column},{customer_column},{assembly_column}")
+            .eq(job_number_column, normalized)
+            .limit(1)
+            .execute()
+        )
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to lookup job: {exc}"
+
+    rows = getattr(response, "data", None) or []
+    if rows:
+        return rows[0].get(id_column), None
+
+    payload = {
+        job_number_column: normalized,
+    }
+    if isinstance(customer_id, int):
+        payload[customer_column] = customer_id
+    if isinstance(assembly_id, int):
+        payload[assembly_column] = assembly_id
+
+    try:
+        insert_response = supabase.table(table).insert(payload).execute()
+    except Exception as exc:  # pragma: no cover - network errors
+        return None, f"Failed to create job record: {exc}"
+
+    inserted = getattr(insert_response, "data", None) or []
+    if not inserted:
+        return None, "Failed to create job record."
+    return inserted[0].get(id_column), None
+
+
 def fetch_app_versions() -> tuple[list[dict] | None, str | None]:
     """Return all recorded application release versions."""
 
@@ -586,7 +1005,9 @@ def fetch_aoi_reports():
     supabase = _get_client()
     try:
         response = supabase.table(table_name("aoi_reports")).select("*").execute()
-        return response.data, None
+        rows = getattr(response, "data", None) or []
+        _apply_aoi_aliases(rows)
+        return rows, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to fetch AOI reports: {exc}"
 
@@ -596,7 +1017,9 @@ def fetch_fi_reports():
     supabase = _get_client()
     try:
         response = supabase.table(table_name("fi_reports")).select("*").execute()
-        return response.data, None
+        rows = getattr(response, "data", None) or []
+        _apply_fi_aliases(rows)
+        return rows, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to fetch FI reports: {exc}"
 
@@ -677,7 +1100,9 @@ def fetch_combined_reports():
     supabase = _get_client()
     try:
         response = supabase.table(table_name("combined_reports")).select("*").execute()
-        return response.data, None
+        rows = getattr(response, "data", None) or []
+        _apply_combined_aliases(rows)
+        return rows, None
     except Exception as exc:  # pragma: no cover - network errors
         return None, f"Failed to fetch combined reports: {exc}"
 

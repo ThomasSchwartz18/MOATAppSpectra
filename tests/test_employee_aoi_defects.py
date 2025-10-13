@@ -69,6 +69,14 @@ def test_employee_submission_succeeds_without_defect_dropdown(employee_app, monk
             return ([record], None)
 
         monkeypatch.setattr(routes, 'insert_aoi_report', fake_insert)
+        monkeypatch.setattr(routes, 'ensure_customer', lambda name: (1, None))
+        monkeypatch.setattr(
+            routes,
+            'ensure_customer_assembly',
+            lambda customer_id, assembly, rev: (1, None),
+        )
+        monkeypatch.setattr(routes, 'ensure_operator', lambda name, role: (1, None))
+        monkeypatch.setattr(routes, 'ensure_job', lambda job_number, **kwargs: (1, None))
 
     _login_employee(client)
     base_payload = {
@@ -76,7 +84,8 @@ def test_employee_submission_succeeds_without_defect_dropdown(employee_app, monk
         'shift': '1st',
         'operator': 'Op One',
         'customer': 'Example Customer',
-        'program': 'Program A',
+        'program': 'SMT',
+        'area': 'AOI',
         'assembly': 'Assembly 1',
         'job_number': 'J123',
         'quantity_inspected': '10',
@@ -89,8 +98,17 @@ def test_employee_submission_succeeds_without_defect_dropdown(employee_app, monk
     assert response.status_code == 201
     assert len(inserted_records) == 1
     record = inserted_records[0]
-    assert 'Defect ID' not in record
-    assert record['Additional Information'] == 'SMT AOI Inspection Data Sheet submission'
+    assert record['program'] == 'SMT'
+    assert record['quantity_inspected'] == 10
+    assert record['quantity_rejected'] == 0
+    assert record.get('additional_information') is None or record.get('additional_information') == ""
+    assert record['assembly_id'] == 1
+    assert record['customer_id'] == 1
+    assert record['operator_id'] == 1
+    assert 'operator' not in record
+    assert 'assembly' not in record
+    assert 'operator' not in record
+    assert 'assembly' not in record
 
 
 def test_employee_submission_formats_rejection_details(employee_app, monkeypatch):
@@ -107,6 +125,14 @@ def test_employee_submission_formats_rejection_details(employee_app, monkeypatch
             return ([record], None)
 
         monkeypatch.setattr(routes, 'insert_aoi_report', fake_insert)
+        monkeypatch.setattr(routes, 'ensure_customer', lambda name: (1, None))
+        monkeypatch.setattr(
+            routes,
+            'ensure_customer_assembly',
+            lambda customer_id, assembly, rev: (1, None),
+        )
+        monkeypatch.setattr(routes, 'ensure_operator', lambda name, role: (1, None))
+        monkeypatch.setattr(routes, 'ensure_job', lambda job_number, **kwargs: (1, None))
 
     _login_employee(client)
 
@@ -115,7 +141,8 @@ def test_employee_submission_formats_rejection_details(employee_app, monkeypatch
         'shift': '2nd',
         'operator': 'Operator Two',
         'customer': 'Customer B',
-        'program': 'Program B',
+        'program': 'TH',
+        'area': 'AOI',
         'assembly': 'Assembly 2',
         'job_number': 'J456',
         'quantity_inspected': '25',
@@ -123,8 +150,8 @@ def test_employee_submission_formats_rejection_details(employee_app, monkeypatch
         'inspection_type': 'SMT',
         'notes': 'Needs review',
         'rejection_details': [
-            {'ref': 'R15', 'reason': 'Bent lead', 'quantity': 2},
-            {'ref': 'R22', 'reason': ' Tombstone ', 'quantity': 1},
+            {'ref': 'R15', 'reason': 'Bent lead', 'reason_id': 'th-POR', 'quantity': 2},
+            {'ref': 'R22', 'reason': ' Tombstone ', 'reason_id': 'smt-TOS', 'quantity': 1},
         ],
         'operator_signature_acknowledged': 'true',
     }
@@ -133,10 +160,12 @@ def test_employee_submission_formats_rejection_details(employee_app, monkeypatch
 
     assert response.status_code == 201
     assert inserted_records
-    assert inserted_records[0]['Additional Information'] == (
-        'SMT AOI Inspection Data Sheet submission | '
-        'R15 - Bent lead (2), R22 - Tombstone (1) | Needs review'
-    )
+    record = inserted_records[0]
+    additional = record.get('additional_information')
+    assert additional == 'R15 th-POR (2),\nR22 smt-TOS (1)\nNotes: Needs review'
+    assert record['assembly_id'] == 1
+    assert record['customer_id'] == 1
+    assert record['operator_id'] == 1
 
 
 def test_employee_submission_rejects_invalid_rejection_rows(employee_app, monkeypatch):
@@ -150,15 +179,24 @@ def test_employee_submission_rejects_invalid_rejection_rows(employee_app, monkey
             raise AssertionError('Should not insert invalid record')
 
         monkeypatch.setattr(routes, 'insert_aoi_report', fake_insert)
+        monkeypatch.setattr(routes, 'ensure_customer', lambda name: (1, None))
+        monkeypatch.setattr(
+            routes,
+            'ensure_customer_assembly',
+            lambda customer_id, assembly, rev: (1, None),
+        )
+        monkeypatch.setattr(routes, 'ensure_operator', lambda name, role: (1, None))
+        monkeypatch.setattr(routes, 'ensure_job', lambda job_number, **kwargs: (1, None))
 
     _login_employee(client)
 
     payload = {
         'date': '2024-02-04',
-        'shift': '3rd',
+        'shift': '1st',
         'operator': 'Operator Three',
         'customer': 'Customer C',
-        'program': 'Program C',
+        'program': 'SMT',
+        'area': 'AOI',
         'assembly': 'Assembly 3',
         'job_number': 'J789',
         'quantity_inspected': '30',
@@ -189,6 +227,14 @@ def test_employee_submission_requires_operator_signature(employee_app, monkeypat
             raise AssertionError('Should not insert without signature')
 
         monkeypatch.setattr(routes, 'insert_aoi_report', fake_insert)
+        monkeypatch.setattr(routes, 'ensure_customer', lambda name: (1, None))
+        monkeypatch.setattr(
+            routes,
+            'ensure_customer_assembly',
+            lambda customer_id, assembly, rev: (1, None),
+        )
+        monkeypatch.setattr(routes, 'ensure_operator', lambda name, role: (1, None))
+        monkeypatch.setattr(routes, 'ensure_job', lambda job_number, **kwargs: (1, None))
 
     _login_employee(client)
 
@@ -197,7 +243,8 @@ def test_employee_submission_requires_operator_signature(employee_app, monkeypat
         'shift': '1st',
         'operator': 'Operator Four',
         'customer': 'Customer D',
-        'program': 'Program D',
+        'program': 'SMT',
+        'area': 'AOI',
         'assembly': 'Assembly 4',
         'job_number': 'J101',
         'quantity_inspected': '15',

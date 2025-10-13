@@ -11,6 +11,8 @@ via this configuration file.
 
 from __future__ import annotations
 
+import json
+import os
 from dataclasses import dataclass, field
 from typing import Any, Dict, Mapping
 
@@ -23,11 +25,9 @@ class SupabaseTable:
     columns: Mapping[str, str] = field(default_factory=dict)
 
 
-# Table and column mappings may be customised by editing the values below.
-# The keys (e.g. ``"app_versions"``) are stable identifiers used throughout the
-# code base; ``name`` is the actual table name in Supabase and ``columns`` maps
-# logical column identifiers to their Supabase counterparts.
-SUPABASE_SCHEMA: Dict[str, SupabaseTable] = {
+# Default table and column mappings. These act as fallbacks if no environment
+# overrides are supplied.
+_DEFAULT_SUPABASE_SCHEMA: Dict[str, SupabaseTable] = {
     "app_versions": SupabaseTable(
         name="app_versions",
         columns={
@@ -77,15 +77,72 @@ SUPABASE_SCHEMA: Dict[str, SupabaseTable] = {
             "reporter_name": "reporter_name",
         },
     ),
-    "aoi_reports": SupabaseTable(name="aoi_reports"),
-    "fi_reports": SupabaseTable(name="fi_reports"),
+    "aoi_reports": SupabaseTable(
+        name="aoi_reports",
+        columns={
+            "id": "id",
+            "date": "date",
+            "shift": "shift",
+            "operator_id": "operator_id",
+            "customer_id": "customer_id",
+            "rev": "rev",
+            "assembly_id": "assembly_id",
+            "job_number": "job_number",
+            "quantity_inspected": "quantity_inspected",
+            "quantity_rejected": "quantity_rejected",
+            "additional_information": "additional_information",
+            "program": "program",
+        },
+    ),
+    "fi_reports": SupabaseTable(
+        name="fi_reports",
+        columns={
+            "id": "id",
+            "date": "date",
+            "shift": "shift",
+            "operator_id": "operator_id",
+            "customer_id": "customer_id",
+            "rev": "rev",
+            "assembly_id": "assembly_id",
+            "job_number": "job_number",
+            "quantity_inspected": "quantity_inspected",
+            "quantity_rejected": "quantity_rejected",
+            "additional_information": "additional_information",
+        },
+    ),
     "moat": SupabaseTable(
-        name="moat",
-        columns={"report_date": "Report Date"},
+        name="ppm_moat",
+        columns={
+            "id": "id",
+            "total_boards": "total_boards",
+            "total_parts_per_board": "total_parts_per_board",
+            "total_parts": "total_parts",
+            "ng_parts": "ng_parts",
+            "ng_ppm": "ng_ppm",
+            "falsecall_parts": "falsecall_parts",
+            "falsecall_ppm": "falsecall_ppm",
+            "report_date": "report_date",
+            "line": "line",
+            "model_name": "model_name",
+            "created_at": "created_at",
+        },
     ),
     "moat_dpm": SupabaseTable(
-        name="moat_dpm",
-        columns={"report_date": "Report Date"},
+        name="dpm_moat",
+        columns={
+            "id": "id",
+            "created_at": "created_at",
+            "report_date": "report_date",
+            "total_boards": "total_boards",
+            "windows_per_board": "windows_per_board",
+            "total_windows": "total_windows",
+            "ng_windows": "ng_windows",
+            "dpm": "dpm",
+            "falsecall_windows": "falsecall_windows",
+            "fc_dpm": "fc_dpm",
+            "model_name": "model_name",
+            "line": "line",
+        },
     ),
     "combined_reports": SupabaseTable(name="combined_reports"),
     "part_result_table": SupabaseTable(
@@ -156,7 +213,99 @@ SUPABASE_SCHEMA: Dict[str, SupabaseTable] = {
             "created_at": "created_at",
         },
     ),
+    "customers": SupabaseTable(
+        name="customer",
+        columns={
+            "id": "id",
+            "created_at": "created_at",
+            "name": "name",
+            "manager": "manager",
+            "alt_names": "alt_names",
+        },
+    ),
+    "assemblies": SupabaseTable(
+        name="assembly",
+        columns={
+            "id": "id",
+            "customer_id": "customer_id",
+            "assembly_no": "assembly_no",
+            "rev": "rev",
+            "assembly_id": "assembly_id",
+        },
+    ),
+    "jobs": SupabaseTable(
+        name="job",
+        columns={
+            "id": "id",
+            "job_number": "job_number",
+            "customer_id": "customer_id",
+            "assembly_id": "assembly_id",
+            "start_date": "start_date",
+            "end_date": "end_date",
+            "panel_count": "panel_count",
+            "last_operation_completed": "last_operation_completed",
+            "operations": "operations",
+            "additional_information": "additional_information",
+            "created_at": "created_at",
+            "updated_at": "updated_at",
+            "assembly_color_id": "assembly_color_id",
+        },
+    ),
+    "operators": SupabaseTable(
+        name="operator",
+        columns={
+            "id": "id",
+            "name": "name",
+            "role": "role",
+        },
+    ),
 }
+
+
+def _normalise_columns(columns: Any) -> Dict[str, str]:
+    """Return a string-to-string column mapping from ``columns``."""
+
+    if not isinstance(columns, Mapping):
+        return {}
+    return {
+        str(logical): str(actual)
+        for logical, actual in columns.items()
+        if isinstance(logical, str) and isinstance(actual, str)
+    }
+
+
+def _load_schema_from_env() -> Dict[str, SupabaseTable]:
+    """Build the Supabase schema from environment overrides."""
+
+    schema = dict(_DEFAULT_SUPABASE_SCHEMA)
+
+    raw_schema = os.getenv("SUPABASE_SCHEMA_JSON")
+    if not raw_schema:
+        return schema
+
+    try:
+        parsed = json.loads(raw_schema)
+    except json.JSONDecodeError:
+        return schema
+
+    if not isinstance(parsed, Mapping):
+        return schema
+
+    for identifier, entry in parsed.items():
+        if not isinstance(identifier, str) or not isinstance(entry, Mapping):
+            continue
+
+        name = entry.get("name")
+        if not isinstance(name, str) or not name:
+            continue
+
+        columns = _normalise_columns(entry.get("columns", {}))
+        schema[identifier] = SupabaseTable(name=name, columns=columns)
+
+    return schema
+
+
+SUPABASE_SCHEMA: Dict[str, SupabaseTable] = _load_schema_from_env()
 
 
 def table_name(identifier: str) -> str:
@@ -195,4 +344,3 @@ def to_supabase_payload(
     if not columns:
         return dict(payload)
     return {columns.get(key, key): value for key, value in payload.items()}
-

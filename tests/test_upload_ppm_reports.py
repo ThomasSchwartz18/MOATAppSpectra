@@ -55,8 +55,8 @@ def test_upload_ppm_single_date(app_instance, monkeypatch):
         resp = client.post("/ppm_reports/upload", data=data, content_type="multipart/form-data")
     assert resp.status_code == 201
     assert resp.get_json()["inserted"] == 1
-    assert captured["rows"][0]["Line"] == "L1"
-    assert captured["rows"][0]["Report Date"] == "2024-07-01"
+    assert captured["rows"][0]["line"] == "L1"
+    assert captured["rows"][0]["report_date"] == "2024-07-01"
 
 
 def test_upload_ppm_date_range(app_instance, monkeypatch):
@@ -77,8 +77,8 @@ def test_upload_ppm_date_range(app_instance, monkeypatch):
         resp = client.post("/ppm_reports/upload", data=data, content_type="multipart/form-data")
     assert resp.status_code == 201
     assert resp.get_json()["inserted"] == 1
-    assert captured["rows"][0]["Line"] == "L2"
-    assert captured["rows"][0]["Report Date"] == "2024-07-01"
+    assert captured["rows"][0]["line"] == "L2"
+    assert captured["rows"][0]["report_date"] == "2024-07-01"
 
 
 def test_upload_ppm_mixed_case_filename(app_instance, monkeypatch):
@@ -106,5 +106,5 @@ def test_upload_ppm_mixed_case_filename(app_instance, monkeypatch):
         )
     assert resp.status_code == 201
     assert resp.get_json()["inserted"] == 1
-    assert captured["rows"][0]["Line"] == "l3"
-    assert captured["rows"][0]["Report Date"] == "2024-07-01"
+    assert captured["rows"][0]["line"] == "l3"
+    assert captured["rows"][0]["report_date"] == "2024-07-01"

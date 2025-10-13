@@ -73,14 +73,14 @@ def test_upload_dpm_single_date(app_instance, monkeypatch):
         resp = client.post("/dpm_reports/upload", data=data, content_type="multipart/form-data")
     assert resp.status_code == 201
     assert resp.get_json()["inserted"] == 1
-    assert captured["rows"][0]["Line"] == "L1"
-    assert captured["rows"][0]["Report Date"] == "2024-07-01"
-    assert captured["rows"][0]["Windows per board"] == 1
-    assert captured["rows"][0]["Total Windows"] == 1
-    assert captured["rows"][0]["NG Windows"] == 1
-    assert captured["rows"][0]["DPM"] == 1
-    assert captured["rows"][0]["FalseCall Windows"] == 1
-    assert captured["rows"][0]["FC DPM"] == 1
+    assert captured["rows"][0]["line"] == "L1"
+    assert captured["rows"][0]["report_date"] == "2024-07-01"
+    assert captured["rows"][0]["windows_per_board"] == 1.0
+    assert captured["rows"][0]["total_windows"] == 1
+    assert captured["rows"][0]["ng_windows"] == 1
+    assert captured["rows"][0]["dpm"] == 1.0
+    assert captured["rows"][0]["falsecall_windows"] == 1
+    assert captured["rows"][0]["fc_dpm"] == 1.0
 
 
 def test_upload_dpm_date_range(app_instance, monkeypatch):
@@ -101,8 +101,8 @@ def test_upload_dpm_date_range(app_instance, monkeypatch):
         resp = client.post("/dpm_reports/upload", data=data, content_type="multipart/form-data")
     assert resp.status_code == 201
     assert resp.get_json()["inserted"] == 1
-    assert captured["rows"][0]["Line"] == "L2"
-    assert captured["rows"][0]["Report Date"] == "2024-07-01"
+    assert captured["rows"][0]["line"] == "L2"
+    assert captured["rows"][0]["report_date"] == "2024-07-01"
 
 
 def test_upload_dpm_mixed_case_filename(app_instance, monkeypatch):
@@ -130,8 +130,8 @@ def test_upload_dpm_mixed_case_filename(app_instance, monkeypatch):
         )
     assert resp.status_code == 201
     assert resp.get_json()["inserted"] == 1
-    assert captured["rows"][0]["Line"] == "l3"
-    assert captured["rows"][0]["Report Date"] == "2024-07-01"
+    assert captured["rows"][0]["line"] == "l3"
+    assert captured["rows"][0]["report_date"] == "2024-07-01"
 
 
 def test_upload_dpm_coerces_formatted_numbers(app_instance, monkeypatch):
@@ -152,11 +152,11 @@ def test_upload_dpm_coerces_formatted_numbers(app_instance, monkeypatch):
     assert resp.status_code == 201
     assert resp.get_json()["inserted"] == 1
     row = captured["rows"][0]
-    assert row["Model Name"] == "ModelY"
-    assert row["Total Boards"] == 1234.0
-    assert row["Windows per board"] == 2500.0
-    assert row["Total Windows"] == 3750.0
-    assert row["NG Windows"] == 4000.0
-    assert row["DPM"] == 5.5
-    assert row["FalseCall Windows"] == 6250.0
-    assert row["FC DPM"] == 7.0
+    assert row["model_name"] == "ModelY"
+    assert row["total_boards"] == 1234
+    assert row["windows_per_board"] == 2500.0
+    assert row["total_windows"] == 3750
+    assert row["ng_windows"] == 4000
+    assert row["dpm"] == 5.5
+    assert row["falsecall_windows"] == 6250
+    assert row["fc_dpm"] == 7.0

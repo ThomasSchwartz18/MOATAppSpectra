@@ -1,20 +1,20 @@
-CREATE TABLE IF NOT EXISTS moat_dpm (
+CREATE TABLE IF NOT EXISTS dpm_moat (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    "Model Name" text NOT NULL,
-    "Total Boards" numeric,
-    "Windows per board" numeric,
-    "Total Windows" numeric,
-    "NG Windows" numeric,
-    "DPM" numeric,
-    "FalseCall Windows" numeric,
-    "FC DPM" numeric,
-    "Report Date" date NOT NULL,
-    "Line" text NOT NULL,
+    model_name text NOT NULL,
+    total_boards numeric,
+    windows_per_board numeric,
+    total_windows numeric,
+    ng_windows numeric,
+    dpm numeric,
+    falsecall_windows numeric,
+    fc_dpm numeric,
+    report_date date NOT NULL,
+    line text NOT NULL,
     created_at timestamptz NOT NULL DEFAULT timezone('utc', now())
 );
 
-CREATE INDEX IF NOT EXISTS moat_dpm_report_date_idx ON moat_dpm ("Report Date");
-CREATE INDEX IF NOT EXISTS moat_dpm_line_idx ON moat_dpm ("Line");
+CREATE INDEX IF NOT EXISTS dpm_moat_report_date_idx ON dpm_moat (report_date);
+CREATE INDEX IF NOT EXISTS dpm_moat_line_idx ON dpm_moat (line);
 
 CREATE TABLE IF NOT EXISTS dpm_saved_queries (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
